@@ -1,0 +1,58 @@
+{
+  "common": {
+    "copy": "Copy"
+  },
+  "nav": {
+    "features": "Features",
+    "demo": "Demo",
+    "integration": "Integration",
+    "github": "GitHub"
+  },
+  "hero": {
+    "title_lightning": "Lightning Fast",
+    "title_rest": "Sub-15MB Search Engine",
+    "subtitle": "A completely self-hosted, REST-based, typo-tolerant full-text search engine written in Go. Drop it into any tech stack and supercharge your search in minutes.",
+    "cta_demo": "Try the Demo",
+    "cta_docs": "Read the Docs",
+    "stats": {
+      "binary_size": "Binary Size",
+      "ram_usage": "RAM Usage",
+      "response_time": "Response Time",
+      "dependencies": "Dependencies",
+      "zero": "Zero"
+    }
+  },
+  "demo": {
+    "title": "Live Playground",
+    "subtitle": "Test the engine hitting a real local instance. Generate demo data and type below!",
+    "setup": {
+      "title": "1. Dataset Setup",
+      "subtitle": "Populate the search engine with sample data to test queries locally.",
+      "load_movies": "Load Movies",
+      "load_products": "Load Products",
+      "clear": "Clear",
+      "status": {
+        "creating": "Creating index '{{name}}'...",
+        "loading": "Loading {{count}} documents...",
+        "success": "Success! {{name}} index is ready. Try searching.",
+        "clearing": "Clearing index...",
+        "cleared": "Index cleared.",
+        "error_connection": "Error: Cannot connect to Koskidex at {{url}}. Is it running?",
+        "error_clear": "Error clearing index."
+      }
+    },
+    "search": {
+      "placeholder": "Search for movies or products... (Try a typo!)",
+      "load_dataset": "Load a dataset above to start searching.",
+      "no_results": "No results found for \"{{query}}\".",
+      "ms": "ms"
+    }
+  },
+  "integration": {
+    "title": "Integrate in seconds",
+    "subtitle": "Pure REST. No heavy client limits. Speaks JSON to any language."
+  },
+  "footer": {
+    "made_with": "Made with ❤️ by Martin & General Koski"
+  }
+}

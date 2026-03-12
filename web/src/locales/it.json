@@ -1,0 +1,58 @@
+{
+  "common": {
+    "copy": "Copia"
+  },
+  "nav": {
+    "features": "Funzionalità",
+    "demo": "Demo",
+    "integration": "Integrazione",
+    "github": "GitHub"
+  },
+  "hero": {
+    "title_lightning": "Velocità Fulminea",
+    "title_rest": "Motore di Ricerca <15MB",
+    "subtitle": "Un motore di ricerca full-text completamente self-hosted, basato su REST e tollerante ai refusi, scritto in Go. Integralo in qualsiasi stack tecnologico e potenzia la tua ricerca in pochi minuti.",
+    "cta_demo": "Prova la Demo",
+    "cta_docs": "Leggi la Documentazione",
+    "stats": {
+      "binary_size": "Dimensione Binario",
+      "ram_usage": "Utilizzo RAM",
+      "response_time": "Tempo di Risposta",
+      "dependencies": "Dipendenze",
+      "zero": "Zero"
+    }
+  },
+  "demo": {
+    "title": "Playground Live",
+    "subtitle": "Testa il motore su un'istanza locale reale. Genera dati demo e digita qui sotto!",
+    "setup": {
+      "title": "1. Configurazione Dataset",
+      "subtitle": "Popola il motore di ricerca con dati di esempio per testare le query localmente.",
+      "load_movies": "Carica Film",
+      "load_products": "Carica Prodotti",
+      "clear": "Pulisci",
+      "status": {
+        "creating": "Creazione indice '{{name}}'...",
+        "loading": "Caricamento di {{count}} documenti...",
+        "success": "Successo! L'indice {{name}} è pronto. Prova a cercare.",
+        "clearing": "Pulizia indice...",
+        "cleared": "Indice pulito.",
+        "error_connection": "Errore: Impossibile connettersi a Koskidex su {{url}}. È attivo?",
+        "error_clear": "Errore durante la pulizia dell'indice."
+      }
+    },
+    "search": {
+      "placeholder": "Cerca film o prodotti... (Prova con un refuso!)",
+      "load_dataset": "Carica un dataset sopra per iniziare a cercare.",
+      "no_results": "Nessun risultato trovato per \"{{query}}\".",
+      "ms": "ms"
+    }
+  },
+  "integration": {
+    "title": "Integralo in pochi secondi",
+    "subtitle": "REST puro. Nessun limite pesante lato client. Parla JSON con qualsiasi linguaggio."
+  },
+  "footer": {
+    "made_with": "Fatto con ❤️ da Martin & General Koski"
+  }
+}

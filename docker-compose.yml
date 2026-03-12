@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: koskidex_backend
+    ports:
+      - "7700:7700"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    command: ["/app/koskidex", "--port", "7700", "--data-dir", "/data"]
+
+  frontend:
+    build: 
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: koskidex_frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
