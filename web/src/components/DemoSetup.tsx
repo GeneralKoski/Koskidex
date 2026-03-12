@@ -58,7 +58,7 @@ export default function DemoSetup({
         msg: t("demo.setup.status.success", { name: indexName }),
       });
       onIndexReady(indexName);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error(e);
       setStatus({
         type: "error",
@@ -158,7 +158,7 @@ export default function DemoSetup({
       await fetch(`${API_URL}/indexes/${activeIndex}`, { method: "DELETE" });
       setStatus({ type: "idle", msg: t("demo.setup.status.cleared") });
       onClear();
-    } catch (e) {
+    } catch (e: unknown) {
       console.error(e);
       setStatus({ type: "error", msg: t("demo.setup.status.error_clear") });
     }

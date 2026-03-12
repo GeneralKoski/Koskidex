@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/general-koski/koskidex/internal/engine"
@@ -75,11 +76,48 @@ func (s *Server) handleDeleteIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleAddDocuments(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-
 	var docs []map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&docs); err != nil {
-		sendError(w, http.StatusBadRequest, "Invalid JSON payload (expected array of objects)")
-		return
+
+	contentType := r.Header.Get("Content-Type")
+
+	// 1. Support Multipart File Uploads
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(10 << 20); err != nil { // 10MB max
+			sendError(w, http.StatusBadRequest, "Failed to parse multipart form")
+			return
+		}
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			sendError(w, http.StatusBadRequest, "File field 'file' is required for multipart uploads")
+			return
+		}
+		defer file.Close()
+		if err := json.NewDecoder(file).Decode(&docs); err != nil {
+			sendError(w, http.StatusBadRequest, "Invalid JSON in uploaded file")
+			return
+		}
+	} else {
+		// 2. Support Polymorphic JSON (Single object or Array)
+		var rawBody json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&rawBody); err != nil {
+			sendError(w, http.StatusBadRequest, "Invalid JSON payload")
+			return
+		}
+
+		// Check if it's an array or an object
+		if len(rawBody) > 0 && rawBody[0] == '[' {
+			if err := json.Unmarshal(rawBody, &docs); err != nil {
+				sendError(w, http.StatusBadRequest, "Invalid JSON array")
+				return
+			}
+		} else {
+			var doc map[string]interface{}
+			if err := json.Unmarshal(rawBody, &doc); err != nil {
+				sendError(w, http.StatusBadRequest, "Invalid JSON object")
+				return
+			}
+			docs = append(docs, doc)
+		}
 	}
 
 	if err := s.mgr.AddDocuments(name, docs); err != nil {

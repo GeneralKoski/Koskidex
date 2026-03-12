@@ -18,6 +18,11 @@ class KoskidexClient:
         res.raise_for_status()
         return res.json()
 
+    def add_document(self, index_name: str, document: dict):
+        res = self.session.post(f"{self.host}/indexes/{index_name}/documents", json=document)
+        res.raise_for_status()
+        return res.json()
+
     def search(self, index_name: str, query: str):
         res = self.session.get(f"{self.host}/indexes/{index_name}/search", params={"q": query})
         res.raise_for_status()

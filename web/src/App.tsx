@@ -49,7 +49,7 @@ function App() {
               <Globe className="w-4 h-4 text-slate-400" />
               <select 
                 value={i18n.language.split('-')[0]} 
-                onChange={(e) => changeLanguage(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => changeLanguage(e.target.value)}
                 className="bg-transparent text-sm text-slate-300 focus:outline-none cursor-pointer"
                 aria-label="Select Language"
               >

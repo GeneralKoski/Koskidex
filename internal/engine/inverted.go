@@ -95,13 +95,6 @@ func (idx *InvertedIndex) AddDocument(docID string, doc map[string]interface{}, 
 					idx.addToPrefixMap(prefix, t.Term)
 				}
 
-				// Optional: update TF based on totals, though currently simple TF is fine
-				for _, t := range tokens {
-					for i := range idx.index[t.Term] {
-						if idx.index[t.Term][i].DocID == docID && idx.index[t.Term][i].Field == field && idx.index[t.Term][i].Position == t.Position {
-							idx.index[t.Term][i].TF = float64(termCounts[t.Term]) / float64(len(tokens))
-						}
-					}
 				}
 			}
 		}

@@ -26,7 +26,10 @@ curl -X POST http://localhost:7700/indexes/movies/documents \\
 # 3. Search (Typo tolerant!)
 curl "http://localhost:7700/indexes/movies/search?q=matrx"`,
 
-    php: `// Using our Laravel Searchable Trait - No manual syncs!
+    php: `# 1. Install via Composer (Local Path)
+# Add the local repository in your composer.json, then:
+# composer require general-koski/koskidex-laravel
+
 use App\\Traits\\Searchable;
 
 class Movie extends Model {
@@ -39,7 +42,10 @@ Movie::create(['title' => 'The Matrix']);
 // Later, search with extreme speed matching typos!
 $results = Movie::koskidexSearch('matrx');`,
 
-    node: `const KoskidexClient = require('./koskidex_client');
+    node: `# 1. Install via npm
+# npm install ../path-to-koskidex/examples/nodejs
+
+const KoskidexClient = require('koskidex-node');
 const client = new KoskidexClient('http://localhost:7700');
 
 // Bulk ingest 10,000 documents instantly
@@ -50,7 +56,10 @@ const results = await client.search('movies', 'matrihx');
 
 console.log(results.hits);`,
 
-    python: `from koskidex_client import KoskidexClient
+    python: `# 1. Install via pip
+# pip install ../path-to-koskidex/examples/python
+
+from koskidex_client import KoskidexClient
 client = KoskidexClient('http://localhost:7700')
 
 # Create index

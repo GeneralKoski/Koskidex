@@ -66,7 +66,7 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
         <input
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
           placeholder={t('demo.search.placeholder')}
           disabled={!activeIndex}
           aria-label={t('demo.search.placeholder')}

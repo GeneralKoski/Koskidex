@@ -44,6 +44,22 @@ class KoskidexClient
     }
 
     /**
+     * Index a single document
+     */
+    public function addDocument(string $index, array $document)
+    {
+        return $this->request()->post("{$this->host}/indexes/{$index}/documents", $document)->json();
+    }
+
+    /**
+     * Perform a search
+     */
+    public function search(string $index, string $query)
+    {
+        return $this->request()->get("{$this->host}/indexes/{$index}/search", ['q' => $query])->json();
+    }
+
+    /**
      * Remove a document from the index
      */
     public function deleteDocument(string $index, string $id)

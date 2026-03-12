@@ -1,0 +1,47 @@
+# Binaries and executables
+koskidex
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Data directory (Engine database)
+/data/
+
+# Javascript / Node
+node_modules/
+.npm
+dist/
+.vite
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+/Users/martintrajkovski/Desktop/Progetti-personali/Koskidex/.gemini/
