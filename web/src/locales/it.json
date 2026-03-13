@@ -76,19 +76,40 @@
         "run_engine": "Esecuzione del motore"
       },
       "php": {
-        "title": "PHP / Composer",
-        "desc": "Integra Koskidex in Laravel o qualsiasi progetto PHP usando Composer.",
-        "command": "Esegui questo comando per installare il client ufficiale:",
-        "laravel_trait": "Laravel Trait",
-        "laravel_trait_desc": "Integrazione senza sforzo sui tuoi modelli Eloquent.",
-        "sync_desc": "L'SDK PHP sincronizza automaticamente i tuoi modelli con Koskidex ogni volta che effettui un save(). Nessuna configurazione complessa di worker necessaria."
+        "title": "PHP / Laravel",
+        "desc": "Integra Koskidex in Laravel o in qualsiasi progetto PHP usando Composer. Supporto dedicato per i modelli Eloquent e sincronizzazione automatica.",
+        "command": "Installa tramite Composer:",
+        "laravel_trait": "Laravel Searchable Trait",
+        "laravel_trait_desc": "Integrazione immediata per i tuoi modelli Eloquent. Basta aggiungere il trait e configurare il mapping.",
+        "sync_desc": "L'SDK PHP sincronizza automaticamente i tuoi modelli con Koskidex ogni volta che esegui un save(), update() o delete(). Nessuna configurazione complessa di worker necessaria.",
+        "config_title": "Configurazione & Mapping",
+        "config_desc": "Configura le tue connessioni e i mapping dei modelli in `config/koskidex.php`. Puoi specificare quali campi indicizzare e impostare le soglie di rilevanza.",
+        "mapping_example": "Esempio di Mapping Modelli"
       },
       "js": {
-        "title": "JavaScript / NPM",
-        "desc": "Client Node.js e Browser per integrazioni rapide.",
-        "command": "Installa via NPM:",
-        "client_usage": "Esempio Client",
-        "search_desc": "Ricerca ultra-veloce"
+        "title": "JavaScript / Node.js",
+        "desc": "Client flessibile per ambienti Node.js e Browser. Ideale per interfacce di ricerca in tempo reale e pipeline di indicizzazione automatizzate.",
+        "command": "Installa tramite NPM:",
+        "client_usage": "Utilizzo del Client",
+        "search_desc": "Ricerca ultra veloce"
+      },
+      "architecture": {
+        "title": "Architettura & Concetti",
+        "desc": "Scopri come funziona Koskidex sotto il cofano per ottenere il massimo dal tuo motore di ricerca.",
+        "concepts": {
+          "indices": "Indici",
+          "indices_desc": "Un indice è una collezione di documenti simili. Ogni indice può avere le proprie impostazioni, sinonimi e regole di ranking.",
+          "documents": "Documenti",
+          "documents_desc": "I documenti sono oggetti JSON. Koskidex è schemaless, ma ogni documento deve avere un campo 'id' unico.",
+          "search": "Ricerca & Ranking",
+          "search_desc": "La ricerca è alimentata da un indice inverso e una pipeline di ranking personalizzata che considera la distanza degli errori (Damerau-Levenshtein) e la frequenza dei campi."
+        },
+        "customization": {
+          "title": "CSS & Personalizzazione",
+          "desc": "L'interfaccia di Koskidex è progettata per essere completamente personalizzabile. Puoi sovrascrivere le nostre classi CSS per adattarla al tuo brand.",
+          "classes_title": "Classi Utility",
+          "classes_desc": "Ogni componente espone nomi di classe prevedibili come `koskidex-result-item`, `koskidex-search-input` e `koskidex-highlight`."
+        }
       }
     }
   },

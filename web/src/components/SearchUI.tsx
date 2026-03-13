@@ -74,8 +74,8 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
     : null;
 
   return (
-    <div className="glass-effect rounded-2xl p-6 md:p-10 max-w-4xl mx-auto shadow-2xl shadow-blue-500/10 mb-20 relative">
-      <div className="relative mb-8 group">
+    <div className="glass-effect rounded-2xl p-6 md:p-8 w-full shadow-xl shadow-blue-500/10 mb-8 relative">
+      <div className="relative mb-6 group">
         <SearchIcon className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-400 transition-colors w-6 h-6" />
         <input
           type="text"
@@ -84,7 +84,7 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
           placeholder={t('demo.search.placeholder')}
           disabled={!activeIndex}
           aria-label={t('demo.search.placeholder')}
-          className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl py-5 pl-16 pr-24 text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-inner"
+          className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl py-4 pl-14 pr-24 text-base text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-inner"
         />
 
         {displayTime !== null && (
@@ -97,16 +97,16 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
         )}
       </div>
 
-      <div className="min-h-[300px]">
+      <div className="min-h-[200px]">
         {!activeIndex ? (
-          <div className="flex flex-col items-center justify-center h-[300px] text-slate-500 text-center animate-in fade-in duration-700">
+          <div className="flex flex-col items-center justify-center h-[200px] text-slate-500 text-center animate-in fade-in duration-700">
             <Ghost className="w-16 h-16 mb-4 opacity-20" />
             <p className="text-lg">{t('demo.search.load_dataset')}</p>
           </div>
         ) : isSearching && !results ? (
           <div className="flex flex-col gap-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="bg-slate-900/40 border border-slate-800/60 p-5 rounded-xl animate-pulse">
+              <div key={i} className="bg-slate-900/40 border border-slate-800/60 p-4 rounded-xl animate-pulse">
                 <div className="h-6 bg-slate-800 rounded w-3/4 mb-3"></div>
                 <div className="flex gap-4">
                   <div className="h-4 bg-slate-800 rounded w-1/4"></div>
@@ -116,18 +116,20 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
             ))}
           </div>
         ) : error === "connection_error" ? (
-          <div className="flex flex-col items-center justify-center h-[300px] text-red-400 text-center animate-in zoom-in-95 duration-500">
+          <div className="flex flex-col items-center justify-center h-[200px] text-red-400 text-center animate-in zoom-in-95 duration-500">
             <AlertCircle className="w-16 h-16 mb-4 opacity-50" />
             <p className="text-lg font-bold">{t('search_status.offline_title')}</p>
             <p className="text-slate-500 max-w-xs mt-2">{t('search_status.offline_desc', { url: API_URL })}</p>
           </div>
         ) : results?.hits?.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[300px] text-slate-500 text-center animate-in zoom-in-95 duration-500">
+          <div className="flex flex-col items-center justify-center min-h-[200px] text-slate-500 text-center animate-in zoom-in-95 duration-500 p-4">
             <SearchIcon className="w-16 h-16 mb-4 opacity-20" />
-            <p className="text-lg">{t('demo.search.no_results', { query })}</p>
+            <p className="text-lg break-words max-w-full">
+              {t("demo.search.no_results", { query })}
+            </p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-3" aria-label="Search results">
+          <ul className="flex flex-col gap-2.5" aria-label="Search results">
             {results?.hits?.map((hit: Hit, index: number) => {
               let titleLine = '';
               let metaItems: { icon: React.ReactNode; text: string }[] = [];
@@ -137,15 +139,15 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
                 titleLine = hit.highlights.title || doc.title;
                 metaItems = [
                   {
-                    icon: <Video className="w-4 h-4" />,
+                    icon: <Video className="w-4 h-4 shrink-0" />,
                     text: hit.highlights.director || doc.director,
                   },
                   {
-                    icon: <Calendar className="w-4 h-4" />,
+                    icon: <Calendar className="w-4 h-4 shrink-0" />,
                     text: hit.highlights.year || String(doc.year),
                   },
                   {
-                    icon: <Ticket className="w-4 h-4" />,
+                    icon: <Ticket className="w-4 h-4 shrink-0" />,
                     text: hit.highlights.genre || doc.genre,
                   },
                 ];
@@ -154,11 +156,11 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
                 titleLine = hit.highlights.name || doc.name;
                 metaItems = [
                   {
-                    icon: <Tag className="w-4 h-4" />,
+                    icon: <Tag className="w-4 h-4 shrink-0" />,
                     text: hit.highlights.category || doc.category,
                   },
                   {
-                    icon: <DollarSign className="w-4 h-4" />,
+                    icon: <DollarSign className="w-4 h-4 shrink-0" />,
                     text: doc.price,
                   },
                 ];
@@ -168,19 +170,19 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
                 <li
                   key={hit.id}
                   style={{ animationDelay: `${index * 50}ms` }}
-                  className="bg-slate-900/40 border border-slate-800/60 p-5 rounded-xl hover:bg-slate-800/50 hover:border-blue-500/30 hover:-translate-y-1 transition-all cursor-default flex flex-col gap-2 relative overflow-hidden group animate-in slide-in-from-bottom-4 fade-in duration-500 fill-mode-both"
+                  className="bg-slate-900/40 border border-slate-800/60 p-4 rounded-xl hover:bg-slate-800/50 hover:border-blue-500/30 hover:-translate-y-1 transition-all cursor-default flex flex-col gap-1.5 relative overflow-hidden group animate-in slide-in-from-bottom-4 fade-in duration-500 fill-mode-both"
                 >
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
-                  <div className="text-xl font-semibold text-slate-100 group-hover:text-blue-400 transition-colors">
+                  <div className="text-lg font-semibold text-slate-100 group-hover:text-blue-400 transition-colors break-words">
                     {renderHighlightLine(titleLine)}
                   </div>
 
-                  <div className="flex flex-wrap gap-4 text-sm text-slate-400">
+                  <div className="flex flex-wrap gap-3 text-xs text-slate-400">
                     {metaItems.map((item, idx) => (
                       <span
                         key={idx}
-                        className="flex items-center gap-1.5 bg-slate-900/50 px-2.5 py-1 rounded-md border border-slate-800/50"
+                        className="flex items-center gap-1.5 bg-slate-900/50 px-2 py-0.5 rounded-md border border-slate-800/50"
                       >
                         {item.icon}
                         {renderHighlightLine(item.text)}

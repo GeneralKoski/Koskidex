@@ -76,19 +76,40 @@
         "run_engine": "Running the engine"
       },
       "php": {
-        "title": "PHP / Composer",
-        "desc": "Integrate Koskidex into Laravel or any PHP project using Composer.",
-        "command": "Run this command to install the official client:",
-        "laravel_trait": "Laravel Trait",
-        "laravel_trait_desc": "Effortless integration on your Eloquent models.",
-        "sync_desc": "The PHP SDK automatically synchronizes your models with Koskidex every time you perform a save(). No complex worker setup needed."
+        "title": "PHP / Laravel",
+        "desc": "Integrate Koskidex into Laravel or any PHP project using Composer. Dedicated support for Eloquent models and automatic synchronization.",
+        "command": "Install via Composer:",
+        "laravel_trait": "Laravel Searchable Trait",
+        "laravel_trait_desc": "Effortless integration for your Eloquent models. Just add the trait and configure the mapping.",
+        "sync_desc": "The PHP SDK automatically synchronizes your models with Koskidex every time you perform a save(), update() or delete(). No complex worker setup needed.",
+        "config_title": "Configuration & Mapping",
+        "config_desc": "Configure your connections and model mappings in `config/koskidex.php`. You can specify which fields to index and set relevance thresholds.",
+        "mapping_example": "Model Mapping Example"
       },
       "js": {
-        "title": "JavaScript / NPM",
-        "desc": "Node.js and Browser client for rapid integrations.",
+        "title": "JavaScript / Node.js",
+        "desc": "Flexible client for Node.js and Browser environments. Ideal for real-time search UIs and automated indexing pipelines.",
         "command": "Install via NPM:",
         "client_usage": "Client Usage",
         "search_desc": "Blazing fast search"
+      },
+      "architecture": {
+        "title": "Architecture & Concepts",
+        "desc": "Understand how Koskidex works under the hood to get the most out of your search engine.",
+        "concepts": {
+          "indices": "Indices",
+          "indices_desc": "An index is a collection of similar documents. Each index can have its own settings, synonyms, and ranking rules.",
+          "documents": "Documents",
+          "documents_desc": "Documents are JSON objects. Koskidex is schemaless, but every document must have a unique 'id' field.",
+          "search": "Search & Ranking",
+          "search_desc": "Search is powered by an inverted index and a custom ranking pipeline that considers typo distance (Damerau-Levenshtein) and field frequency."
+        },
+        "customization": {
+          "title": "CSS & Customization",
+          "desc": "The Koskidex UI is designed to be fully themeable. You can override our CSS utility classes to match your brand.",
+          "classes_title": "Utility Classes",
+          "classes_desc": "Every component exposes predictable class names like `koskidex-result-item`, `koskidex-search-input`, and `koskidex-highlight`."
+        }
       }
     }
   },

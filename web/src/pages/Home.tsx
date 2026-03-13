@@ -33,13 +33,14 @@ export default function Home({
             {t("demo.subtitle")}
           </p>
 
-          <DemoSetup
-            activeIndex={activeIndex}
-            onIndexReady={onIndexReady}
-            onClear={onClear}
-          />
-
-          <SearchUI activeIndex={activeIndex} />
+          <div className="grid lg:grid-cols-2 gap-8 items-start max-w-7xl mx-auto">
+            <DemoSetup
+              activeIndex={activeIndex}
+              onIndexReady={onIndexReady}
+              onClear={onClear}
+            />
+            <SearchUI activeIndex={activeIndex} />
+          </div>
         </div>
 
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay pointer-events-none"></div>

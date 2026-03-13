@@ -111,27 +111,31 @@ export default function IntegrationSnippets() {
             </div>
           </div>
 
-          <div className="p-8 bg-[#0B1120]/80 relative group h-[400px] border-b border-white/5">
-            <div className="absolute right-6 top-6 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(codeSnippets[activeTab][method]);
-                }}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-black rounded-xl border border-white/5 transition-all active:scale-95"
-              >
-                {t("common.copy")}
-              </button>
-              <div className="px-3 py-2 bg-slate-900/80 text-[10px] text-slate-500 font-mono rounded-xl border border-white/5 flex items-center uppercase tracking-widest leading-none">
-                {activeTab}
+          <div className="p-8 bg-[#0B1120]/80 relative group h-[450px] border-b border-white/5">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                  {activeTab === 'php' ? t('docs.sections.php.config_title') : t('docs.sections.js.client_usage')}
+                </span>
+              </div>
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(codeSnippets[activeTab][method]);
+                  }}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[10px] font-black rounded-lg border border-white/5 transition-all active:scale-95"
+                >
+                  {t("common.copy")}
+                </button>
               </div>
             </div>
             
-            <pre className="font-mono text-sm text-slate-300 overflow-x-auto h-full leading-relaxed custom-scrollbar text-left">
-              <code className="block py-4 whitespace-pre-wrap">{codeSnippets[activeTab][method]}</code>
+            <pre className="font-mono text-[13px] text-slate-300 overflow-x-auto h-[340px] leading-relaxed custom-scrollbar text-left scroll-smooth">
+              <code className="block py-2 whitespace-pre-wrap">{codeSnippets[activeTab][method]}</code>
             </pre>
           </div>
-
-          <div className="p-6 bg-slate-950/40 text-center">
+        <div className="p-6 bg-slate-950/40 text-center">
             <Link 
               to="/docs" 
               className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 font-black text-sm uppercase tracking-widest transition-colors group"
