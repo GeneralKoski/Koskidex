@@ -1,4 +1,4 @@
-module github.com/general-koski/koskidex
+module github.com/GeneralKoski/Koskidex
 
 go 1.23
 

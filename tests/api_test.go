@@ -8,9 +8,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/general-koski/koskidex/internal/manager"
-	"github.com/general-koski/koskidex/internal/server"
-	"github.com/general-koski/koskidex/internal/storage"
+	"github.com/GeneralKoski/Koskidex/internal/manager"
+	"github.com/GeneralKoski/Koskidex/internal/server"
+	"github.com/GeneralKoski/Koskidex/internal/storage"
 )
 
 func setupTestServer(t *testing.T) (*server.Server, func()) {

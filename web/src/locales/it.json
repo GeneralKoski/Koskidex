@@ -1,14 +1,17 @@
 {
   "common": {
-    "copy": "Copia"
+    "copy": "Copia",
+    "search_engine": "Motore di Ricerca"
   },
   "nav": {
     "features": "Funzionalità",
     "demo": "Demo",
     "integration": "Integrazione",
-    "github": "GitHub"
+    "github": "GitHub",
+    "select_language": "Seleziona Lingua"
   },
   "hero": {
+    "the": "Il",
     "title_lightning": "Velocità Fulminea",
     "title_rest": "Motore di Ricerca <15MB",
     "subtitle": "Un motore di ricerca full-text completamente self-hosted, basato su REST e tollerante ai refusi, scritto in Go. Integralo in qualsiasi stack tecnologico e potenzia la tua ricerca in pochi minuti.",
@@ -34,15 +37,19 @@
       "status": {
         "creating": "Creazione indice '{{name}}'...",
         "loading": "Caricamento di {{count}} documenti...",
+        "loading_plain": "Caricamento",
         "success": "Successo! L'indice {{name}} è pronto. Prova a cercare.",
         "clearing": "Pulizia indice...",
         "cleared": "Indice pulito.",
         "error_connection": "Errore: Impossibile connettersi a Koskidex su {{url}}. È attivo?",
         "error_clear": "Errore durante la pulizia dell'indice."
-      }
+      },
+      "preview_title": "Dataset Caricato",
+      "preview_subtitle": "Ecco alcuni esempi di cosa puoi cercare ora:"
     },
     "search": {
       "placeholder": "Cerca film o prodotti... (Prova con un refuso!)",
+      "search_plain": "Cerca",
       "load_dataset": "Carica un dataset sopra per iniziare a cercare.",
       "no_results": "Nessun risultato trovato per \"{{query}}\".",
       "ms": "ms"
@@ -50,9 +57,81 @@
   },
   "integration": {
     "title": "Integralo in pochi secondi",
-    "subtitle": "REST puro. Nessun limite pesante lato client. Parla JSON con qualsiasi linguaggio."
+    "subtitle": "REST puro. Nessun limite pesante lato client. Parla JSON con qualsiasi linguaggio.",
+    "install_method": "Metodo di Installazione",
+    "method_package": "Registry Ufficiale (npm/composer)",
+    "method_repo": "Clone Repository Locale",
+    "view_full": "Vai alla Documentazione Completa"
   },
-  "footer": {
-    "made_with": "Fatto con ❤️ da Martin & General Koski"
+  "docs": {
+    "title": "Documentazione Tecnica",
+    "subtitle": "Guida completa all'integrazione di Koskidex nel tuo ecosistema.",
+    "back_home": "Torna alla Home",
+    "sections": {
+      "go": {
+        "title": "Go (Nativo)",
+        "desc": "Koskidex è scritto in Go. Puoi compilarlo come binario statico o usarlo come libreria nel tuo progetto Go.",
+        "port_desc": "La porta API predefinita è {{port}}. Assicurati che il tuo firewall consenta il traffico su questa porta.",
+        "clone_build": "Clona e compila",
+        "run_engine": "Esecuzione del motore"
+      },
+      "php": {
+        "title": "PHP / Composer",
+        "desc": "Integra Koskidex in Laravel o qualsiasi progetto PHP usando Composer.",
+        "command": "Esegui questo comando per installare il client ufficiale:",
+        "laravel_trait": "Laravel Trait",
+        "laravel_trait_desc": "Integrazione senza sforzo sui tuoi modelli Eloquent.",
+        "sync_desc": "L'SDK PHP sincronizza automaticamente i tuoi modelli con Koskidex ogni volta che effettui un save(). Nessuna configurazione complessa di worker necessaria."
+      },
+      "js": {
+        "title": "JavaScript / NPM",
+        "desc": "Client Node.js e Browser per integrazioni rapide.",
+        "command": "Installa via NPM:",
+        "client_usage": "Esempio Client",
+        "search_desc": "Ricerca ultra-veloce"
+      }
+    }
+  },
+  "search_status": {
+    "offline_title": "Koskidex Engine Offline",
+    "offline_desc": "Impossibile connettersi al servizio di ricerca su {{url}}.",
+    "instant": "< 1"
+  },
+  "error": {
+    "oops": "Ops!",
+    "something_wrong": "Qualcosa è andato storto nell'interfaccia. Non preoccuparti, è colpa nostra.",
+    "retry": "Riprova"
+  },
+  "datasets": {
+    "movies": {
+      "titles": {
+        "matrix": "The Matrix",
+        "godfather": "Il Padrino",
+        "goodfellas": "Quei Bravi Ragazzi",
+        "pulp_fiction": "Pulp Fiction",
+        "interstellar": "Interstellar",
+        "inception": "Inception"
+      },
+      "genres": {
+        "sci_fi": "Fantascienza",
+        "crime": "Crime",
+        "biography": "Biografico",
+        "action": "Azione"
+      }
+    },
+    "products": {
+      "names": {
+        "macbook": "MacBook Pro 14",
+        "iphone": "iPhone 15 Pro",
+        "samsung": "Samsung Galaxy S24 Ultra",
+        "sony": "Cuffie Sony WH-1000XM5",
+        "dell": "Dell XPS 13 Plus"
+      },
+      "categories": {
+        "laptops": "Portatili",
+        "smartphones": "Smartphone",
+        "audio": "Audio"
+      }
+    }
   }
 }

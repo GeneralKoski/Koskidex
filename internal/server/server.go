@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/general-koski/koskidex/internal/manager"
+	"github.com/GeneralKoski/Koskidex/internal/manager"
 )
 
 // Server wraps the API routes and manager

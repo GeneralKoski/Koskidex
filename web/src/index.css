@@ -7,7 +7,7 @@
   --color-dark-bg: #0f172a;
   --color-dark-card: rgba(30, 41, 59, 0.7);
   --color-border-subtle: rgba(255, 255, 255, 0.1);
-  --font-inter: 'Inter', sans-serif;
+  --font-outfit: 'Outfit', sans-serif;
   
   --animate-float: float 10s infinite alternate;
 
@@ -17,12 +17,13 @@
   }
 }
 
-/* Glassmorphism utility */
 @utility glass-effect {
-  background: var(--color-dark-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--color-border-subtle);
+  @apply bg-slate-900/60 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-[2rem];
+  cursor: default;
+}
+
+.btn, button, select, a {
+  cursor: pointer;
 }
 
 @utility text-gradient {
@@ -32,10 +33,16 @@
 }
 
 body {
-  font-family: var(--font-inter);
+  font-family: var(--font-outfit);
   background-color: var(--color-dark-bg);
   color: #f8fafc;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3 {
+  letter-spacing: -0.02em;
 }
 
 /* Custom Scrollbar for Code blocks */

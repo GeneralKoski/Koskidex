@@ -52,7 +52,7 @@ Add this to your project's `composer.json`:
     }
 ],
 "require": {
-    "general-koski/koskidex-laravel": "@dev"
+    "GeneralKoski/Koskidex-laravel": "@dev"
 }
 ```
 
@@ -70,7 +70,7 @@ pip install ../path-to-koskidex/examples/python
 
 #### 3. Public Registries
 
-To enable `composer require general-koski/koskidex` globally, you would need to publish these subdirectories as standalone Git repositories to [Packagist](https://packagist.org/) or [npm](https://www.npmjs.com/).
+To enable `composer require GeneralKoski/Koskidex` globally, you would need to publish these subdirectories as standalone Git repositories to [Packagist](https://packagist.org/) or [npm](https://www.npmjs.com/).
 
 ---
 
@@ -122,6 +122,7 @@ curl -X POST http://localhost:7700/indexes/my-index/documents \
 > **Schemaless & Flexible**: You can index ANY structured JSON object. Koskidex is schemaless, meaning different documents in the same index can have different fields. The only requirement is a unique `id` field.
 >
 > Examples of what you can index:
+>
 > - **E-commerce**: Products with prices, categories, and attributes.
 > - **Blogs**: Articles with content, tags, and authors.
 > - **Logs**: System events with timestamps and error levels.

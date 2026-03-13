@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Search as SearchIcon, Ghost, Video, Calendar, Tag, DollarSign, Ticket } from 'lucide-react';
+import { Search as SearchIcon, Ghost, Video, Calendar, Tag, DollarSign, Ticket, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { SearchResponse, Hit, MovieDocument, ProductDocument } from '../types';
 
@@ -14,6 +14,8 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [error, setError] = useState<"connection_error" | null>(null);
+  const [lastProcessingTime, setLastProcessingTime] = useState<number | null>(null);
 
   const performSearch = useCallback(
     async (q: string) => {
@@ -24,10 +26,17 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
         const res = await fetch(
           `${API_URL}/indexes/${activeIndex}/search?q=${encodeURIComponent(q)}`,
         );
+        if (!res.ok) {
+          throw new Error(`Search failed: ${res.status}`);
+        }
         const data: SearchResponse = await res.json();
         setResults(data);
+        setLastProcessingTime(data.processing_time_ms);
+        setError(null);
       } catch (error) {
         console.error("Search failed", error);
+        setError("connection_error");
+        setResults(null);
       } finally {
         setIsSearching(false);
       }
@@ -49,6 +58,7 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
     if (!activeIndex) {
       setQuery("");
       setResults(null);
+      setLastProcessingTime(null);
     } else {
       performSearch(query); // Refetch current query on new index
     }
@@ -58,6 +68,10 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
   const renderHighlightLine = (html: string) => (
     <span dangerouslySetInnerHTML={{ __html: html }} />
   );
+
+  const displayTime = lastProcessingTime !== null 
+    ? (lastProcessingTime === 0 ? t('search_status.instant') : lastProcessingTime) 
+    : null;
 
   return (
     <div className="glass-effect rounded-2xl p-6 md:p-10 max-w-4xl mx-auto shadow-2xl shadow-blue-500/10 mb-20 relative">
@@ -73,12 +87,12 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
           className="w-full bg-slate-900/60 border border-slate-700/50 rounded-xl py-5 pl-16 pr-24 text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-inner"
         />
 
-        {results && (
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-md text-xs font-bold tracking-wider flex items-center gap-2">
+        {displayTime !== null && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-md text-xs font-bold tracking-wider flex items-center gap-2 animate-in fade-in duration-300">
             {isSearching && (
               <span className="animate-spin w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full" />
             )}
-            {results.processing_time_ms}{t('demo.search.ms')}
+            {displayTime}{t('demo.search.ms')}
           </div>
         )}
       </div>
@@ -101,14 +115,20 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
               </div>
             ))}
           </div>
-        ) : results?.hits.length === 0 ? (
+        ) : error === "connection_error" ? (
+          <div className="flex flex-col items-center justify-center h-[300px] text-red-400 text-center animate-in zoom-in-95 duration-500">
+            <AlertCircle className="w-16 h-16 mb-4 opacity-50" />
+            <p className="text-lg font-bold">{t('search_status.offline_title')}</p>
+            <p className="text-slate-500 max-w-xs mt-2">{t('search_status.offline_desc', { url: API_URL })}</p>
+          </div>
+        ) : results?.hits?.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[300px] text-slate-500 text-center animate-in zoom-in-95 duration-500">
             <SearchIcon className="w-16 h-16 mb-4 opacity-20" />
             <p className="text-lg">{t('demo.search.no_results', { query })}</p>
           </div>
         ) : (
           <ul className="flex flex-col gap-3" aria-label="Search results">
-            {results?.hits.map((hit: Hit, index: number) => {
+            {results?.hits?.map((hit: Hit, index: number) => {
               let titleLine = '';
               let metaItems: { icon: React.ReactNode; text: string }[] = [];
 

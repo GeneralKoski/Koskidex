@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/general-koski/koskidex/internal/engine"
-	"github.com/general-koski/koskidex/internal/manager"
+	"github.com/GeneralKoski/Koskidex/internal/engine"
+	"github.com/GeneralKoski/Koskidex/internal/manager"
 )
 
 type createIndexReq struct {
@@ -208,20 +208,25 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 	// For phase 1 we only support exact search, phase 2 we do typo tolerance
 
-	if query == "" {
-		sendError(w, http.StatusBadRequest, "Missing 'q' query parameter")
-		return
-	}
-
 	idx, err := s.mgr.GetIndex(name)
 	if err == manager.ErrIndexNotFound {
 		sendError(w, http.StatusNotFound, "Index not found")
 		return
 	}
 
+	if query == "" {
+		sendJSON(w, http.StatusOK, map[string]interface{}{
+			"query":              query,
+			"hits":               []interface{}{},
+			"total_hits":         0,
+			"processing_time_ms": time.Since(start).Milliseconds(),
+		})
+		return
+	}
+
 	docIDs, highlights := idx.Engine.Search(query, idx.Settings)
 
-	var hits []map[string]interface{}
+	hits := []map[string]interface{}{}
 	for _, id := range docIDs {
 		if doc, ok := idx.Engine.GetDocument(id); ok {
 			// Filter DisplayedFields if configured

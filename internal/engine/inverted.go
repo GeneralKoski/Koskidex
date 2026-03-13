@@ -90,11 +90,18 @@ func (idx *InvertedIndex) AddDocument(docID string, doc map[string]interface{}, 
 					// Track terms per document for fast deletion
 					idx.docToTerms[docID] = append(idx.docToTerms[docID], t.Term)
 					
-					// Add to prefix map
-					prefix := getPrefix(t.Term)
-					idx.addToPrefixMap(prefix, t.Term)
-				}
-
+					// Substring Indexing (Bigrams):
+					// Instead of just the first 2 chars, we index all 2-char slices.
+					// This allows matching "amsung" to "samsung".
+					runes := []rune(t.Term)
+					if len(runes) < 2 {
+						idx.addToPrefixMap(t.Term, t.Term)
+					} else {
+						for i := 0; i <= len(runes)-2; i++ {
+							substring := string(runes[i : i+2])
+							idx.addToPrefixMap(substring, t.Term)
+						}
+					}
 				}
 			}
 		}

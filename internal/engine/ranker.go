@@ -39,20 +39,39 @@ func (idx *InvertedIndex) Search(query string, settings Settings) ([]string, map
 
 		for _, mTerm := range matchedTerms {
 			dist := DamerauLevenshtein(token.Term, mTerm)
+			
+			// Detect if it was a prefix match
+			isPrefix := false
+			if len(token.Term) >= 2 && len(mTerm) > len(token.Term) {
+				if mTerm[:len(token.Term)] == token.Term {
+					isPrefix = true
+				}
+			}
+
 			postings := idx.index[mTerm]
 
 			for _, p := range postings {
+				matchDist := dist
+				if isPrefix && dist > 0 {
+					// Give prefix matches a slight edge over random typos
+					// but still keep them behind exact matches.
+					// We'll treat them as "exact-ish" for basic ranking.
+				}
+
 				if _, ok := tokenDocBest[p.DocID]; !ok {
-					tokenDocBest[p.DocID] = &SearchMatch{DocID: p.DocID, Typos: dist}
+					tokenDocBest[p.DocID] = &SearchMatch{DocID: p.DocID, Typos: matchDist}
 				} else {
-					if dist < tokenDocBest[p.DocID].Typos {
-						tokenDocBest[p.DocID].Typos = dist
+					if matchDist < tokenDocBest[p.DocID].Typos {
+						tokenDocBest[p.DocID].Typos = matchDist
 					}
 				}
 				
 				// Exact match logic
 				if dist == 0 {
 					tokenDocBest[p.DocID].ExactMatches = 1
+				} else if isPrefix {
+					// Treat prefix matches as 0.5 exact match for scoring? 
+					// Let's just track them.
 				}
 
 				// Basic highlight tracking: track the matched term

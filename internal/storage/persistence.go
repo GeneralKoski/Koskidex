@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/general-koski/koskidex/internal/engine"
+	"github.com/GeneralKoski/Koskidex/internal/engine"
 )
 
 type Options struct {
@@ -35,7 +35,7 @@ type Persistence struct {
 
 func NewPersistence(opts Options) *Persistence {
 	os.MkdirAll(opts.DataDir, 0755)
-	
+
 	p := &Persistence{
 		opts:     opts,
 		filePath: filepath.Join(opts.DataDir, "koskidex.db"),
@@ -50,11 +50,11 @@ func NewPersistence(opts Options) *Persistence {
 
 func (p *Persistence) worker() {
 	defer p.wg.Done()
-	
+
 	// Debounce timer
 	var timer *time.Timer
 	var latestData map[string]IndexData
-	
+
 	for {
 		select {
 		case data, ok := <-p.saveCh:
@@ -66,7 +66,7 @@ func (p *Persistence) worker() {
 				return
 			}
 			latestData = data
-			
+
 			if timer == nil {
 				timer = time.AfterFunc(1*time.Second, func() {
 					// Dummy push to trigger save in select
@@ -84,7 +84,7 @@ func (p *Persistence) worker() {
 
 func (p *Persistence) writeToDisk(data map[string]IndexData) {
 	slog.Debug("Saving to disk", "file", p.filePath)
-	
+
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	if err := enc.Encode(data); err != nil {

@@ -1,14 +1,17 @@
 {
   "common": {
-    "copy": "Copy"
+    "copy": "Copy",
+    "search_engine": "Search Engine"
   },
   "nav": {
     "features": "Features",
     "demo": "Demo",
     "integration": "Integration",
-    "github": "GitHub"
+    "github": "GitHub",
+    "select_language": "Select Language"
   },
   "hero": {
+    "the": "The",
     "title_lightning": "Lightning Fast",
     "title_rest": "Sub-15MB Search Engine",
     "subtitle": "A completely self-hosted, REST-based, typo-tolerant full-text search engine written in Go. Drop it into any tech stack and supercharge your search in minutes.",
@@ -34,15 +37,19 @@
       "status": {
         "creating": "Creating index '{{name}}'...",
         "loading": "Loading {{count}} documents...",
+        "loading_plain": "Loading",
         "success": "Success! {{name}} index is ready. Try searching.",
         "clearing": "Clearing index...",
         "cleared": "Index cleared.",
         "error_connection": "Error: Cannot connect to Koskidex at {{url}}. Is it running?",
         "error_clear": "Error clearing index."
-      }
+      },
+      "preview_title": "Loaded Dataset",
+      "preview_subtitle": "Here are some examples of what you can search for now:"
     },
     "search": {
       "placeholder": "Search for movies or products... (Try a typo!)",
+      "search_plain": "Search",
       "load_dataset": "Load a dataset above to start searching.",
       "no_results": "No results found for \"{{query}}\".",
       "ms": "ms"
@@ -50,9 +57,81 @@
   },
   "integration": {
     "title": "Integrate in seconds",
-    "subtitle": "Pure REST. No heavy client limits. Speaks JSON to any language."
+    "subtitle": "Pure REST. No heavy client limits. Speaks JSON to any language.",
+    "install_method": "Installation Method",
+    "method_package": "Official Registry (npm/composer)",
+    "method_repo": "Local Project Clone",
+    "view_full": "View Full Documentation"
   },
-  "footer": {
-    "made_with": "Made with ❤️ by Martin & General Koski"
+  "docs": {
+    "title": "Technical Documentation",
+    "subtitle": "Complete guide to integrating Koskidex into your ecosystem.",
+    "back_home": "Back to Home",
+    "sections": {
+      "go": {
+        "title": "Go (Native)",
+        "desc": "Koskidex is written in Go. You can compile it as a static binary or use it as a library in your Go project.",
+        "port_desc": "Default API port is {{port}}. Ensure your firewall allows traffic on this port.",
+        "clone_build": "Clone and build",
+        "run_engine": "Running the engine"
+      },
+      "php": {
+        "title": "PHP / Composer",
+        "desc": "Integrate Koskidex into Laravel or any PHP project using Composer.",
+        "command": "Run this command to install the official client:",
+        "laravel_trait": "Laravel Trait",
+        "laravel_trait_desc": "Effortless integration on your Eloquent models.",
+        "sync_desc": "The PHP SDK automatically synchronizes your models with Koskidex every time you perform a save(). No complex worker setup needed."
+      },
+      "js": {
+        "title": "JavaScript / NPM",
+        "desc": "Node.js and Browser client for rapid integrations.",
+        "command": "Install via NPM:",
+        "client_usage": "Client Usage",
+        "search_desc": "Blazing fast search"
+      }
+    }
+  },
+  "search_status": {
+    "offline_title": "Koskidex Engine Offline",
+    "offline_desc": "Cannot connect to the search service at {{url}}.",
+    "instant": "< 1"
+  },
+  "error": {
+    "oops": "Oops!",
+    "something_wrong": "Something went wrong in the search engine UI. Don't worry, it's not you, it's us.",
+    "retry": "Retry"
+  },
+  "datasets": {
+    "movies": {
+      "titles": {
+        "matrix": "The Matrix",
+        "godfather": "The Godfather",
+        "goodfellas": "Goodfellas",
+        "pulp_fiction": "Pulp Fiction",
+        "interstellar": "Interstellar",
+        "inception": "Inception"
+      },
+      "genres": {
+        "sci_fi": "Sci-Fi",
+        "crime": "Crime",
+        "biography": "Biography",
+        "action": "Action"
+      }
+    },
+    "products": {
+      "names": {
+        "macbook": "Apple MacBook Pro 14",
+        "iphone": "Apple iPhone 15 Pro",
+        "samsung": "Samsung Galaxy S24 Ultra",
+        "sony": "Sony WH-1000XM5 Headphones",
+        "dell": "Dell XPS 13 Plus"
+      },
+      "categories": {
+        "laptops": "Laptops",
+        "smartphones": "Smartphones",
+        "audio": "Audio"
+      }
+    }
   }
 }

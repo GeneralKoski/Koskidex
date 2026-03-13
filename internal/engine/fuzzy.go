@@ -81,6 +81,14 @@ func (idx *InvertedIndex) FuzzySearchTerms(queryTerm string, maxDistance int, ex
 			continue // Already handled
 		}
 
+		// Prefix matching: if candidate starts with queryTerm, it's a match regardless of distance
+		if len(queryTerm) >= 2 && len(candidate) > len(queryTerm) {
+			if candidate[:len(queryTerm)] == queryTerm {
+				matchedTerms = append(matchedTerms, candidate)
+				continue
+			}
+		}
+
 		dist := DamerauLevenshtein(queryTerm, candidate)
 		if dist <= maxDistance {
 			matchedTerms = append(matchedTerms, candidate)

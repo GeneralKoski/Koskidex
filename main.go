@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/general-koski/koskidex/internal/server"
-	"github.com/general-koski/koskidex/internal/manager"
-	"github.com/general-koski/koskidex/internal/storage"
+	"github.com/GeneralKoski/Koskidex/internal/server"
+	"github.com/GeneralKoski/Koskidex/internal/manager"
+	"github.com/GeneralKoski/Koskidex/internal/storage"
 )
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 		fmt.Printf("Invalid log level %q, falling back to info\n", *logLevelStr)
 		level = slog.LevelInfo
 	}
-	
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 	slog.SetDefault(logger)
 
@@ -52,7 +52,7 @@ func main() {
 
 	// Initialize HTTP server
 	srv := server.NewServer(mgr, *apiKey)
-	
+
 	// Start serving
 	addr := ":" + *port
 	slog.Info("HTTP server listening", "address", addr)

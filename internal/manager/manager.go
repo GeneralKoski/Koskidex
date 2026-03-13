@@ -4,8 +4,8 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/general-koski/koskidex/internal/engine"
-	"github.com/general-koski/koskidex/internal/storage"
+	"github.com/GeneralKoski/Koskidex/internal/engine"
+	"github.com/GeneralKoski/Koskidex/internal/storage"
 )
 
 var (
@@ -31,7 +31,7 @@ type Manager struct {
 // NewManager initializes a new Manager and loads existing indexes from disk
 func NewManager(opts storage.Options) (*Manager, error) {
 	p := storage.NewPersistence(opts)
-	
+
 	mgr := &Manager{
 		indexes:     make(map[string]*Index),
 		storageOpts: opts,
@@ -163,14 +163,14 @@ func (m *Manager) UpdateSettings(indexName string, settings engine.Settings) err
 	// Re-indexing is technically needed for synonyms/searchable fields changes
 	// For simplicity, we just save and advise users to re-add docs or we could trigger re-indexing here
 	// In a real product, we'd iterate over all docs and re-index them.
-	
+
 	// Re-index all docs with new settings
 	allDocs := idx.Engine.GetAllDocs()
 	newEngine := engine.NewInvertedIndex()
 	for id, doc := range allDocs {
 		newEngine.AddDocument(id, doc, settings)
 	}
-	
+
 	m.mu.Lock()
 	idx.Engine = newEngine
 	m.mu.Unlock()
