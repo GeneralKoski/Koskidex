@@ -52,7 +52,15 @@
       "search_plain": "Cerca",
       "load_dataset": "Carica un dataset sopra per iniziare a cercare.",
       "no_results": "Nessun risultato trovato per \"{{query}}\".",
-      "ms": "ms"
+      "ms": "ms",
+      "sort_relevance": "Rilevanza",
+      "sort_year_desc": "Anno (recenti)",
+      "sort_year_asc": "Anno (vecchi)",
+      "sort_rating_desc": "Voto (migliori)",
+      "sort_price_asc": "Prezzo (crescente)",
+      "sort_price_desc": "Prezzo (decrescente)",
+      "fuzziness": "Fuzziness",
+      "sort": "Ordina"
     }
   },
   "integration": {

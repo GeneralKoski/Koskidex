@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search as SearchIcon, Ghost, Video, Calendar, Tag, DollarSign, Ticket, AlertCircle, Star, ShoppingBag } from 'lucide-react';
+import { Search as SearchIcon, Ghost, Video, Calendar, Tag, DollarSign, Ticket, AlertCircle, Star, ShoppingBag, ArrowUpDown, Zap, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { SearchResponse, Hit, MovieDocument, ProductDocument } from '../types';
 
@@ -9,6 +9,26 @@ interface SearchUIProps {
   activeIndex: string;
 }
 
+const SORT_OPTIONS_MOVIES = [
+  { value: "", label: "sort_relevance" },
+  { value: "year:desc", label: "sort_year_desc" },
+  { value: "year:asc", label: "sort_year_asc" },
+  { value: "rating:desc", label: "sort_rating_desc" },
+];
+
+const SORT_OPTIONS_PRODUCTS = [
+  { value: "", label: "sort_relevance" },
+  { value: "price:asc", label: "sort_price_asc" },
+  { value: "price:desc", label: "sort_price_desc" },
+  { value: "rating:desc", label: "sort_rating_desc" },
+];
+
+const FUZZINESS_OPTIONS = ["AUTO", "0", "1", "2"];
+
+function getFacetField(activeIndex: string): string {
+  return activeIndex === "movies" ? "genre" : "category";
+}
+
 export default function SearchUI({ activeIndex }: SearchUIProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -16,6 +36,9 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState<"connection_error" | null>(null);
   const [lastProcessingTime, setLastProcessingTime] = useState<number | null>(null);
+  const [sortValue, setSortValue] = useState("");
+  const [fuzziness, setFuzziness] = useState("AUTO");
+  const [activeFacet, setActiveFacet] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -29,14 +52,27 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
     return () => document.removeEventListener("keydown", handler);
   }, []);
 
+  useEffect(() => {
+    setSortValue("");
+    setFuzziness("AUTO");
+    setActiveFacet(null);
+  }, [activeIndex]);
+
   const performSearch = useCallback(
     async (q: string) => {
       if (!activeIndex) return;
       setIsSearching(true);
 
       try {
+        const params = new URLSearchParams();
+        if (q) params.set("q", q);
+        params.set("fuzziness", fuzziness);
+        params.set("facets", getFacetField(activeIndex));
+        if (sortValue) params.set("sort", sortValue);
+        if (activeFacet) params.set("filter", `${getFacetField(activeIndex)}=${activeFacet}`);
+
         const res = await fetch(
-          `${API_URL}/indexes/${activeIndex}/search?q=${encodeURIComponent(q)}`,
+          `${API_URL}/indexes/${activeIndex}/search?${params.toString()}`,
         );
         if (!res.ok) {
           throw new Error(`Search failed: ${res.status}`);
@@ -53,7 +89,7 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
         setIsSearching(false);
       }
     },
-    [activeIndex],
+    [activeIndex, fuzziness, sortValue, activeFacet],
   );
 
   useEffect(() => {
@@ -80,6 +116,11 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
   const displayTime = lastProcessingTime !== null
     ? (lastProcessingTime === 0 ? t('search_status.instant') : lastProcessingTime)
     : null;
+
+  const sortOptions = activeIndex === "movies" ? SORT_OPTIONS_MOVIES : SORT_OPTIONS_PRODUCTS;
+
+  const facetData = results?.facets?.[getFacetField(activeIndex)] || {};
+  const facetEntries = Object.entries(facetData).sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -110,6 +151,70 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
           )}
         </div>
       </div>
+
+      {/* Controls: Sort + Fuzziness */}
+      {activeIndex && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+            <select
+              value={sortValue}
+              onChange={(e) => setSortValue(e.target.value)}
+              className="bg-slate-900/60 border border-slate-700/40 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500/40 cursor-pointer"
+            >
+              {sortOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {t(`demo.search.${opt.label}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <Zap className="w-3.5 h-3.5 text-slate-500" />
+            <div className="flex rounded-lg border border-slate-700/40 overflow-hidden">
+              {FUZZINESS_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => setFuzziness(opt)}
+                  className={`px-2.5 py-1.5 text-xs font-medium transition-all ${
+                    fuzziness === opt
+                      ? "bg-blue-500/15 text-blue-400"
+                      : "bg-slate-900/60 text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Facets */}
+      {activeIndex && facetEntries.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {activeFacet && (
+            <button
+              onClick={() => setActiveFacet(null)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all"
+            >
+              <X className="w-3 h-3" />
+              {activeFacet}
+            </button>
+          )}
+          {!activeFacet && facetEntries.map(([value, count]) => (
+            <button
+              key={value}
+              onClick={() => setActiveFacet(value)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-900/40 text-slate-400 border border-slate-800/40 hover:bg-slate-800/40 hover:text-slate-200 hover:border-blue-500/20 transition-all"
+            >
+              {value}
+              <span className="text-[10px] text-slate-600 bg-slate-800/60 px-1.5 py-0.5 rounded-full">{count}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Results area */}
       <div className="min-h-[240px]">

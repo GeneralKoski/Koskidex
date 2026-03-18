@@ -29,4 +29,5 @@ export type SearchResponse = {
   processing_time_ms: number;
   total_hits: number;
   hits: Hit[];
+  facets: Record<string, Record<string, number>>;
 };
