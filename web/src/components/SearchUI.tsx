@@ -3,7 +3,7 @@ import { Search as SearchIcon, Ghost, Video, Calendar, Tag, DollarSign, Ticket, 
 import { useTranslation } from 'react-i18next';
 import type { SearchResponse, Hit, MovieDocument, ProductDocument } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:7700";
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 interface SearchUIProps {
   activeIndex: string;

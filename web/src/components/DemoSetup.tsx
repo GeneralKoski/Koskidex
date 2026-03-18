@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Document } from "../types";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:7700";
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 interface DemoSetupProps {
   onIndexReady: (indexName: string) => void;
