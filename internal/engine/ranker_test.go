@@ -14,13 +14,13 @@ func TestSearchAndRanker(t *testing.T) {
 	idx.AddDocument("4", map[string]interface{}{"title": "The Matrices"}, settings)
 
 	// 1. Exact match test
-	docs, _ := idx.Search("Matrix", settings)
+	docs, _ := idx.Search("Matrix", settings, "AUTO", nil)
 	if len(docs) == 0 || docs[0] != "1" {
 		t.Errorf("expected doc [1], got %v", docs)
 	}
 
 	// 2. Typo: "godfahter" -> Godfather (dist 1)
-	docs, _ = idx.Search("godfahter", settings)
+	docs, _ = idx.Search("godfahter", settings, "AUTO", nil)
 	if len(docs) == 0 || docs[0] != "2" {
 		t.Errorf("expected doc [2], got %v", docs)
 	}

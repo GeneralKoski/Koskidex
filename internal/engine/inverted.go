@@ -166,6 +166,7 @@ type Settings struct {
 	StopWords        map[string]bool     `json:"stop_words"`
 	Synonyms         map[string][]string `json:"synonyms"`
 	TypoTolerance    TypoSettings        `json:"typo_tolerance"`
+	FieldWeights     map[string]float64  `json:"field_weights"`
 }
 
 type TypoSettings struct {
@@ -187,6 +188,7 @@ func DefaultSettings() Settings {
 			MinWordLengthOneTypo:  4,
 			MinWordLengthTwoTypos: 8,
 		},
+		FieldWeights: make(map[string]float64),
 	}
 }
 

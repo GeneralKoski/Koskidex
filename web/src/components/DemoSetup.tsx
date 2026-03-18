@@ -11,6 +11,95 @@ interface DemoSetupProps {
   activeIndex: string;
 }
 
+type RawMovie = { id: string; title: string; genreKey: string; year: number; director: string; rating: number };
+type RawProduct = { id: string; name: string; categoryKey: string; brand: string; price: number; rating: number };
+
+const MOVIES_RAW: RawMovie[] = [
+  { id: "m1", title: "The Matrix", genreKey: "sci_fi", year: 1999, director: "Lana & Lilly Wachowski", rating: 8.7 },
+  { id: "m2", title: "The Godfather", genreKey: "crime", year: 1972, director: "Francis Ford Coppola", rating: 9.2 },
+  { id: "m3", title: "Goodfellas", genreKey: "crime", year: 1990, director: "Martin Scorsese", rating: 8.7 },
+  { id: "m4", title: "Pulp Fiction", genreKey: "crime", year: 1994, director: "Quentin Tarantino", rating: 8.9 },
+  { id: "m5", title: "Interstellar", genreKey: "sci_fi", year: 2014, director: "Christopher Nolan", rating: 8.7 },
+  { id: "m6", title: "Inception", genreKey: "action", year: 2010, director: "Christopher Nolan", rating: 8.8 },
+  { id: "m7", title: "The Shawshank Redemption", genreKey: "drama", year: 1994, director: "Frank Darabont", rating: 9.3 },
+  { id: "m8", title: "The Dark Knight", genreKey: "action", year: 2008, director: "Christopher Nolan", rating: 9.0 },
+  { id: "m9", title: "Fight Club", genreKey: "drama", year: 1999, director: "David Fincher", rating: 8.8 },
+  { id: "m10", title: "Forrest Gump", genreKey: "drama", year: 1994, director: "Robert Zemeckis", rating: 8.8 },
+  { id: "m11", title: "The Lord of the Rings: The Fellowship of the Ring", genreKey: "fantasy", year: 2001, director: "Peter Jackson", rating: 8.8 },
+  { id: "m12", title: "Star Wars: A New Hope", genreKey: "sci_fi", year: 1977, director: "George Lucas", rating: 8.6 },
+  { id: "m13", title: "The Silence of the Lambs", genreKey: "thriller", year: 1991, director: "Jonathan Demme", rating: 8.6 },
+  { id: "m14", title: "Schindler's List", genreKey: "drama", year: 1993, director: "Steven Spielberg", rating: 9.0 },
+  { id: "m15", title: "Gladiator", genreKey: "action", year: 2000, director: "Ridley Scott", rating: 8.5 },
+  { id: "m16", title: "The Departed", genreKey: "crime", year: 2006, director: "Martin Scorsese", rating: 8.5 },
+  { id: "m17", title: "Saving Private Ryan", genreKey: "war", year: 1998, director: "Steven Spielberg", rating: 8.6 },
+  { id: "m18", title: "Jurassic Park", genreKey: "adventure", year: 1993, director: "Steven Spielberg", rating: 8.2 },
+  { id: "m19", title: "Alien", genreKey: "horror", year: 1979, director: "Ridley Scott", rating: 8.5 },
+  { id: "m20", title: "Blade Runner", genreKey: "sci_fi", year: 1982, director: "Ridley Scott", rating: 8.1 },
+  { id: "m21", title: "The Truman Show", genreKey: "comedy", year: 1998, director: "Peter Weir", rating: 8.2 },
+  { id: "m22", title: "Toy Story", genreKey: "animation", year: 1995, director: "John Lasseter", rating: 8.3 },
+  { id: "m23", title: "WALL-E", genreKey: "animation", year: 2008, director: "Andrew Stanton", rating: 8.4 },
+  { id: "m24", title: "Spirited Away", genreKey: "animation", year: 2001, director: "Hayao Miyazaki", rating: 8.6 },
+  { id: "m25", title: "Parasite", genreKey: "thriller", year: 2019, director: "Bong Joon-ho", rating: 8.5 },
+  { id: "m26", title: "The Grand Budapest Hotel", genreKey: "comedy", year: 2014, director: "Wes Anderson", rating: 8.1 },
+  { id: "m27", title: "Mad Max: Fury Road", genreKey: "action", year: 2015, director: "George Miller", rating: 8.1 },
+  { id: "m28", title: "Whiplash", genreKey: "drama", year: 2014, director: "Damien Chazelle", rating: 8.5 },
+  { id: "m29", title: "Get Out", genreKey: "horror", year: 2017, director: "Jordan Peele", rating: 7.7 },
+  { id: "m30", title: "The Social Network", genreKey: "drama", year: 2010, director: "David Fincher", rating: 7.8 },
+  { id: "m31", title: "Django Unchained", genreKey: "western", year: 2012, director: "Quentin Tarantino", rating: 8.4 },
+  { id: "m32", title: "No Country for Old Men", genreKey: "thriller", year: 2007, director: "Joel & Ethan Coen", rating: 8.2 },
+  { id: "m33", title: "The Prestige", genreKey: "mystery", year: 2006, director: "Christopher Nolan", rating: 8.5 },
+  { id: "m34", title: "Eternal Sunshine of the Spotless Mind", genreKey: "romance", year: 2004, director: "Michel Gondry", rating: 8.3 },
+  { id: "m35", title: "La La Land", genreKey: "musical", year: 2016, director: "Damien Chazelle", rating: 8.0 },
+  { id: "m36", title: "2001: A Space Odyssey", genreKey: "sci_fi", year: 1968, director: "Stanley Kubrick", rating: 8.3 },
+  { id: "m37", title: "Titanic", genreKey: "romance", year: 1997, director: "James Cameron", rating: 7.9 },
+  { id: "m38", title: "The Shining", genreKey: "horror", year: 1980, director: "Stanley Kubrick", rating: 8.4 },
+  { id: "m39", title: "Back to the Future", genreKey: "adventure", year: 1985, director: "Robert Zemeckis", rating: 8.5 },
+  { id: "m40", title: "Terminator 2: Judgment Day", genreKey: "action", year: 1991, director: "James Cameron", rating: 8.6 },
+  { id: "m41", title: "The Lion King", genreKey: "animation", year: 1994, director: "Roger Allers & Rob Minkoff", rating: 8.5 },
+  { id: "m42", title: "Braveheart", genreKey: "war", year: 1995, director: "Mel Gibson", rating: 8.4 },
+  { id: "m43", title: "The Usual Suspects", genreKey: "mystery", year: 1995, director: "Bryan Singer", rating: 8.5 },
+  { id: "m44", title: "Reservoir Dogs", genreKey: "crime", year: 1992, director: "Quentin Tarantino", rating: 8.3 },
+  { id: "m45", title: "Jaws", genreKey: "thriller", year: 1975, director: "Steven Spielberg", rating: 8.0 },
+  { id: "m46", title: "Oppenheimer", genreKey: "drama", year: 2023, director: "Christopher Nolan", rating: 8.3 },
+  { id: "m47", title: "Everything Everywhere All at Once", genreKey: "comedy", year: 2022, director: "Daniel Kwan & Daniel Scheinert", rating: 7.8 },
+  { id: "m48", title: "Dune: Part Two", genreKey: "sci_fi", year: 2024, director: "Denis Villeneuve", rating: 8.5 },
+  { id: "m49", title: "The Batman", genreKey: "action", year: 2022, director: "Matt Reeves", rating: 7.8 },
+  { id: "m50", title: "Spider-Man: Across the Spider-Verse", genreKey: "animation", year: 2023, director: "Joaquim Dos Santos", rating: 8.6 },
+];
+
+const PRODUCTS_RAW: RawProduct[] = [
+  { id: "p1", name: "MacBook Pro 16 M3 Max", categoryKey: "laptops", brand: "Apple", price: 2499, rating: 4.7 },
+  { id: "p2", name: "MacBook Air 15 M3", categoryKey: "laptops", brand: "Apple", price: 1299, rating: 4.8 },
+  { id: "p3", name: "Dell XPS 15", categoryKey: "laptops", brand: "Dell", price: 1799, rating: 4.5 },
+  { id: "p4", name: "ThinkPad X1 Carbon Gen 11", categoryKey: "laptops", brand: "Lenovo", price: 1649, rating: 4.6 },
+  { id: "p5", name: "ROG Strix G16 Gaming Laptop", categoryKey: "gaming", brand: "ASUS", price: 1599, rating: 4.4 },
+  { id: "p6", name: "iPhone 15 Pro Max", categoryKey: "smartphones", brand: "Apple", price: 1199, rating: 4.7 },
+  { id: "p7", name: "Samsung Galaxy S24 Ultra", categoryKey: "smartphones", brand: "Samsung", price: 1299, rating: 4.6 },
+  { id: "p8", name: "Google Pixel 8 Pro", categoryKey: "smartphones", brand: "Google", price: 999, rating: 4.5 },
+  { id: "p9", name: "OnePlus 12", categoryKey: "smartphones", brand: "OnePlus", price: 799, rating: 4.3 },
+  { id: "p10", name: "Sony WH-1000XM5 Headphones", categoryKey: "audio", brand: "Sony", price: 348, rating: 4.7 },
+  { id: "p11", name: "AirPods Pro 2nd Generation", categoryKey: "audio", brand: "Apple", price: 249, rating: 4.8 },
+  { id: "p12", name: "Bose QuietComfort Ultra", categoryKey: "audio", brand: "Bose", price: 429, rating: 4.6 },
+  { id: "p13", name: "Sennheiser Momentum 4 Wireless", categoryKey: "audio", brand: "Sennheiser", price: 349, rating: 4.5 },
+  { id: "p14", name: "iPad Pro 12.9 M2", categoryKey: "tablets", brand: "Apple", price: 1099, rating: 4.7 },
+  { id: "p15", name: "Samsung Galaxy Tab S9 Ultra", categoryKey: "tablets", brand: "Samsung", price: 1199, rating: 4.5 },
+  { id: "p16", name: "Apple Watch Ultra 2", categoryKey: "wearables", brand: "Apple", price: 799, rating: 4.6 },
+  { id: "p17", name: "Samsung Galaxy Watch 6 Classic", categoryKey: "wearables", brand: "Samsung", price: 329, rating: 4.3 },
+  { id: "p18", name: "Sony Alpha A7 IV Mirrorless Camera", categoryKey: "cameras", brand: "Sony", price: 2498, rating: 4.8 },
+  { id: "p19", name: "Canon EOS R6 Mark II", categoryKey: "cameras", brand: "Canon", price: 2499, rating: 4.7 },
+  { id: "p20", name: "GoPro Hero 12 Black", categoryKey: "cameras", brand: "GoPro", price: 399, rating: 4.4 },
+  { id: "p21", name: "Nintendo Switch OLED", categoryKey: "gaming", brand: "Nintendo", price: 349, rating: 4.7 },
+  { id: "p22", name: "PlayStation 5 Console", categoryKey: "gaming", brand: "Sony", price: 499, rating: 4.8 },
+  { id: "p23", name: "Xbox Series X", categoryKey: "gaming", brand: "Microsoft", price: 499, rating: 4.6 },
+  { id: "p24", name: "LG UltraGear 27GP950 4K Monitor", categoryKey: "monitors", brand: "LG", price: 799, rating: 4.5 },
+  { id: "p25", name: "Samsung Odyssey G9 49 Ultrawide", categoryKey: "monitors", brand: "Samsung", price: 1299, rating: 4.4 },
+  { id: "p26", name: "Apple Studio Display", categoryKey: "monitors", brand: "Apple", price: 1599, rating: 4.3 },
+  { id: "p27", name: "Razer BlackWidow V4 Pro Keyboard", categoryKey: "accessories", brand: "Razer", price: 229, rating: 4.5 },
+  { id: "p28", name: "Logitech MX Master 3S Mouse", categoryKey: "accessories", brand: "Logitech", price: 99, rating: 4.8 },
+  { id: "p29", name: "Samsung T7 Shield 2TB SSD", categoryKey: "storage", brand: "Samsung", price: 159, rating: 4.6 },
+  { id: "p30", name: "WD Black SN850X 2TB NVMe", categoryKey: "storage", brand: "Western Digital", price: 179, rating: 4.7 },
+];
+
 export default function DemoSetup({
   onIndexReady,
   onClear,
@@ -70,25 +159,26 @@ export default function DemoSetup({
   };
 
   const handleLoadMovies = () => {
-    const movies: Document[] = [
-      { id: "m1", title: t("datasets.movies.titles.matrix"), genre: t("datasets.movies.genres.sci_fi"), year: 1999, director: "Wachowskis" },
-      { id: "m2", title: t("datasets.movies.titles.godfather"), genre: t("datasets.movies.genres.crime"), year: 1972, director: "Francis Ford Coppola" },
-      { id: "m3", title: t("datasets.movies.titles.goodfellas"), genre: t("datasets.movies.genres.biography"), year: 1990, director: "Martin Scorsese" },
-      { id: "m4", title: t("datasets.movies.titles.pulp_fiction"), genre: t("datasets.movies.genres.crime"), year: 1994, director: "Quentin Tarantino" },
-      { id: "m5", title: t("datasets.movies.titles.interstellar"), genre: t("datasets.movies.genres.sci_fi"), year: 2014, director: "Christopher Nolan" },
-      { id: "m6", title: t("datasets.movies.titles.inception"), genre: t("datasets.movies.genres.action"), year: 2010, director: "Christopher Nolan" },
-    ];
+    const movies: Document[] = MOVIES_RAW.map((m) => ({
+      id: m.id,
+      title: m.title,
+      genre: t(`datasets.movies.genres.${m.genreKey}`),
+      year: m.year,
+      director: m.director,
+      rating: m.rating,
+    }));
     setupIndex("movies", movies);
   };
 
   const handleLoadProducts = () => {
-    const products: Document[] = [
-      { id: "p1", name: t("datasets.products.names.macbook"), category: t("datasets.products.categories.laptops"), price: "$1999" },
-      { id: "p2", name: t("datasets.products.names.iphone"), category: t("datasets.products.categories.smartphones"), price: "$999" },
-      { id: "p3", name: t("datasets.products.names.samsung"), category: t("datasets.products.categories.smartphones"), price: "$1199" },
-      { id: "p4", name: t("datasets.products.names.sony"), category: t("datasets.products.categories.audio"), price: "$398" },
-      { id: "p5", name: t("datasets.products.names.dell"), category: t("datasets.products.categories.laptops"), price: "$1299" },
-    ];
+    const products: Document[] = PRODUCTS_RAW.map((p) => ({
+      id: p.id,
+      name: p.name,
+      category: t(`datasets.products.categories.${p.categoryKey}`),
+      brand: p.brand,
+      price: p.price,
+      rating: p.rating,
+    }));
     setupIndex("products", products);
   };
 
@@ -109,7 +199,6 @@ export default function DemoSetup({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Dataset selector tabs */}
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={handleLoadMovies}
@@ -154,7 +243,6 @@ export default function DemoSetup({
         )}
       </div>
 
-      {/* Status bar */}
       {status.msg && (
         <div className={`flex items-center gap-2 text-xs font-medium px-1 ${
           status.type === "loading" ? "text-blue-400" :

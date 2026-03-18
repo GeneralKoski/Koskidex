@@ -39,7 +39,7 @@ func BenchmarkSearch(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		idx.Search("great adventure world", settings)
+		idx.Search("great adventure world", settings, "AUTO", nil)
 	}
 }
 

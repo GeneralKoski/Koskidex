@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -213,21 +214,62 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, http.StatusOK, map[string]string{"message": "Settings updated"})
 }
 
+type SearchRequest struct {
+	Q         string    `json:"q"`
+	Vector    []float64 `json:"vector"`
+	Limit     int       `json:"limit"`
+	Offset    int       `json:"offset"`
+	Filter    string    `json:"filter"`
+	Fuzziness string    `json:"fuzziness"`
+	Sort      string    `json:"sort"`
+	Facets    string    `json:"facets"`
+}
+
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	name := r.PathValue("name")
+	
 	query := r.URL.Query().Get("q")
-
+	filterRaw := r.URL.Query().Get("filter")
+	fuzziness := r.URL.Query().Get("fuzziness")
+	sortParam := r.URL.Query().Get("sort")
+	facetsParam := r.URL.Query().Get("facets")
 	limit := 20
+	offset := 0
+	var vector []float64
+
 	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
 		limit = l
-		if limit > 1000 {
-			limit = 1000
-		}
 	}
-	offset := 0
 	if o, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && o >= 0 {
 		offset = o
+	}
+	vecStr := r.URL.Query().Get("vector")
+	if vecStr != "" {
+		parts := strings.Split(vecStr, ",")
+		for _, p := range parts {
+			if f, err := strconv.ParseFloat(strings.TrimSpace(p), 64); err == nil {
+				vector = append(vector, f)
+			}
+		}
+	}
+
+	if r.Method == http.MethodPost {
+		var req SearchRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			if req.Q != "" { query = req.Q }
+			if req.Filter != "" { filterRaw = req.Filter }
+			if req.Fuzziness != "" { fuzziness = req.Fuzziness }
+			if req.Sort != "" { sortParam = req.Sort }
+			if req.Facets != "" { facetsParam = req.Facets }
+			if req.Limit > 0 { limit = req.Limit }
+			if req.Offset >= 0 { offset = req.Offset }
+			if len(req.Vector) > 0 { vector = req.Vector }
+		}
+	}
+
+	if limit > 1000 {
+		limit = 1000
 	}
 
 	idx, err := s.mgr.GetIndex(name)
@@ -236,13 +278,12 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filterRaw := r.URL.Query().Get("filter")
-
-	if query == "" {
+	if query == "" && len(vector) == 0 {
 		sendJSON(w, http.StatusOK, map[string]interface{}{
 			"query":              query,
 			"hits":               []interface{}{},
 			"total_hits":         0,
+			"facets":             make(map[string]map[string]int),
 			"limit":              limit,
 			"offset":             offset,
 			"processing_time_ms": time.Since(start).Milliseconds(),
@@ -251,7 +292,11 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check cache
-	cacheKey := fmt.Sprintf("%s|%s|%s|%d|%d", name, query, filterRaw, limit, offset)
+	vecKey := ""
+	if len(vector) > 0 {
+		vecKey = fmt.Sprintf("%v", vector)
+	}
+	cacheKey := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%s", name, query, filterRaw, fuzziness, sortParam, facetsParam, limit, offset, vecKey)
 	if cached, ok := s.cache.Get(cacheKey); ok {
 		if resp, ok := cached.(map[string]interface{}); ok {
 			resp["processing_time_ms"] = time.Since(start).Milliseconds()
@@ -260,7 +305,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	docIDs, highlights := idx.Engine.Search(query, idx.Settings)
+	docIDs, highlights := idx.Engine.Search(query, idx.Settings, fuzziness, vector)
 
 	// Apply filters before pagination
 	filters := engine.ParseFilters(filterRaw)
@@ -274,6 +319,82 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		docIDs = filtered
+	}
+
+	facetsResult := make(map[string]map[string]int)
+	if facetsParam != "" {
+		facetFields := strings.Split(facetsParam, ",")
+		for _, f := range facetFields {
+			facetsResult[f] = make(map[string]int)
+		}
+		
+		for _, id := range docIDs {
+			if doc, ok := idx.Engine.GetDocument(id); ok {
+				for _, f := range facetFields {
+					if val, ok := doc[f]; ok {
+						if strVal, isStr := val.(string); isStr {
+							facetsResult[f][strVal]++
+						} else {
+							facetsResult[f][fmt.Sprintf("%v", val)]++
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if sortParam != "" {
+		sortRules := strings.Split(sortParam, ",")
+		
+		sort.SliceStable(docIDs, func(i, j int) bool {
+			docI, _ := idx.Engine.GetDocument(docIDs[i])
+			docJ, _ := idx.Engine.GetDocument(docIDs[j])
+			
+			for _, rule := range sortRules {
+				parts := strings.SplitN(rule, ":", 2)
+				field := parts[0]
+				dir := "asc"
+				if len(parts) > 1 {
+					dir = strings.ToLower(parts[1])
+				}
+				
+				valI, okI := docI[field]
+				valJ, okJ := docJ[field]
+				
+				if okI && okJ {
+					if numI, isNumI := valI.(float64); isNumI {
+						if numJ, isNumJ := valJ.(float64); isNumJ {
+							if numI != numJ {
+								if dir == "desc" {
+									return numI > numJ
+								}
+								return numI < numJ
+							}
+							continue
+						}
+					}
+					strI := fmt.Sprintf("%v", valI)
+					strJ := fmt.Sprintf("%v", valJ)
+					if strI != strJ {
+						if dir == "desc" {
+							return strI > strJ
+						}
+						return strI < strJ
+					}
+				} else if okI && !okJ {
+					if dir == "desc" {
+						return true
+					}
+					return false
+				} else if !okI && okJ {
+					if dir == "desc" {
+						return false
+					}
+					return true
+				}
+			}
+			return false
+		})
 	}
 
 	totalHits := len(docIDs)
@@ -329,6 +450,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		"query":              query,
 		"hits":               hits,
 		"total_hits":         totalHits,
+		"facets":             facetsResult,
 		"limit":              limit,
 		"offset":             offset,
 		"processing_time_ms": elapsed.Milliseconds(),

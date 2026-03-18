@@ -2,6 +2,7 @@ package manager
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/GeneralKoski/Koskidex/internal/engine"
@@ -71,6 +72,34 @@ func NewManager(opts storage.Options) (*Manager, error) {
 		return nil, err
 	}
 
+	walOps, _ := p.ReadWAL()
+	for _, op := range walOps {
+		switch op.Op {
+		case "CREATE_INDEX":
+			if _, exists := mgr.indexes[op.Index]; !exists {
+				mgr.indexes[op.Index] = &Index{
+					Name:     op.Index,
+					Engine:   engine.NewInvertedIndex(),
+					Settings: engine.DefaultSettings(),
+				}
+			}
+		case "DELETE_INDEX":
+			delete(mgr.indexes, op.Index)
+		case "UPDATE_SETTINGS":
+			if idx, ok := mgr.indexes[op.Index]; ok && op.Settings != nil {
+				idx.Settings = *op.Settings
+			}
+		case "ADD_DOC":
+			if idx, ok := mgr.indexes[op.Index]; ok && op.DocData != nil {
+				idx.Engine.AddDocument(op.DocID, op.DocData, idx.Settings)
+			}
+		case "DELETE_DOC":
+			if idx, ok := mgr.indexes[op.Index]; ok && op.DocID != "" {
+				idx.Engine.DeleteDocument(op.DocID)
+			}
+		}
+	}
+
 	return mgr, nil
 }
 
@@ -84,14 +113,15 @@ func (m *Manager) CreateIndex(name string) error {
 	}
 
 	m.indexes[name] = &Index{
-		Name:   name,
-		Engine: engine.NewInvertedIndex(),
-		Settings: engine.Settings{
-			SearchableFields: nil, // index all fields by default
-			StopWords:        make(map[string]bool),
-		},
+		Name:     name,
+		Engine:   engine.NewInvertedIndex(),
+		Settings: engine.DefaultSettings(),
 	}
 
+	if err := m.persistence.AppendWAL(storage.WALOperation{Op: "CREATE_INDEX", Index: name}); err != nil {
+		delete(m.indexes, name)
+		return fmt.Errorf("WAL write failed: %w", err)
+	}
 	return m.triggerSaveLocked()
 }
 
@@ -131,6 +161,9 @@ func (m *Manager) DeleteIndex(name string) error {
 	delete(m.indexes, name)
 
 	m.invalidateCache(name)
+	if err := m.persistence.AppendWAL(storage.WALOperation{Op: "DELETE_INDEX", Index: name}); err != nil {
+		return fmt.Errorf("WAL write failed: %w", err)
+	}
 	return m.triggerSaveLocked()
 }
 
@@ -147,6 +180,9 @@ func (m *Manager) AddDocuments(indexName string, docs []map[string]interface{}) 
 			idVal = doc["_id"] // fallback
 		}
 		if idStr, ok := idVal.(string); ok {
+			if err := m.persistence.AppendWAL(storage.WALOperation{Op: "ADD_DOC", Index: indexName, DocID: idStr, DocData: doc}); err != nil {
+				return fmt.Errorf("WAL write failed: %w", err)
+			}
 			idx.Engine.AddDocument(idStr, doc, idx.Settings)
 		}
 	}
@@ -162,6 +198,9 @@ func (m *Manager) DeleteDocument(indexName, docID string) error {
 		return err
 	}
 
+	if err := m.persistence.AppendWAL(storage.WALOperation{Op: "DELETE_DOC", Index: indexName, DocID: docID}); err != nil {
+		return fmt.Errorf("WAL write failed: %w", err)
+	}
 	idx.Engine.DeleteDocument(docID)
 	m.invalidateCache(indexName)
 	return m.triggerSave()
@@ -177,6 +216,10 @@ func (m *Manager) UpdateSettings(indexName string, settings engine.Settings) err
 	m.mu.Lock()
 	idx.Settings = settings
 	m.mu.Unlock()
+	
+	if err := m.persistence.AppendWAL(storage.WALOperation{Op: "UPDATE_SETTINGS", Index: indexName, Settings: &settings}); err != nil {
+		return fmt.Errorf("WAL write failed: %w", err)
+	}
 
 	// Re-indexing is technically needed for synonyms/searchable fields changes
 	// For simplicity, we just save and advise users to re-add docs or we could trigger re-indexing here

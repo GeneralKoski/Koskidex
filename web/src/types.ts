@@ -4,13 +4,16 @@ export type MovieDocument = {
   genre: string;
   year: number;
   director: string;
+  rating: number;
 };
 
 export type ProductDocument = {
   id: string;
   name: string;
   category: string;
-  price: string;
+  brand: string;
+  price: number;
+  rating: number;
 };
 
 export type Document = MovieDocument | ProductDocument;

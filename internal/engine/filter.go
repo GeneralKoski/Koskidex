@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -51,6 +52,35 @@ func parseFilter(s string) Filter {
 
 func ApplyFilters(doc map[string]interface{}, filters []Filter) bool {
 	for _, f := range filters {
+		if strings.HasPrefix(f.Field, "distance(") && strings.HasSuffix(f.Field, ")") {
+			argsStr := f.Field[9 : len(f.Field)-1]
+			args := strings.Split(argsStr, ",")
+			if len(args) == 3 {
+				geoField := strings.TrimSpace(args[0])
+				lat, _ := strconv.ParseFloat(strings.TrimSpace(args[1]), 64)
+				lng, _ := strconv.ParseFloat(strings.TrimSpace(args[2]), 64)
+
+				geoVal, ok := doc[geoField]
+				if !ok {
+					return false
+				}
+				
+				if geoMap, ok := geoVal.(map[string]interface{}); ok {
+					docLat, lOk := toFloat64(geoMap["lat"])
+					docLng, gOk := toFloat64(geoMap["lng"])
+					if lOk && gOk {
+						dist := haversineDistance(docLat, docLng, lat, lng)
+						filterDist, _ := strconv.ParseFloat(f.Value, 64)
+						if !compareNumeric(dist, f.Operator, filterDist) {
+							return false
+						}
+						continue
+					}
+				}
+				return false
+			}
+		}
+
 		val, ok := doc[f.Field]
 		if !ok {
 			return false
@@ -60,6 +90,21 @@ func ApplyFilters(doc map[string]interface{}, filters []Filter) bool {
 		}
 	}
 	return true
+}
+
+func haversineDistance(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371e3 // Earth radius in meters
+	phi1 := lat1 * math.Pi / 180
+	phi2 := lat2 * math.Pi / 180
+	deltaPhi := (lat2 - lat1) * math.Pi / 180
+	deltaLambda := (lon2 - lon1) * math.Pi / 180
+
+	a := math.Sin(deltaPhi/2)*math.Sin(deltaPhi/2) +
+		math.Cos(phi1)*math.Cos(phi2)*
+			math.Sin(deltaLambda/2)*math.Sin(deltaLambda/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+
+	return R * c
 }
 
 func matchFilter(val interface{}, f Filter) bool {

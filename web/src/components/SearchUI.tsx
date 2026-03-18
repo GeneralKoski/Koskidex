@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search as SearchIcon, Ghost, Video, Calendar, Tag, DollarSign, Ticket, AlertCircle } from 'lucide-react';
+import { Search as SearchIcon, Ghost, Video, Calendar, Tag, DollarSign, Ticket, AlertCircle, Star, ShoppingBag } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { SearchResponse, Hit, MovieDocument, ProductDocument } from '../types';
 
@@ -156,13 +156,16 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
                   { icon: <Video className="w-3.5 h-3.5 shrink-0" />, text: hit.highlights.director || doc.director },
                   { icon: <Calendar className="w-3.5 h-3.5 shrink-0" />, text: hit.highlights.year || String(doc.year) },
                   { icon: <Ticket className="w-3.5 h-3.5 shrink-0" />, text: hit.highlights.genre || doc.genre },
+                  { icon: <Star className="w-3.5 h-3.5 shrink-0" />, text: String(doc.rating) },
                 ];
               } else if (activeIndex === "products") {
                 const doc = hit.document as ProductDocument;
                 titleLine = hit.highlights.name || doc.name;
                 metaItems = [
+                  { icon: <ShoppingBag className="w-3.5 h-3.5 shrink-0" />, text: doc.brand },
                   { icon: <Tag className="w-3.5 h-3.5 shrink-0" />, text: hit.highlights.category || doc.category },
-                  { icon: <DollarSign className="w-3.5 h-3.5 shrink-0" />, text: doc.price },
+                  { icon: <DollarSign className="w-3.5 h-3.5 shrink-0" />, text: `$${doc.price}` },
+                  { icon: <Star className="w-3.5 h-3.5 shrink-0" />, text: String(doc.rating) },
                 ];
               }
 

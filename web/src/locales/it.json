@@ -144,33 +144,36 @@
   },
   "datasets": {
     "movies": {
-      "titles": {
-        "matrix": "The Matrix",
-        "godfather": "Il Padrino",
-        "goodfellas": "Quei Bravi Ragazzi",
-        "pulp_fiction": "Pulp Fiction",
-        "interstellar": "Interstellar",
-        "inception": "Inception"
-      },
       "genres": {
         "sci_fi": "Fantascienza",
         "crime": "Crime",
-        "biography": "Biografico",
-        "action": "Azione"
+        "drama": "Drammatico",
+        "action": "Azione",
+        "comedy": "Commedia",
+        "horror": "Horror",
+        "thriller": "Thriller",
+        "animation": "Animazione",
+        "adventure": "Avventura",
+        "romance": "Romantico",
+        "fantasy": "Fantasy",
+        "mystery": "Giallo",
+        "war": "Guerra",
+        "musical": "Musical",
+        "western": "Western"
       }
     },
     "products": {
-      "names": {
-        "macbook": "MacBook Pro 14",
-        "iphone": "iPhone 15 Pro",
-        "samsung": "Samsung Galaxy S24 Ultra",
-        "sony": "Cuffie Sony WH-1000XM5",
-        "dell": "Dell XPS 13 Plus"
-      },
       "categories": {
         "laptops": "Portatili",
         "smartphones": "Smartphone",
-        "audio": "Audio"
+        "audio": "Audio",
+        "tablets": "Tablet",
+        "gaming": "Gaming",
+        "wearables": "Indossabili",
+        "cameras": "Fotocamere",
+        "accessories": "Accessori",
+        "monitors": "Monitor",
+        "storage": "Archiviazione"
       }
     }
   }

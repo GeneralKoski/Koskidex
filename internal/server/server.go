@@ -100,6 +100,7 @@ func (s *Server) routes() {
 
 	// Search
 	s.mux.HandleFunc("GET /indexes/{name}/search", s.handleSearch)
+	s.mux.HandleFunc("POST /indexes/{name}/search", s.handleSearch)
 }
 
 func sendJSON(w http.ResponseWriter, status int, data interface{}) {

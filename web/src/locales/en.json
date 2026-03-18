@@ -144,33 +144,36 @@
   },
   "datasets": {
     "movies": {
-      "titles": {
-        "matrix": "The Matrix",
-        "godfather": "The Godfather",
-        "goodfellas": "Goodfellas",
-        "pulp_fiction": "Pulp Fiction",
-        "interstellar": "Interstellar",
-        "inception": "Inception"
-      },
       "genres": {
         "sci_fi": "Sci-Fi",
         "crime": "Crime",
-        "biography": "Biography",
-        "action": "Action"
+        "drama": "Drama",
+        "action": "Action",
+        "comedy": "Comedy",
+        "horror": "Horror",
+        "thriller": "Thriller",
+        "animation": "Animation",
+        "adventure": "Adventure",
+        "romance": "Romance",
+        "fantasy": "Fantasy",
+        "mystery": "Mystery",
+        "war": "War",
+        "musical": "Musical",
+        "western": "Western"
       }
     },
     "products": {
-      "names": {
-        "macbook": "Apple MacBook Pro 14",
-        "iphone": "Apple iPhone 15 Pro",
-        "samsung": "Samsung Galaxy S24 Ultra",
-        "sony": "Sony WH-1000XM5 Headphones",
-        "dell": "Dell XPS 13 Plus"
-      },
       "categories": {
         "laptops": "Laptops",
         "smartphones": "Smartphones",
-        "audio": "Audio"
+        "audio": "Audio",
+        "tablets": "Tablets",
+        "gaming": "Gaming",
+        "wearables": "Wearables",
+        "cameras": "Cameras",
+        "accessories": "Accessories",
+        "monitors": "Monitors",
+        "storage": "Storage"
       }
     }
   }

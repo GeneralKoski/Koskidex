@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -26,19 +27,35 @@ type IndexData struct {
 	Docs     []DocRecord
 }
 
+type WALOperation struct {
+	Op       string                 `json:"op"`
+	Index    string                 `json:"index"`
+	DocID    string                 `json:"doc_id,omitempty"`
+	DocData  map[string]interface{} `json:"doc_data,omitempty"`
+	Settings *engine.Settings       `json:"settings,omitempty"`
+}
+
 type Persistence struct {
 	opts       Options
 	filePath   string
 	saveCh     chan map[string]IndexData
 	wg         sync.WaitGroup
+	walPath    string
+	walFile    *os.File
+	walMutex   sync.Mutex
 }
 
 func NewPersistence(opts Options) *Persistence {
 	_ = os.MkdirAll(opts.DataDir, 0755)
 
+	walPath := filepath.Join(opts.DataDir, "operations.log")
+	walFile, _ := os.OpenFile(walPath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+
 	p := &Persistence{
 		opts:     opts,
 		filePath: filepath.Join(opts.DataDir, "koskidex.db"),
+		walPath:  walPath,
+		walFile:  walFile,
 		saveCh:   make(chan map[string]IndexData, 10),
 	}
 
@@ -81,6 +98,7 @@ func (p *Persistence) worker() {
 			timerRunning = false
 			if latestData != nil {
 				p.writeToDisk(latestData)
+				p.truncateWAL()
 				latestData = nil
 			}
 		}
@@ -111,6 +129,57 @@ func (p *Persistence) writeToDisk(data map[string]IndexData) {
 
 func (p *Persistence) Save(data map[string]IndexData) {
 	p.saveCh <- data
+}
+
+func (p *Persistence) AppendWAL(op WALOperation) error {
+	p.walMutex.Lock()
+	defer p.walMutex.Unlock()
+
+	if p.walFile == nil {
+		return nil
+	}
+
+	data, err := json.Marshal(op)
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	_, err = p.walFile.Write(data)
+	if err == nil {
+		p.walFile.Sync()
+	}
+	return err
+}
+
+func (p *Persistence) truncateWAL() {
+	p.walMutex.Lock()
+	defer p.walMutex.Unlock()
+	if p.walFile != nil {
+		p.walFile.Close()
+	}
+	p.walFile, _ = os.OpenFile(p.walPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+}
+
+func (p *Persistence) ReadWAL() ([]WALOperation, error) {
+	data, err := os.ReadFile(p.walPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var ops []WALOperation
+	lines := bytes.Split(data, []byte("\n"))
+	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+		var op WALOperation
+		if err := json.Unmarshal(line, &op); err == nil {
+			ops = append(ops, op)
+		}
+	}
+	return ops, nil
 }
 
 func (p *Persistence) Wait() {

@@ -99,7 +99,16 @@ func (idx *InvertedIndex) FuzzySearchTerms(queryTerm string, maxDistance int, ex
 }
 
 // MaxTypos is standard logic for allowed typos based on word length
-func MaxTypos(term string, settings TypoSettings) int {
+func MaxTypos(term string, settings TypoSettings, fuzziness string) int {
+	if fuzziness == "0" {
+		return 0
+	}
+	if fuzziness == "1" {
+		return 1
+	}
+	if fuzziness == "2" {
+		return 2
+	}
 	if !settings.Enabled {
 		return 0
 	}
