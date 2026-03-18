@@ -22,6 +22,61 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleRobots(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+	// Prevent crawlers from exhausting the API search endpoint and wasting crawl budget
+	_, _ = w.Write([]byte("User-agent: *\nDisallow: /indexes/*/search\n"))
+}
+
+func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	idx, err := s.mgr.GetIndex(name)
+	if err != nil {
+		http.Error(w, "Index not found", http.StatusNotFound)
+		return
+	}
+
+	baseUrl := idx.Settings.Sitemap.BaseUrl
+	if baseUrl == "" {
+		http.Error(w, "Sitemap base_url not configured for this index in settings", http.StatusBadRequest)
+		return
+	}
+
+	urlField := idx.Settings.Sitemap.UrlField
+	if urlField == "" {
+		urlField = "url"
+	}
+
+	freq := idx.Settings.Sitemap.ChangeFreq
+	if freq == "" {
+		freq = "weekly"
+	}
+
+	w.Header().Set("Content-Type", "application/xml")
+	_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>` + "\n"))
+	_, _ = w.Write([]byte(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n"))
+
+	docs := idx.Engine.GetAllDocs()
+	for id, doc := range docs {
+		loc := ""
+		if val, ok := doc[urlField]; ok {
+			loc = baseUrl + fmt.Sprintf("%v", val)
+		} else {
+			// fallback relative ID path
+			loc = baseUrl + "/" + id
+		}
+
+		// Ensure proper formatting if baseUrl ends with / and value starts with /
+		loc = strings.ReplaceAll(loc, "///", "/")
+		loc = strings.ReplaceAll(loc, "https:/", "https://")
+		loc = strings.ReplaceAll(loc, "http:/", "http://")
+
+		_, _ = w.Write([]byte(fmt.Sprintf("  <url>\n    <loc>%s</loc>\n    <changefreq>%s</changefreq>\n  </url>\n", loc, freq)))
+	}
+
+	_, _ = w.Write([]byte(`</urlset>` + "\n"))
+}
+
 type createIndexReq struct {
 	Name string `json:"name"`
 }
@@ -394,15 +449,9 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 						return strI < strJ
 					}
 				} else if okI && !okJ {
-					if dir == "desc" {
-						return true
-					}
-					return false
+					return dir == "desc"
 				} else if !okI && okJ {
-					if dir == "desc" {
-						return false
-					}
-					return true
+					return dir != "desc"
 				}
 			}
 			return false

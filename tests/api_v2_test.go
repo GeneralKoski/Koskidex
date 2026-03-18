@@ -286,7 +286,7 @@ func TestAPIGeoFilter(t *testing.T) {
 	]`)
 
 	// Search near Milan (5km radius) — should only find Duomo
-	res := searchV2(t, srv, "/indexes/geo/search?q=duomo+colosseo+torre&fuzziness=AUTO&filter=distance(_geo,45.4650,9.1910)<5000")
+	res := searchV2(t, srv, "/indexes/geo/search?q=duomo+OR+colosseo+OR+torre&fuzziness=AUTO&filter=distance(_geo,45.4650,9.1910)<5000")
 
 	total := res["total_hits"].(float64)
 	if total != 1 {

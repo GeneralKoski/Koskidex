@@ -18,17 +18,40 @@ func ParseFilters(raw string) []Filter {
 	}
 
 	var filters []Filter
-	parts := strings.Split(raw, ",")
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
+	var currentPart strings.Builder
+	parenCount := 0
+
+	for _, ch := range raw {
+		switch ch {
+		case '(':
+			parenCount++
+		case ')':
+			parenCount--
+		}
+
+		if ch == ',' && parenCount == 0 {
+			part := strings.TrimSpace(currentPart.String())
+			if part != "" {
+				f := parseFilter(part)
+				if f.Field != "" {
+					filters = append(filters, f)
+				}
+			}
+			currentPart.Reset()
 			continue
 		}
+
+		currentPart.WriteRune(ch)
+	}
+
+	part := strings.TrimSpace(currentPart.String())
+	if part != "" {
 		f := parseFilter(part)
 		if f.Field != "" {
 			filters = append(filters, f)
 		}
 	}
+
 	return filters
 }
 

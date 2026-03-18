@@ -167,6 +167,13 @@ type Settings struct {
 	Synonyms         map[string][]string `json:"synonyms"`
 	TypoTolerance    TypoSettings        `json:"typo_tolerance"`
 	FieldWeights     map[string]float64  `json:"field_weights"`
+	Sitemap          SitemapSettings     `json:"sitemap"`
+}
+
+type SitemapSettings struct {
+	BaseUrl    string `json:"base_url"`
+	UrlField   string `json:"url_field"`
+	ChangeFreq string `json:"changefreq"`
 }
 
 type TypoSettings struct {
@@ -189,6 +196,9 @@ func DefaultSettings() Settings {
 			MinWordLengthTwoTypos: 8,
 		},
 		FieldWeights: make(map[string]float64),
+		Sitemap: SitemapSettings{
+			ChangeFreq: "weekly",
+		},
 	}
 }
 

@@ -83,6 +83,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // routes sets up the routing
 func (s *Server) routes() {
+	// SEO
+	s.mux.HandleFunc("GET /robots.txt", s.handleRobots)
+	s.mux.HandleFunc("GET /indexes/{name}/sitemap.xml", s.handleSitemap)
+
 	// Indexes
 	s.mux.HandleFunc("POST /indexes", s.handleCreateIndex)
 	s.mux.HandleFunc("GET /indexes", s.handleListIndexes)

@@ -146,7 +146,7 @@ func (p *Persistence) AppendWAL(op WALOperation) error {
 	data = append(data, '\n')
 	_, err = p.walFile.Write(data)
 	if err == nil {
-		p.walFile.Sync()
+		_ = p.walFile.Sync()
 	}
 	return err
 }
@@ -155,7 +155,7 @@ func (p *Persistence) truncateWAL() {
 	p.walMutex.Lock()
 	defer p.walMutex.Unlock()
 	if p.walFile != nil {
-		p.walFile.Close()
+		_ = p.walFile.Close()
 	}
 	p.walFile, _ = os.OpenFile(p.walPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 }
@@ -187,7 +187,7 @@ func (p *Persistence) Wait() {
 	p.wg.Wait()
 	p.walMutex.Lock()
 	if p.walFile != nil {
-		p.walFile.Close()
+		_ = p.walFile.Close()
 		p.walFile = nil
 	}
 	p.walMutex.Unlock()
