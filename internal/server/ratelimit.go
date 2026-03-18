@@ -74,5 +74,5 @@ func RateLimitExceeded(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Retry-After", "1")
 	w.WriteHeader(http.StatusTooManyRequests)
-	w.Write([]byte(`{"error":"rate limit exceeded"}`))
+	_, _ = w.Write([]byte(`{"error":"rate limit exceeded"}`))
 }

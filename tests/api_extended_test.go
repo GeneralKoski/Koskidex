@@ -49,7 +49,7 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 
 	var res map[string]string
-	json.NewDecoder(w.Body).Decode(&res)
+	_ = json.NewDecoder(w.Body).Decode(&res)
 	if res["status"] != "ok" {
 		t.Fatalf("Expected status 'ok', got %q", res["status"])
 	}
@@ -177,7 +177,7 @@ func TestPagination(t *testing.T) {
 	srv.ServeHTTP(w, req)
 
 	var res map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&res)
+	_ = json.NewDecoder(w.Body).Decode(&res)
 
 	hits := res["hits"].([]interface{})
 	if len(hits) != 3 {
@@ -217,7 +217,7 @@ func TestSearchFilter(t *testing.T) {
 	srv.ServeHTTP(w, req)
 
 	var res map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&res)
+	_ = json.NewDecoder(w.Body).Decode(&res)
 
 	if res["total_hits"].(float64) != 1 {
 		t.Fatalf("Expected 1 hit with genre=sci-fi filter, got %v", res["total_hits"])

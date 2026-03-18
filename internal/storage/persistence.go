@@ -34,7 +34,7 @@ type Persistence struct {
 }
 
 func NewPersistence(opts Options) *Persistence {
-	os.MkdirAll(opts.DataDir, 0755)
+	_ = os.MkdirAll(opts.DataDir, 0755)
 
 	p := &Persistence{
 		opts:     opts,

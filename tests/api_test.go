@@ -75,7 +75,7 @@ func TestAPIIntegration(t *testing.T) {
 	}
 
 	var searchRes map[string]interface{}
-	json.NewDecoder(w.Body).Decode(&searchRes)
+	_ = json.NewDecoder(w.Body).Decode(&searchRes)
 
 	if searchRes["total_hits"].(float64) != 1 {
 		t.Fatalf("Expected 1 hit for 'Matrix', got %v", searchRes["total_hits"])

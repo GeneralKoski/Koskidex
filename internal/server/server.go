@@ -104,7 +104,7 @@ func (s *Server) routes() {
 
 func sendJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 func sendError(w http.ResponseWriter, status int, message string) {
