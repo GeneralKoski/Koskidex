@@ -185,6 +185,12 @@ func (p *Persistence) ReadWAL() ([]WALOperation, error) {
 func (p *Persistence) Wait() {
 	close(p.saveCh)
 	p.wg.Wait()
+	p.walMutex.Lock()
+	if p.walFile != nil {
+		p.walFile.Close()
+		p.walFile = nil
+	}
+	p.walMutex.Unlock()
 }
 
 func (p *Persistence) LoadIndexes(callback func(string, []DocRecord, engine.Settings)) error {

@@ -116,7 +116,7 @@ curl "http://localhost:7700/indexes/movies/search?q=matrix&limit=10&offset=0"
 curl "http://localhost:7700/indexes/movies/search?q=matrix&filter=genre=Sci-Fi"
 curl "http://localhost:7700/indexes/movies/search?q=movie&filter=year>2000,genre=Action"
 
-# Dynamic fuzziness (0 = exact, 1 = one typo, 2 = two typos, AUTO = adaptive)
+# Dynamic fuzziness (0 = exact, 1 = one typo, 2 = two typos, AUTO = default, adaptive by word length)
 curl "http://localhost:7700/indexes/movies/search?q=matrx&fuzziness=AUTO"
 curl "http://localhost:7700/indexes/movies/search?q=matrx&fuzziness=0"  # no results (exact only)
 

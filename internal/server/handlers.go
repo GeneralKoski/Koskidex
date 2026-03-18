@@ -268,6 +268,11 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if fuzziness != "" && fuzziness != "0" && fuzziness != "1" && fuzziness != "2" && fuzziness != "AUTO" {
+		sendError(w, http.StatusBadRequest, "Invalid fuzziness value. Allowed: 0, 1, 2, AUTO")
+		return
+	}
+
 	if limit > 1000 {
 		limit = 1000
 	}
@@ -345,11 +350,18 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 	if sortParam != "" {
 		sortRules := strings.Split(sortParam, ",")
-		
+
+		docCache := make(map[string]map[string]interface{}, len(docIDs))
+		for _, id := range docIDs {
+			if doc, ok := idx.Engine.GetDocument(id); ok {
+				docCache[id] = doc
+			}
+		}
+
 		sort.SliceStable(docIDs, func(i, j int) bool {
-			docI, _ := idx.Engine.GetDocument(docIDs[i])
-			docJ, _ := idx.Engine.GetDocument(docIDs[j])
-			
+			docI := docCache[docIDs[i]]
+			docJ := docCache[docIDs[j]]
+
 			for _, rule := range sortRules {
 				parts := strings.SplitN(rule, ":", 2)
 				field := parts[0]
@@ -357,10 +369,10 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 				if len(parts) > 1 {
 					dir = strings.ToLower(parts[1])
 				}
-				
+
 				valI, okI := docI[field]
 				valJ, okJ := docJ[field]
-				
+
 				if okI && okJ {
 					if numI, isNumI := valI.(float64); isNumI {
 						if numJ, isNumJ := valJ.(float64); isNumJ {
