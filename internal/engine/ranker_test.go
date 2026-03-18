@@ -6,7 +6,7 @@ import (
 
 func TestSearchAndRanker(t *testing.T) {
 	idx := NewInvertedIndex()
-	settings := Settings{}
+	settings := DefaultSettings()
 
 	idx.AddDocument("1", map[string]interface{}{"title": "The Matrix"}, settings)
 	idx.AddDocument("2", map[string]interface{}{"title": "The Godfather"}, settings)

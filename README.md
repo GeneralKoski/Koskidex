@@ -1,171 +1,309 @@
-# Koskidex ⚡️
+<p align="center">
+  <img src="web/public/og-image.png" alt="Koskidex" width="100%" />
+</p>
 
-A lightning-fast, ultra-lightweight (<15MB), self-hosted full-text search engine written in Go. Purely RESTful, zero runtime dependencies, and built for simplicity.
+<h1 align="center">Koskidex</h1>
 
-![Koskidex OG](web/public/og-image.png)
+<p align="center">
+  A lightning-fast, self-hosted full-text search engine written in Go.<br/>
+  Sub-15MB binary. Sub-5ms queries. Zero dependencies. Drop it into any stack.
+</p>
 
-## 🚀 Key Features
-
-- **🚀 Performance**: Sub-5ms search response times on reasonable datasets.
-- **📦 Lightweight**: Binary size under 15MB. RAM usage under 20MB idle.
-- **🧠 Intelligent**: Handles typos via fuzzy matching (Damerau-Levenshtein) and smart ranking.
-- **🔌 Integration**: Purely RESTful JSON API. Speaks anything.
-- **Multilingual**: Built-in support for multiple languages (In-app translations for EN/IT).
-- **🛡️ Multi-tenancy**: Create and manage multiple indexes independently.
-- **🐳 Docker Ready**: Deploy anywhere with one command.
-
-## 🛠️ Quick Start
-
-### Run with Docker (Recommended)
-
-```bash
-docker-compose up --build
-```
-
-The stack includes:
-
-- **Search API**: `http://localhost:7700` (Backend engine)
-- **Web UI**: `http://localhost:8080` (A modern React playground)
-  > [!TIP]
-  > Use the "Load Movies" or "Load Products" buttons in the web UI to instantly populate the engine and start testing queries!
-
-### 📦 Integration & Packaging
-
-Koskidex provides ready-to-use client libraries in the `examples/` directory. You can integrate them into your projects in three ways:
-
-#### 1. Manual Copy (Fastest)
-
-Simply copy the relevant client file/folder from `examples/` into your project source.
-
-#### 2. Local Package (Cleanest for Development)
-
-If you want to use `composer require` or `npm install` without publishing to public registries, you can use local path repositories.
-
-**Laravel (Composer):**
-Add this to your project's `composer.json`:
-
-```json
-"repositories": [
-    {
-        "type": "path",
-        "url": "../path-to-koskidex/examples/laravel"
-    }
-],
-"require": {
-    "GeneralKoski/Koskidex-laravel": "@dev"
-}
-```
-
-**Node.js (npm):**
-
-```bash
-npm install ../path-to-koskidex/examples/nodejs
-```
-
-**Python (pip):**
-
-```bash
-pip install ../path-to-koskidex/examples/python
-```
-
-#### 3. Public Registries
-
-To enable `composer require GeneralKoski/Koskidex` globally, you would need to publish these subdirectories as standalone Git repositories to [Packagist](https://packagist.org/) or [npm](https://www.npmjs.com/).
+<p align="center">
+  <a href="#quick-start">Quick Start</a> •
+  <a href="#features">Features</a> •
+  <a href="#api-reference">API</a> •
+  <a href="#integrations">Integrations</a> •
+  <a href="#architecture">Architecture</a>
+</p>
 
 ---
 
-### 🔑 API Key & Security
-
-By default, the engine starts without an API key for ease of use. If you want to secure your instance:
-
-1. Start with `--api-key your-secret-token`.
-2. All requests must then include headers: `Authorization: Bearer your-secret-token` or `X-API-Key: your-secret-token`.
-
-### ⚓️ Port Configuration
-
-The internal port is `7700`. You can map it to any host port in `docker-compose.yml`:
-
-```yaml
-services:
-  backend:
-    ports:
-      - "8000:7700" # Maps host 8000 to internal 7700
-```
-
-## 📖 API Documentation
-
-### Create an Index
+## Quick Start
 
 ```bash
-curl -X POST http://localhost:7700/indexes -d '{"name": "my-index"}'
+git clone https://github.com/GeneralKoski/Koskidex.git
+cd Koskidex
+docker compose up -d
 ```
 
-### Add Documents
+That's it. Two services are now running:
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| **API** | `http://localhost:7700` | Search engine REST API |
+| **Web UI** | `http://localhost:8080` | Interactive playground |
 
 ```bash
-curl -X POST http://localhost:7700/indexes/my-index/documents \
-  -H 'Content-Type: application/json' -d '[
-  {"id": "doc1", "title": "Inception", "genre": "Sci-Fi"},
-  {"id": "doc2", "title": "The Matrix", "genre": "Sci-Fi"}
+# Create an index
+curl -X POST http://localhost:7700/indexes \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "movies"}'
+
+# Add documents
+curl -X POST http://localhost:7700/indexes/movies/documents \
+  -H 'Content-Type: application/json' \
+  -d '[
+  {"id": "1", "title": "The Matrix", "genre": "Sci-Fi", "year": 1999},
+  {"id": "2", "title": "Inception", "genre": "Action", "year": 2010},
+  {"id": "3", "title": "Interstellar", "genre": "Sci-Fi", "year": 2014}
 ]'
 
-# Index a SINGLE document (polymorphic)
-curl -X POST http://localhost:7700/indexes/my-index/documents \
-  -H 'Content-Type: application/json' -d '{"id": "doc3", "title": "Tenet"}'
-
-# UPLOAD a JSON file (multipart)
-curl -X POST http://localhost:7700/indexes/my-index/documents \
-  -F "file=@movies.json"
+# Search — try a typo!
+curl "http://localhost:7700/indexes/movies/search?q=matrx"
 ```
 
-> [!IMPORTANT]
-> **Schemaless & Flexible**: You can index ANY structured JSON object. Koskidex is schemaless, meaning different documents in the same index can have different fields. The only requirement is a unique `id` field.
->
-> Examples of what you can index:
->
-> - **E-commerce**: Products with prices, categories, and attributes.
-> - **Blogs**: Articles with content, tags, and authors.
-> - **Logs**: System events with timestamps and error levels.
-> - **Users**: Names, emails, and profiles.
+---
+
+## Features
+
+| | Feature | Details |
+|---|---------|---------|
+| **Performance** | Sub-5ms response times on reasonable datasets |
+| **Lightweight** | Binary <15MB, RAM <20MB idle, zero runtime dependencies |
+| **Typo tolerance** | Damerau-Levenshtein fuzzy matching with configurable distance |
+| **Smart ranking** | Multi-factor pipeline: exactness, typo count, field weight, term frequency |
+| **Search operators** | `AND` (default), `OR`, `NOT` (prefix `-`) |
+| **Field filters** | `filter=genre=Sci-Fi,year>2000` with `=`, `!=`, `>`, `<`, `>=`, `<=` |
+| **Pagination** | `limit` and `offset` params, `total_hits` in response |
+| **Multi-index** | Create and manage independent indexes with their own settings |
+| **Schemaless** | Index any JSON object — only requires a unique `id` field |
+| **Synonyms** | Configure per-index synonym mappings |
+| **Auth** | Optional API key via `--api-key` flag, Bearer token auth |
+| **Rate limiting** | Per-IP token bucket via `--rate-limit` flag |
+| **TLS** | Native HTTPS via `--tls-cert` and `--tls-key` flags |
+| **LRU cache** | Query results cached, auto-invalidated on writes |
+| **Docker ready** | Multi-stage Alpine build, healthcheck included |
+| **Client libraries** | PHP/Laravel, Node.js, Python — ready to copy |
+
+---
+
+## API Reference
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/indexes` | Create an index |
+| `GET` | `/indexes` | List all indexes |
+| `GET` | `/indexes/{name}` | Get index info |
+| `DELETE` | `/indexes/{name}` | Delete index |
+| `POST` | `/indexes/{name}/documents` | Add documents (single, array, or file upload) |
+| `GET` | `/indexes/{name}/documents/{id}` | Get document by ID |
+| `DELETE` | `/indexes/{name}/documents/{id}` | Delete document |
+| `GET` | `/indexes/{name}/search?q=` | Full-text search |
+| `GET` | `/indexes/{name}/settings` | Get index settings |
+| `PUT` | `/indexes/{name}/settings` | Update settings (synonyms, stop words, etc.) |
+| `GET` | `/health` | Health check (no auth required) |
 
 ### Search
 
 ```bash
-curl "http://localhost:7700/indexes/my-index/search?q=incption"
+# Basic search
+curl "http://localhost:7700/indexes/movies/search?q=matrx"
+
+# Pagination
+curl "http://localhost:7700/indexes/movies/search?q=matrix&limit=10&offset=0"
+
+# Field filters
+curl "http://localhost:7700/indexes/movies/search?q=matrix&filter=genre=Sci-Fi"
+curl "http://localhost:7700/indexes/movies/search?q=movie&filter=year>2000,genre=Action"
+
+# OR operator
+curl "http://localhost:7700/indexes/movies/search?q=matrix OR inception"
+
+# NOT operator
+curl "http://localhost:7700/indexes/movies/search?q=movie -horror"
 ```
 
-### Delete a Document
+### Documents
 
 ```bash
-curl -X DELETE http://localhost:7700/indexes/my-index/documents/doc1
+# Add array of documents
+curl -X POST http://localhost:7700/indexes/movies/documents \
+  -H 'Content-Type: application/json' \
+  -d '[{"id": "1", "title": "Inception"}, {"id": "2", "title": "Tenet"}]'
+
+# Add single document
+curl -X POST http://localhost:7700/indexes/movies/documents \
+  -H 'Content-Type: application/json' \
+  -d '{"id": "3", "title": "The Matrix"}'
+
+# Upload JSON file
+curl -X POST http://localhost:7700/indexes/movies/documents \
+  -F "file=@movies.json"
 ```
 
-### Manage Settings
+### Settings
 
 ```bash
-# Get current settings
-curl http://localhost:7700/indexes/my-index/settings
-
-# Update settings (Synonyms, Ranking, etc.)
-curl -X PUT http://localhost:7700/indexes/my-index/settings -d '{
-  "synonyms": {"iphone": ["apple telefon", "smartphone"]},
+curl -X PUT http://localhost:7700/indexes/movies/settings \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "synonyms": {"iphone": ["apple phone", "smartphone"]},
   "searchable_fields": ["title", "description"],
-  "displayed_fields": ["title", "price"]
+  "displayed_fields": ["title", "price"],
+  "stop_words": ["the", "a", "is"]
 }'
 ```
 
-## 🏗️ Technical Architecture
+### Authentication
 
-- **Go**: High-performance backend logic.
-- **Inverted Index**: Core data structure for efficient lookups.
-- **Custom Tokenizer**: Normalization, stop-words, and splitting.
-- **Ranker Pipeline**: Scoring matching documents based on relevance, typos, and frequency.
-- **Vite/React/TS/Tailwind**: Modern frontend stack for the presentation layer.
+```bash
+# Start with API key
+./koskidex --api-key your-secret-key
 
-## 🤝 Integrations
+# All requests require the Bearer token
+curl -H "Authorization: Bearer your-secret-key" \
+  http://localhost:7700/indexes
 
-Check out the `examples/` directory for ready-to-use clients in:
+# /health is always public
+curl http://localhost:7700/health
+```
 
-- **PHP / Laravel** (with automatic model syncing)
-- **Node.js**
-- **Python**
+---
+
+## Integrations
+
+Client libraries are in the `examples/` directory. Clone the repo inside your project and copy what you need.
+
+### Docker Compose (any stack)
+
+```yaml
+services:
+  koskidex:
+    build: ./koskidex
+    ports:
+      - "${KOSKIDEX_PORT:-7700}:7700"
+    volumes:
+      - koskidex_data:/data
+    command: ["/app/koskidex", "--port", "7700", "--data-dir", "/data", "--api-key", "${KOSKIDEX_API_KEY}"]
+
+volumes:
+  koskidex_data:
+```
+
+```env
+KOSKIDEX_HOST=http://koskidex:7700
+KOSKIDEX_API_KEY=your-secret-key
+```
+
+### PHP / Laravel
+
+Copy the integration files and add the `Searchable` trait to your models — they auto-sync on every `save()`, `update()`, and `delete()`.
+
+```bash
+cp koskidex/examples/laravel/app/Services/KoskidexClient.php app/Services/
+cp koskidex/examples/laravel/app/Traits/Searchable.php app/Traits/
+cp koskidex/examples/laravel/config/koskidex.php config/
+```
+
+```php
+use App\Traits\Searchable;
+
+class Movie extends Model
+{
+    use Searchable;
+}
+
+// Auto-synced on create/update/delete
+Movie::create(['title' => 'The Matrix', 'genre' => 'Sci-Fi']);
+
+// Search
+$results = Movie::koskidexSearch('matrx');
+```
+
+### Node.js
+
+```bash
+npm install ./koskidex/examples/nodejs
+```
+
+```js
+const KoskidexClient = require('koskidex-node');
+const client = new KoskidexClient('http://localhost:7700', 'your-api-key');
+
+await client.createIndex('movies');
+await client.addDocuments('movies', [{ id: '1', title: 'The Matrix' }]);
+const results = await client.search('movies', 'matrx');
+```
+
+### Python
+
+```bash
+pip install ./koskidex/examples/python
+```
+
+```python
+from koskidex_client import KoskidexClient
+
+client = KoskidexClient('http://localhost:7700', api_key='your-api-key')
+
+client.create_index('movies')
+client.add_documents('movies', [{'id': '1', 'title': 'The Matrix'}])
+results = client.search('movies', 'matrx')
+```
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│                   HTTP Server                    │
+│  CORS → Rate Limiter → Auth → Router            │
+├─────────────────────────────────────────────────┤
+│                 Index Manager                    │
+│  Create / Delete / List indexes                  │
+│  Cache invalidation on writes                    │
+├──────────────┬──────────────┬───────────────────┤
+│   Tokenizer  │    Engine    │    Persistence    │
+│  Normalize   │  Inverted    │  GOB binary       │
+│  Stop words  │  Index       │  Debounced        │
+│  Split       │  Bigram      │  writes           │
+│              │  Prefix      │                    │
+├──────────────┼──────────────┤                    │
+│    Ranker    │   Filters    │                    │
+│  Fuzzy match │  Field ops   │                    │
+│  Multi-score │  =,!=,>,<    │                    │
+│  OR / NOT    │  >=, <=      │                    │
+├──────────────┴──────────────┤                    │
+│          LRU Cache          │                    │
+│  1024 entries, prefix       │                    │
+│  invalidation               │                    │
+└─────────────────────────────┴───────────────────┘
+```
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Engine** | Go 1.23, zero external dependencies |
+| **Search** | Inverted index, Damerau-Levenshtein, bigram prefix indexing |
+| **Storage** | GOB binary encoding, debounced persistence |
+| **Cache** | LRU (doubly-linked list + map), auto-invalidation |
+| **API** | net/http, token bucket rate limiter |
+| **Frontend** | React 19, TypeScript, Vite 6, Tailwind CSS 4 |
+| **i18n** | English, Italian |
+| **Deploy** | Docker multi-stage Alpine, docker-compose |
+
+---
+
+## Configuration
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port` | `7700` | HTTP port |
+| `--data-dir` | `./data` | Data directory for persistence |
+| `--api-key` | _(empty)_ | API key for authentication |
+| `--rate-limit` | `0` | Max requests/sec per IP (0 = disabled) |
+| `--tls-cert` | _(empty)_ | Path to TLS certificate |
+| `--tls-key` | _(empty)_ | Path to TLS key |
+| `--log-level` | `info` | Log level: debug, info, warn, error |
+| `--version` | | Print version and exit |
+
+---
+
+## License
+
+MIT

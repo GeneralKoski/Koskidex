@@ -51,33 +51,38 @@ func NewPersistence(opts Options) *Persistence {
 func (p *Persistence) worker() {
 	defer p.wg.Done()
 
-	// Debounce timer
-	var timer *time.Timer
 	var latestData map[string]IndexData
+	timer := time.NewTimer(0)
+	if !timer.Stop() {
+		<-timer.C
+	}
+	timerRunning := false
 
 	for {
 		select {
 		case data, ok := <-p.saveCh:
 			if !ok {
-				// flush on close
+				if timerRunning {
+					timer.Stop()
+				}
 				if latestData != nil {
 					p.writeToDisk(latestData)
 				}
 				return
 			}
 			latestData = data
-
-			if timer == nil {
-				timer = time.AfterFunc(1*time.Second, func() {
-					// Dummy push to trigger save in select
-					// In a real impl, we'd handle concurrent access to latestData better
-					// For simplicity, directly writing since this is debounced loosely
-				})
-			} else {
-				timer.Reset(1 * time.Second)
+			if timerRunning {
+				timer.Stop()
 			}
-			// immediately write for simplicity without strict debounce logic
-			p.writeToDisk(latestData)
+			timer.Reset(1 * time.Second)
+			timerRunning = true
+
+		case <-timer.C:
+			timerRunning = false
+			if latestData != nil {
+				p.writeToDisk(latestData)
+				latestData = nil
+			}
 		}
 	}
 }

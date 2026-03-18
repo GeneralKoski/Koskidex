@@ -4,7 +4,7 @@
     "search_engine": "Motore di Ricerca"
   },
   "nav": {
-    "features": "Funzionalità",
+    "features": "Documentazione",
     "demo": "Demo",
     "integration": "Integrazione",
     "github": "GitHub",
@@ -56,59 +56,78 @@
     }
   },
   "integration": {
-    "title": "Integralo in pochi secondi",
-    "subtitle": "REST puro. Nessun limite pesante lato client. Parla JSON con qualsiasi linguaggio.",
-    "install_method": "Metodo di Installazione",
-    "method_package": "Registry Ufficiale (npm/composer)",
-    "method_repo": "Clone Repository Locale",
+    "title": "Quick Start",
+    "subtitle": "Clona, avvia, cerca. Tre passaggi per un motore di ricerca funzionante.",
+    "step1_title": "Clona la repository",
+    "step2_title": "Avvia con Docker",
+    "step3_title": "Inizia a cercare",
     "view_full": "Vai alla Documentazione Completa"
   },
   "docs": {
     "title": "Documentazione Tecnica",
-    "subtitle": "Guida completa all'integrazione di Koskidex nel tuo ecosistema.",
+    "subtitle": "Guida passo-passo completa per integrare Koskidex nel tuo progetto.",
     "back_home": "Torna alla Home",
     "sections": {
-      "go": {
-        "title": "Go (Nativo)",
-        "desc": "Koskidex è scritto in Go. Puoi compilarlo come binario statico o usarlo come libreria nel tuo progetto Go.",
-        "port_desc": "La porta API predefinita è {{port}}. Assicurati che il tuo firewall consenta il traffico su questa porta.",
-        "clone_build": "Clona e compila",
-        "run_engine": "Esecuzione del motore"
+      "quickstart": {
+        "title": "Quick Start con Docker",
+        "desc": "Il modo più veloce per avviare Koskidex. Serve solo Docker e un comando.",
+        "step1": "Clona e avvia",
+        "step2": "Verifica che funzioni",
+        "step3": "Crea un indice e aggiungi documenti",
+        "step4": "Cerca (con tolleranza ai refusi!)",
+        "running_at": "Koskidex è ora in esecuzione su http://localhost:7700"
+      },
+      "docker_compose": {
+        "title": "Aggiungi al tuo Docker Compose",
+        "desc": "Aggiungi Koskidex come servizio accanto alla tua applicazione esistente. Funziona con qualsiasi stack.",
+        "add_service": "Aggiungi il servizio al tuo docker-compose.yml:",
+        "env_vars": "Poi imposta la variabile d'ambiente nella tua app per connetterti:",
+        "sail_title": "Integrazione con Laravel Sail",
+        "sail_desc": "Se usi Laravel Sail, aggiungi il servizio koskidex al tuo docker-compose.yml e referenzialo nel tuo .env:"
       },
       "php": {
         "title": "PHP / Laravel",
-        "desc": "Integra Koskidex in Laravel o in qualsiasi progetto PHP usando Composer. Supporto dedicato per i modelli Eloquent e sincronizzazione automatica.",
-        "command": "Installa tramite Composer:",
-        "laravel_trait": "Laravel Searchable Trait",
-        "laravel_trait_desc": "Integrazione immediata per i tuoi modelli Eloquent. Basta aggiungere il trait e configurare il mapping.",
-        "sync_desc": "L'SDK PHP sincronizza automaticamente i tuoi modelli con Koskidex ogni volta che esegui un save(), update() o delete(). Nessuna configurazione complessa di worker necessaria.",
-        "config_title": "Configurazione & Mapping",
-        "config_desc": "Configura le tue connessioni e i mapping dei modelli in `config/koskidex.php`. Puoi specificare quali campi indicizzare e impostare le soglie di rilevanza.",
-        "mapping_example": "Esempio di Mapping Modelli"
+        "desc": "Integrazione completa con modelli Eloquent e sync automatico su save/update/delete.",
+        "step1_title": "1. Installa il pacchetto",
+        "step2_title": "2. Pubblica la configurazione",
+        "step3_title": "3. Configura .env",
+        "step4_title": "4. Configura il mapping dei modelli",
+        "step5_title": "5. Aggiungi il trait al modello",
+        "step6_title": "6. Cerca",
+        "sync_note": "I modelli vengono sincronizzati automaticamente con Koskidex ad ogni save(), update() e delete(). Nessun worker necessario."
       },
       "js": {
         "title": "JavaScript / Node.js",
-        "desc": "Client flessibile per ambienti Node.js e Browser. Ideale per interfacce di ricerca in tempo reale e pipeline di indicizzazione automatizzate.",
-        "command": "Installa tramite NPM:",
-        "client_usage": "Utilizzo del Client",
-        "search_desc": "Ricerca ultra veloce"
+        "desc": "Client leggero per ambienti Node.js e browser.",
+        "step1_title": "1. Installa",
+        "step2_title": "2. Inizializza il client",
+        "step3_title": "3. Indicizza documenti",
+        "step4_title": "4. Cerca"
+      },
+      "python": {
+        "title": "Python",
+        "desc": "Client semplice basato su requests. Funziona con Django, Flask, FastAPI o standalone.",
+        "step1_title": "1. Installa",
+        "step2_title": "2. Usa"
+      },
+      "api": {
+        "title": "Riferimento API REST",
+        "desc": "Koskidex espone una semplice API REST. Usala da qualsiasi linguaggio con supporto HTTP.",
+        "endpoints_title": "Endpoint",
+        "auth_title": "Autenticazione",
+        "auth_desc": "Se avviato con --api-key, tutte le richieste richiedono un Bearer token:",
+        "search_params": "La ricerca supporta paginazione e filtri:"
       },
       "architecture": {
         "title": "Architettura & Concetti",
-        "desc": "Scopri come funziona Koskidex sotto il cofano per ottenere il massimo dal tuo motore di ricerca.",
+        "desc": "Scopri come funziona Koskidex sotto il cofano.",
         "concepts": {
           "indices": "Indici",
-          "indices_desc": "Un indice è una collezione di documenti simili. Ogni indice può avere le proprie impostazioni, sinonimi e regole di ranking.",
+          "indices_desc": "Un indice è una collezione di documenti simili. Ogni indice ha le proprie impostazioni, sinonimi e regole di ranking.",
           "documents": "Documenti",
-          "documents_desc": "I documenti sono oggetti JSON. Koskidex è schemaless, ma ogni documento deve avere un campo 'id' unico.",
+          "documents_desc": "I documenti sono oggetti JSON. Koskidex è schemaless — ogni documento necessita solo di un campo 'id' unico.",
           "search": "Ricerca & Ranking",
-          "search_desc": "La ricerca è alimentata da un indice inverso e una pipeline di ranking personalizzata che considera la distanza degli errori (Damerau-Levenshtein) e la frequenza dei campi."
-        },
-        "customization": {
-          "title": "CSS & Personalizzazione",
-          "desc": "L'interfaccia di Koskidex è progettata per essere completamente personalizzabile. Puoi sovrascrivere le nostre classi CSS per adattarla al tuo brand.",
-          "classes_title": "Classi Utility",
-          "classes_desc": "Ogni componente espone nomi di classe prevedibili come `koskidex-result-item`, `koskidex-search-input` e `koskidex-highlight`."
+          "search_desc": "Alimentata da un indice inverso con fuzzy matching Damerau-Levenshtein, indicizzazione bigram a prefisso e una pipeline di ranking multi-fattore."
         }
       }
     }

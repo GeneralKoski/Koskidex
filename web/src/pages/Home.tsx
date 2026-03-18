@@ -33,13 +33,16 @@ export default function Home({
             {t("demo.subtitle")}
           </p>
 
-          <div className="grid lg:grid-cols-2 gap-8 items-start max-w-7xl mx-auto">
-            <DemoSetup
-              activeIndex={activeIndex}
-              onIndexReady={onIndexReady}
-              onClear={onClear}
-            />
-            <SearchUI activeIndex={activeIndex} />
+          <div className="max-w-3xl mx-auto">
+            <div className="glass-effect rounded-2xl p-5 md:p-7 shadow-xl shadow-blue-500/5 border border-white/5 flex flex-col gap-5">
+              <DemoSetup
+                activeIndex={activeIndex}
+                onIndexReady={onIndexReady}
+                onClear={onClear}
+              />
+              <div className="h-px bg-gradient-to-r from-transparent via-slate-700/50 to-transparent" />
+              <SearchUI activeIndex={activeIndex} />
+            </div>
           </div>
         </div>
 

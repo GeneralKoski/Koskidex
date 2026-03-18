@@ -11,7 +11,8 @@ RUN go mod download
 COPY . .
 
 # Build binary
-RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o koskidex main.go
+ARG VERSION=dev
+RUN CGO_ENABLED=0 go build -ldflags="-w -s -X main.version=${VERSION}" -o koskidex main.go
 
 # Final slim image
 FROM alpine:3.19
@@ -27,6 +28,10 @@ EXPOSE 7700
 
 # Volume for persistence
 VOLUME /data
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:7700/health || exit 1
 
 # Default entrypoint
 ENTRYPOINT ["koskidex", "--data-dir", "/data"]

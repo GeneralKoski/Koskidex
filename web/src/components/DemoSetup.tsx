@@ -17,7 +17,6 @@ export default function DemoSetup({
   activeIndex,
 }: DemoSetupProps) {
   const { t } = useTranslation();
-  const [previewTags, setPreviewTags] = useState<string[]>([]);
   const [status, setStatus] = useState<{
     type: "idle" | "loading" | "success" | "error";
     msg: string;
@@ -26,14 +25,13 @@ export default function DemoSetup({
     msg: "",
   });
 
-  const setupIndex = async (indexName: string, data: Document[], tags: string[]) => {
+  const setupIndex = async (indexName: string, data: Document[]) => {
     setStatus({
       type: "loading",
       msg: t("demo.setup.status.creating", { name: indexName }),
     });
 
     try {
-      // Create Index (handle already exists 409 gracefully)
       const createRes = await fetch(`${API_URL}/indexes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -49,7 +47,6 @@ export default function DemoSetup({
         msg: t("demo.setup.status.loading", { count: data.length }),
       });
 
-      // Add Documents
       const res = await fetch(`${API_URL}/indexes/${indexName}/documents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,7 +59,6 @@ export default function DemoSetup({
         type: "success",
         msg: t("demo.setup.status.success", { name: indexName }),
       });
-      setPreviewTags(tags);
       onIndexReady(indexName);
     } catch (e: unknown) {
       console.error(e);
@@ -75,86 +71,25 @@ export default function DemoSetup({
 
   const handleLoadMovies = () => {
     const movies: Document[] = [
-      {
-        id: "m1",
-        title: t("datasets.movies.titles.matrix"),
-        genre: t("datasets.movies.genres.sci_fi"),
-        year: 1999,
-        director: "Wachowskis",
-      },
-      {
-        id: "m2",
-        title: t("datasets.movies.titles.godfather"),
-        genre: t("datasets.movies.genres.crime"),
-        year: 1972,
-        director: "Francis Ford Coppola",
-      },
-      {
-        id: "m3",
-        title: t("datasets.movies.titles.goodfellas"),
-        genre: t("datasets.movies.genres.biography"),
-        year: 1990,
-        director: "Martin Scorsese",
-      },
-      {
-        id: "m4",
-        title: t("datasets.movies.titles.pulp_fiction"),
-        genre: t("datasets.movies.genres.crime"),
-        year: 1994,
-        director: "Quentin Tarantino",
-      },
-      {
-        id: "m5",
-        title: t("datasets.movies.titles.interstellar"),
-        genre: t("datasets.movies.genres.sci_fi"),
-        year: 2014,
-        director: "Christopher Nolan",
-      },
-      {
-        id: "m6",
-        title: t("datasets.movies.titles.inception"),
-        genre: t("datasets.movies.genres.action"),
-        year: 2010,
-        director: "Christopher Nolan",
-      },
+      { id: "m1", title: t("datasets.movies.titles.matrix"), genre: t("datasets.movies.genres.sci_fi"), year: 1999, director: "Wachowskis" },
+      { id: "m2", title: t("datasets.movies.titles.godfather"), genre: t("datasets.movies.genres.crime"), year: 1972, director: "Francis Ford Coppola" },
+      { id: "m3", title: t("datasets.movies.titles.goodfellas"), genre: t("datasets.movies.genres.biography"), year: 1990, director: "Martin Scorsese" },
+      { id: "m4", title: t("datasets.movies.titles.pulp_fiction"), genre: t("datasets.movies.genres.crime"), year: 1994, director: "Quentin Tarantino" },
+      { id: "m5", title: t("datasets.movies.titles.interstellar"), genre: t("datasets.movies.genres.sci_fi"), year: 2014, director: "Christopher Nolan" },
+      { id: "m6", title: t("datasets.movies.titles.inception"), genre: t("datasets.movies.genres.action"), year: 2010, director: "Christopher Nolan" },
     ];
-    setupIndex("movies", movies, [t("datasets.movies.titles.matrix"), t("datasets.movies.titles.inception"), "Tarantino", t("datasets.movies.genres.sci_fi"), t("datasets.movies.titles.godfather")]);
+    setupIndex("movies", movies);
   };
 
   const handleLoadProducts = () => {
     const products: Document[] = [
-      {
-        id: "p1",
-        name: t("datasets.products.names.macbook"),
-        category: t("datasets.products.categories.laptops"),
-        price: "$1999",
-      },
-      {
-        id: "p2",
-        name: t("datasets.products.names.iphone"),
-        category: t("datasets.products.categories.smartphones"),
-        price: "$999",
-      },
-      {
-        id: "p3",
-        name: t("datasets.products.names.samsung"),
-        category: t("datasets.products.categories.smartphones"),
-        price: "$1199",
-      },
-      {
-        id: "p4",
-        name: t("datasets.products.names.sony"),
-        category: t("datasets.products.categories.audio"),
-        price: "$398",
-      },
-      {
-        id: "p5",
-        name: t("datasets.products.names.dell"),
-        category: t("datasets.products.categories.laptops"),
-        price: "$1299",
-      },
+      { id: "p1", name: t("datasets.products.names.macbook"), category: t("datasets.products.categories.laptops"), price: "$1999" },
+      { id: "p2", name: t("datasets.products.names.iphone"), category: t("datasets.products.categories.smartphones"), price: "$999" },
+      { id: "p3", name: t("datasets.products.names.samsung"), category: t("datasets.products.categories.smartphones"), price: "$1199" },
+      { id: "p4", name: t("datasets.products.names.sony"), category: t("datasets.products.categories.audio"), price: "$398" },
+      { id: "p5", name: t("datasets.products.names.dell"), category: t("datasets.products.categories.laptops"), price: "$1299" },
     ];
-    setupIndex("products", products, ["MacBook", "iPhone", t("datasets.products.categories.smartphones"), t("datasets.products.categories.audio"), t("datasets.products.categories.laptops")]);
+    setupIndex("products", products);
   };
 
   const handleClear = async () => {
@@ -162,8 +97,7 @@ export default function DemoSetup({
     setStatus({ type: "loading", msg: t("demo.setup.status.clearing") });
     try {
       await fetch(`${API_URL}/indexes/${activeIndex}`, { method: "DELETE" });
-      setStatus({ type: "idle", msg: t("demo.setup.status.cleared") });
-      setPreviewTags([]);
+      setStatus({ type: "idle", msg: "" });
       onClear();
     } catch (e: unknown) {
       console.error(e);
@@ -171,96 +105,69 @@ export default function DemoSetup({
     }
   };
 
-  return (
-    <div className="glass-effect rounded-[2rem] p-6 md:p-8 mb-8 text-center w-full shadow-xl shadow-blue-500/5 border-white/5 relative overflow-hidden">
-      <div className="flex items-center justify-center gap-3 mb-4">
-        <div className="h-px w-12 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent"></div>
-        <h3 className="text-xl font-black tracking-tight uppercase text-slate-200">{t("demo.setup.title")}</h3>
-        <div className="h-px w-12 bg-gradient-to-l from-transparent via-blue-500/20 to-transparent"></div>
-      </div>
-      <p className="text-slate-400 mb-6 text-base max-w-xl mx-auto leading-relaxed font-light">{t("demo.setup.subtitle")}</p>
+  const isLoading = status.type === "loading";
 
-      <div className="flex flex-wrap justify-center items-center gap-4 mb-6">
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Dataset selector tabs */}
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={handleLoadMovies}
-          disabled={status.type === "loading"}
+          disabled={isLoading}
           aria-label={t("demo.setup.load_movies")}
-          className={`relative px-5 py-3 rounded-xl font-black transition-all flex items-center gap-2.5 transform hover:scale-105 active:scale-95 group ${
-            activeIndex === "movies" 
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-500/40" 
-              : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+            activeIndex === "movies"
+              ? "bg-blue-500/15 text-blue-400 border border-blue-500/30 shadow-sm shadow-blue-500/10"
+              : "bg-white/5 text-slate-400 border border-white/5 hover:bg-white/10 hover:text-slate-200"
+          } disabled:opacity-50`}
         >
-          {activeIndex === "movies" && (
-            <div className="absolute -inset-0.5 bg-blue-500 rounded-xl blur opacity-30 animate-pulse"></div>
-          )}
-          <Film className={`relative w-5 h-5 ${activeIndex === "movies" ? "animate-pulse" : ""}`} /> 
-          <span className="relative text-sm">{t("demo.setup.load_movies")}</span>
+          <Film className="w-4 h-4" />
+          {t("demo.setup.load_movies")}
         </button>
 
         <button
           onClick={handleLoadProducts}
-          disabled={status.type === "loading"}
+          disabled={isLoading}
           aria-label={t("demo.setup.load_products")}
-          className={`relative px-5 py-3 rounded-xl font-black transition-all flex items-center gap-2.5 transform hover:scale-105 active:scale-95 group ${
-            activeIndex === "products" 
-              ? "bg-purple-600 text-white shadow-lg shadow-purple-500/40" 
-              : "bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+            activeIndex === "products"
+              ? "bg-purple-500/15 text-purple-400 border border-purple-500/30 shadow-sm shadow-purple-500/10"
+              : "bg-white/5 text-slate-400 border border-white/5 hover:bg-white/10 hover:text-slate-200"
+          } disabled:opacity-50`}
         >
-          {activeIndex === "products" && (
-            <div className="absolute -inset-0.5 bg-purple-500 rounded-xl blur opacity-30 animate-pulse"></div>
+          <Package className="w-4 h-4" />
+          {t("demo.setup.load_products")}
+        </button>
+
+        <div className="flex-1" />
+
+        {activeIndex && (
+          <button
+            onClick={handleClear}
+            disabled={isLoading}
+            aria-label={t("demo.setup.clear")}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-30"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            {t("demo.setup.clear")}
+          </button>
+        )}
+      </div>
+
+      {/* Status bar */}
+      {status.msg && (
+        <div className={`flex items-center gap-2 text-xs font-medium px-1 ${
+          status.type === "loading" ? "text-blue-400" :
+          status.type === "success" ? "text-emerald-400" :
+          status.type === "error" ? "text-red-400" :
+          "text-slate-500"
+        }`}>
+          {status.type === "loading" && (
+            <span className="animate-spin w-3 h-3 border-2 border-current border-t-transparent rounded-full shrink-0" />
           )}
-          <Package className={`relative w-5 h-5 ${activeIndex === "products" ? "animate-pulse" : ""}`} /> 
-          <span className="relative text-sm">{t("demo.setup.load_products")}</span>
-        </button>
-
-        <div className="h-12 w-px bg-white/10 mx-4 hidden md:block"></div>
-
-        <button
-          onClick={handleClear}
-          disabled={!activeIndex || status.type === "loading"}
-          aria-label={t("demo.setup.clear")}
-          className="relative px-5 py-3 rounded-xl bg-red-500/5 hover:bg-red-500/10 text-red-500/70 hover:text-red-500 border border-red-500/10 transition-all flex items-center gap-2.5 group disabled:opacity-30 disabled:hover:scale-100 transform hover:scale-105 active:scale-95"
-        >
-          <Trash2 className="w-5 h-5 group-hover:rotate-12 transition-transform" /> 
-          <span className="font-bold text-sm">{t("demo.setup.clear")}</span>
-        </button>
-      </div>
-
-      <div className="min-h-[28px] mb-4 flex items-center justify-center">
-        {status.type === "loading" && (
-          <span className="text-blue-400 animate-pulse font-medium">{status.msg}</span>
-        )}
-        {status.type === "success" && (
-          <span className="text-emerald-400 flex items-center gap-2 font-medium">
-            <CheckCircle2 className="w-4 h-4" /> {status.msg}
-          </span>
-        )}
-        {status.type === "error" && (
-          <span className="text-red-400 flex items-center gap-2 font-medium">
-            <AlertCircle className="w-4 h-4" /> {status.msg}
-          </span>
-        )}
-        {status.type === "idle" && status.msg && (
-          <span className="text-slate-400 font-medium">{status.msg}</span>
-        )}
-      </div>
-
-      {previewTags.length > 0 && (
-        <div className="pt-6 border-t border-white/5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">{t("demo.setup.preview_title")}</h4>
-          <p className="text-slate-400 mb-4 text-xs font-light">{t("demo.setup.preview_subtitle")}</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {previewTags.map((tag) => (
-              <span 
-                key={tag}
-                className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/10 hover:border-blue-500/30 transition-all cursor-default"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
+          {status.type === "success" && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
+          {status.type === "error" && <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
+          {status.msg}
         </div>
       )}
     </div>

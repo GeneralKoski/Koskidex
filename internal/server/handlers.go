@@ -2,13 +2,24 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/GeneralKoski/Koskidex/internal/engine"
 	"github.com/GeneralKoski/Koskidex/internal/manager"
 )
+
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	uptime := time.Since(s.startTime).Round(time.Second).String()
+	sendJSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+		"uptime": uptime,
+	})
+}
 
 type createIndexReq struct {
 	Name string `json:"name"`
@@ -206,7 +217,18 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	name := r.PathValue("name")
 	query := r.URL.Query().Get("q")
-	// For phase 1 we only support exact search, phase 2 we do typo tolerance
+
+	limit := 20
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+		if limit > 1000 {
+			limit = 1000
+		}
+	}
+	offset := 0
+	if o, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && o >= 0 {
+		offset = o
+	}
 
 	idx, err := s.mgr.GetIndex(name)
 	if err == manager.ErrIndexNotFound {
@@ -214,22 +236,62 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	filterRaw := r.URL.Query().Get("filter")
+
 	if query == "" {
 		sendJSON(w, http.StatusOK, map[string]interface{}{
 			"query":              query,
 			"hits":               []interface{}{},
 			"total_hits":         0,
+			"limit":              limit,
+			"offset":             offset,
 			"processing_time_ms": time.Since(start).Milliseconds(),
 		})
 		return
 	}
 
+	// Check cache
+	cacheKey := fmt.Sprintf("%s|%s|%s|%d|%d", name, query, filterRaw, limit, offset)
+	if cached, ok := s.cache.Get(cacheKey); ok {
+		if resp, ok := cached.(map[string]interface{}); ok {
+			resp["processing_time_ms"] = time.Since(start).Milliseconds()
+			sendJSON(w, http.StatusOK, resp)
+			return
+		}
+	}
+
 	docIDs, highlights := idx.Engine.Search(query, idx.Settings)
+
+	// Apply filters before pagination
+	filters := engine.ParseFilters(filterRaw)
+	if len(filters) > 0 {
+		var filtered []string
+		for _, id := range docIDs {
+			if doc, ok := idx.Engine.GetDocument(id); ok {
+				if engine.ApplyFilters(doc, filters) {
+					filtered = append(filtered, id)
+				}
+			}
+		}
+		docIDs = filtered
+	}
+
+	totalHits := len(docIDs)
+
+	// Apply pagination
+	if offset >= len(docIDs) {
+		docIDs = nil
+	} else {
+		end := offset + limit
+		if end > len(docIDs) {
+			end = len(docIDs)
+		}
+		docIDs = docIDs[offset:end]
+	}
 
 	hits := []map[string]interface{}{}
 	for _, id := range docIDs {
 		if doc, ok := idx.Engine.GetDocument(id); ok {
-			// Filter DisplayedFields if configured
 			displayDoc := make(map[string]interface{})
 			if len(idx.Settings.DisplayedFields) > 0 {
 				for _, f := range idx.Settings.DisplayedFields {
@@ -237,7 +299,6 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 						displayDoc[f] = val
 					}
 				}
-				// Always include ID
 				if _, ok := displayDoc["id"]; !ok {
 					displayDoc["id"] = id
 				}
@@ -245,7 +306,6 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 				displayDoc = doc
 			}
 
-			// Apply highlighting
 			highlightsMap := make(map[string]string)
 			for k, v := range displayDoc {
 				if strVal, isStr := v.(string); isStr {
@@ -265,10 +325,15 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 	elapsed := time.Since(start)
 
-	sendJSON(w, http.StatusOK, map[string]interface{}{
+	resp := map[string]interface{}{
 		"query":              query,
 		"hits":               hits,
-		"total_hits":         len(hits),
+		"total_hits":         totalHits,
+		"limit":              limit,
+		"offset":             offset,
 		"processing_time_ms": elapsed.Milliseconds(),
-	})
+	}
+
+	s.cache.Put(cacheKey, resp)
+	sendJSON(w, http.StatusOK, resp)
 }

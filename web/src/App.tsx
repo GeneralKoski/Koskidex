@@ -1,4 +1,4 @@
-import { Github, Globe, Zap } from "lucide-react";
+import { Github, Globe, Menu, X, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -11,6 +11,7 @@ import {
 import ErrorBoundary from "./components/ErrorBoundary";
 import Documentation from "./pages/Documentation";
 import Home from "./pages/Home";
+import NotFound from "./pages/NotFound";
 
 function Navbar({
   changeLanguage,
@@ -24,18 +25,23 @@ function Navbar({
   const { t, i18n } = useTranslation();
   const location = useLocation();
   const isHome = location.pathname === "/";
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 transform ${
-        showNav ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
+        showNav || mobileOpen ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
       } ${
-        lastScrollY > 50
-          ? "glass-effect bg-slate-900/80 border-b border-white/5 py-4 shadow-2xl shadow-blue-500/10 rounded-b-3xl rounded-t-none"
-          : "bg-transparent py-7 border-transparent"
+        lastScrollY > 50 || mobileOpen
+          ? "glass-effect bg-slate-900/80 border-b border-white/5 py-3 md:py-4 shadow-2xl shadow-blue-500/10 rounded-b-3xl rounded-t-none"
+          : "bg-transparent py-5 md:py-7 border-transparent"
       }`}
     >
-      <div className="container mx-auto px-6 h-20 flex justify-between items-center">
+      <div className="container mx-auto px-4 md:px-6 h-14 md:h-20 flex justify-between items-center">
         <Link
           to="/"
           onClick={(e) => {
@@ -44,11 +50,36 @@ function Navbar({
               window.scrollTo({ top: 0, behavior: "smooth" });
             }
           }}
-          className="text-3xl font-black flex items-center gap-2 tracking-tighter text-white"
+          className="text-2xl md:text-3xl font-black flex items-center gap-2 tracking-tighter text-white"
         >
-          <Zap className="w-8 h-8 text-blue-500 fill-blue-500" />
+          <Zap className="w-6 h-6 md:w-8 md:h-8 text-blue-500 fill-blue-500" />
           Koskidex
         </Link>
+
+        {/* Mobile controls */}
+        <div className="flex md:hidden items-center gap-3">
+          <label className="flex items-center gap-1.5 bg-slate-800/40 px-2 py-1 rounded-lg border border-white/5 cursor-pointer">
+            <Globe className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={i18n.language.split("-")[0]}
+              onChange={(e) => changeLanguage(e.target.value)}
+              className="bg-transparent text-xs text-slate-300 focus:outline-none cursor-pointer font-medium appearance-none"
+              aria-label={t("nav.select_language")}
+            >
+              <option value="en" className="bg-slate-900">EN</option>
+              <option value="it" className="bg-slate-900">IT</option>
+            </select>
+          </label>
+          <button
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="p-2 text-slate-300 hover:text-white transition-colors"
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
+
+        {/* Desktop nav */}
         <div className="hidden md:flex items-center gap-8 font-medium">
           {isHome ? (
             <>
@@ -76,7 +107,7 @@ function Navbar({
 
           <Link
             to="/docs"
-            className="text-slate-300 hover:text-white transition-colors italic"
+            className="text-slate-300 hover:text-white transition-colors"
           >
             {t("nav.features")}
           </Link>
@@ -123,6 +154,30 @@ function Navbar({
           </a>
         </div>
       </div>
+
+      {/* Mobile dropdown */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-white/5 px-4 py-4 flex flex-col gap-3 bg-slate-900/95 backdrop-blur-xl">
+          {isHome ? (
+            <>
+              <a href="#demo" onClick={() => setMobileOpen(false)} className="text-slate-300 hover:text-white transition-colors py-2 text-sm font-medium">{t("nav.demo")}</a>
+              <a href="#integration" onClick={() => setMobileOpen(false)} className="text-slate-300 hover:text-white transition-colors py-2 text-sm font-medium">{t("nav.integration")}</a>
+            </>
+          ) : (
+            <Link to="/" className="text-slate-300 hover:text-white transition-colors py-2 text-sm font-medium">{t("docs.back_home")}</Link>
+          )}
+          <Link to="/docs" className="text-slate-300 hover:text-white transition-colors py-2 text-sm font-medium">{t("nav.features")}</Link>
+          <a
+            href="https://github.com/GeneralKoski/Koskidex"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors py-2 text-sm font-medium"
+          >
+            <Github className="w-4 h-4" />
+            {t("nav.github")}
+          </a>
+        </div>
+      )}
     </nav>
   );
 }
@@ -170,6 +225,7 @@ function AppContent() {
             }
           />
           <Route path="/docs" element={<Documentation />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
 

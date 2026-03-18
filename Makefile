@@ -1,10 +1,11 @@
-.PHONY: build test run clean docker
+.PHONY: build test run clean docker docker-run lint bench
 
 # Output binary name
 BINARY=koskidex
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 build:
-	go build -o $(BINARY) main.go
+	go build -ldflags="-X main.version=$(VERSION)" -o $(BINARY) main.go
 
 test:
 	go test -v ./...
@@ -21,3 +22,9 @@ docker:
 
 docker-run: docker
 	docker run --rm --name koskidex -p 7700:7700 -v $(PWD)/data:/data koskidex
+
+lint:
+	golangci-lint run ./...
+
+bench:
+	go test -bench=. -benchmem ./internal/engine/

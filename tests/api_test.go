@@ -26,7 +26,7 @@ func setupTestServer(t *testing.T) (*server.Server, func()) {
 		t.Fatalf("Failed to initialize manager: %v", err)
 	}
 
-	srv := server.NewServer(mgr, "")
+	srv := server.NewServer(mgr, "", 0)
 
 	cleanup := func() {
 		mgr.Close()

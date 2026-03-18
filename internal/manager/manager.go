@@ -20,12 +20,27 @@ type Index struct {
 	Settings engine.Settings
 }
 
+type CacheInvalidator interface {
+	InvalidatePrefix(prefix string)
+}
+
 // Manager manages multiple indexes
 type Manager struct {
-	mu           sync.RWMutex
-	indexes      map[string]*Index
-	storageOpts  storage.Options
-	persistence  *storage.Persistence
+	mu               sync.RWMutex
+	indexes          map[string]*Index
+	storageOpts      storage.Options
+	persistence      *storage.Persistence
+	cacheInvalidator CacheInvalidator
+}
+
+func (m *Manager) SetCacheInvalidator(c CacheInvalidator) {
+	m.cacheInvalidator = c
+}
+
+func (m *Manager) invalidateCache(indexName string) {
+	if m.cacheInvalidator != nil {
+		m.cacheInvalidator.InvalidatePrefix(indexName + "|")
+	}
 }
 
 // NewManager initializes a new Manager and loads existing indexes from disk
@@ -115,6 +130,7 @@ func (m *Manager) DeleteIndex(name string) error {
 	}
 	delete(m.indexes, name)
 
+	m.invalidateCache(name)
 	return m.triggerSaveLocked()
 }
 
@@ -135,6 +151,7 @@ func (m *Manager) AddDocuments(indexName string, docs []map[string]interface{}) 
 		}
 	}
 
+	m.invalidateCache(indexName)
 	return m.triggerSave()
 }
 
@@ -146,6 +163,7 @@ func (m *Manager) DeleteDocument(indexName, docID string) error {
 	}
 
 	idx.Engine.DeleteDocument(docID)
+	m.invalidateCache(indexName)
 	return m.triggerSave()
 }
 
@@ -175,6 +193,7 @@ func (m *Manager) UpdateSettings(indexName string, settings engine.Settings) err
 	idx.Engine = newEngine
 	m.mu.Unlock()
 
+	m.invalidateCache(indexName)
 	return m.triggerSave()
 }
 
