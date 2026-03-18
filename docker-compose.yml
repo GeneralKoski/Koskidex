@@ -9,14 +9,22 @@ services:
     restart: unless-stopped
     command: ["/app/koskidex", "--port", "7700", "--data-dir", "/data"]
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7700/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:7700/health",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 5s
 
   frontend:
-    build: 
+    build:
       context: ./web
       dockerfile: Dockerfile
     container_name: koskidex_frontend
@@ -25,3 +33,21 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+  seeder:
+    image: golang:1.23-alpine
+    container_name: koskidex_seeder
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./scripts:/scripts
+      - ./data:/data
+    restart: "no"
+    command: >
+      sh -c "if [ ! -f /data/wal.log ]; then
+               echo 'First deployment detected. Automatically seeding 100,000 documents...';
+               go run /scripts/seed.go -url http://backend:7700 -index massive -count 100000;
+             else
+               echo 'Data volume already exists (/data/wal.log). Skipping auto-seed.';
+             fi"

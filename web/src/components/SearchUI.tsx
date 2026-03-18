@@ -249,7 +249,7 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
             </p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar" aria-label="Search results">
+          <ul className="flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-2 custom-scrollbar" aria-label="Search results">
             {results?.hits?.map((hit: Hit, index: number) => {
               let titleLine = '';
               let metaItems: { icon: React.ReactNode; text: string }[] = [];
@@ -278,7 +278,7 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
                 <li
                   key={hit.id}
                   style={{ animationDelay: `${index * 40}ms` }}
-                  className="bg-slate-900/30 border border-slate-800/40 px-4 py-3 rounded-xl hover:bg-slate-800/40 hover:border-blue-500/20 transition-all cursor-default flex flex-col gap-1 relative overflow-hidden group animate-in slide-in-from-bottom-2 fade-in duration-300 fill-mode-both"
+                  className="shrink-0 bg-slate-900/30 border border-slate-800/40 px-4 py-3 rounded-xl hover:bg-slate-800/40 hover:border-blue-500/20 transition-all cursor-default flex flex-col gap-1 relative overflow-hidden group animate-in slide-in-from-bottom-2 fade-in duration-300 fill-mode-both"
                 >
                   <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
