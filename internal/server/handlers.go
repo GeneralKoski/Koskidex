@@ -71,7 +71,7 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 		loc = strings.ReplaceAll(loc, "https:/", "https://")
 		loc = strings.ReplaceAll(loc, "http:/", "http://")
 
-		_, _ = w.Write([]byte(fmt.Sprintf("  <url>\n    <loc>%s</loc>\n    <changefreq>%s</changefreq>\n  </url>\n", loc, freq)))
+		_, _ = fmt.Fprintf(w, "  <url>\n    <loc>%s</loc>\n    <changefreq>%s</changefreq>\n  </url>\n", loc, freq)
 	}
 
 	_, _ = w.Write([]byte(`</urlset>` + "\n"))
