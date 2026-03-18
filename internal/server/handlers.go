@@ -102,7 +102,7 @@ func (s *Server) handleAddDocuments(w http.ResponseWriter, r *http.Request) {
 			sendError(w, http.StatusBadRequest, "File field 'file' is required for multipart uploads")
 			return
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		if err := json.NewDecoder(file).Decode(&docs); err != nil {
 			sendError(w, http.StatusBadRequest, "Invalid JSON in uploaded file")
 			return

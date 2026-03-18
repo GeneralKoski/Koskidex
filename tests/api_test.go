@@ -30,7 +30,7 @@ func setupTestServer(t *testing.T) (*server.Server, func()) {
 
 	cleanup := func() {
 		mgr.Close()
-		os.RemoveAll(dataDir)
+		_ = os.RemoveAll(dataDir)
 	}
 
 	return srv, cleanup
