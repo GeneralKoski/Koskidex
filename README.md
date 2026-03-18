@@ -61,8 +61,14 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 |---|---------|---------|
 | **Performance** | Sub-5ms response times on reasonable datasets |
 | **Lightweight** | Binary <15MB, RAM <20MB idle, zero runtime dependencies |
-| **Typo tolerance** | Damerau-Levenshtein fuzzy matching with configurable distance |
+| **Typo tolerance** | Damerau-Levenshtein fuzzy matching with dynamic fuzziness (`0`, `1`, `2`, `AUTO`) |
 | **Smart ranking** | Multi-factor pipeline: exactness, typo count, field weight, term frequency |
+| **Field weighting** | Boost specific fields via `field_weights` settings (e.g. `name: 5`, `description: 1`) |
+| **Explicit sorting** | Sort results by any field: `sort=price:asc,rating:desc` |
+| **Faceted search** | Aggregate counts per field: `facets=genre,category` |
+| **Geospatial** | Haversine distance filtering: `filter=distance(_geo,45.46,9.19)<50000` |
+| **Vector search** | Cosine similarity on `_vector` fields, hybrid mode with full-text scoring |
+| **WAL** | Write-Ahead Log for crash recovery — zero data loss on unexpected shutdowns |
 | **Search operators** | `AND` (default), `OR`, `NOT` (prefix `-`) |
 | **Field filters** | `filter=genre=Sci-Fi,year>2000` with `=`, `!=`, `>`, `<`, `>=`, `<=` |
 | **Pagination** | `limit` and `offset` params, `total_hits` in response |
@@ -92,6 +98,7 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 | `GET` | `/indexes/{name}/documents/{id}` | Get document by ID |
 | `DELETE` | `/indexes/{name}/documents/{id}` | Delete document |
 | `GET` | `/indexes/{name}/search?q=` | Full-text search |
+| `POST` | `/indexes/{name}/search` | Full-text search (POST body) |
 | `GET` | `/indexes/{name}/settings` | Get index settings |
 | `PUT` | `/indexes/{name}/settings` | Update settings (synonyms, stop words, etc.) |
 | `GET` | `/health` | Health check (no auth required) |
@@ -109,11 +116,39 @@ curl "http://localhost:7700/indexes/movies/search?q=matrix&limit=10&offset=0"
 curl "http://localhost:7700/indexes/movies/search?q=matrix&filter=genre=Sci-Fi"
 curl "http://localhost:7700/indexes/movies/search?q=movie&filter=year>2000,genre=Action"
 
+# Dynamic fuzziness (0 = exact, 1 = one typo, 2 = two typos, AUTO = adaptive)
+curl "http://localhost:7700/indexes/movies/search?q=matrx&fuzziness=AUTO"
+curl "http://localhost:7700/indexes/movies/search?q=matrx&fuzziness=0"  # no results (exact only)
+
+# Explicit sorting
+curl "http://localhost:7700/indexes/movies/search?q=nolan&sort=year:desc"
+curl "http://localhost:7700/indexes/products/search?q=apple&sort=price:asc,rating:desc"
+
+# Faceted search (returns aggregated counts per field)
+curl "http://localhost:7700/indexes/movies/search?q=the&facets=genre,director"
+
+# Geospatial filtering (distance in meters, Haversine)
+curl "http://localhost:7700/indexes/places/search?q=pizza&filter=distance(_geo,45.4642,9.1900)<5000"
+
 # OR operator
 curl "http://localhost:7700/indexes/movies/search?q=matrix OR inception"
 
 # NOT operator
 curl "http://localhost:7700/indexes/movies/search?q=movie -horror"
+
+# POST search (for complex queries or vector search)
+curl -X POST http://localhost:7700/indexes/movies/search \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "q": "matrix",
+  "fuzziness": "AUTO",
+  "sort": "year:desc",
+  "facets": "genre",
+  "filter": "year>2000",
+  "limit": 10,
+  "offset": 0,
+  "vector": [0.1, 0.2, 0.3]
+}'
 ```
 
 ### Documents
@@ -143,7 +178,13 @@ curl -X PUT http://localhost:7700/indexes/movies/settings \
   "synonyms": {"iphone": ["apple phone", "smartphone"]},
   "searchable_fields": ["title", "description"],
   "displayed_fields": ["title", "price"],
-  "stop_words": ["the", "a", "is"]
+  "stop_words": ["the", "a", "is"],
+  "field_weights": {"title": 5, "description": 1},
+  "typo_tolerance": {
+    "enabled": true,
+    "min_word_length_one_typo": 4,
+    "min_word_length_two_typos": 8
+  }
 }'
 ```
 
@@ -258,15 +299,16 @@ results = client.search('movies', 'matrx')
 │  Cache invalidation on writes                    │
 ├──────────────┬──────────────┬───────────────────┤
 │   Tokenizer  │    Engine    │    Persistence    │
-│  Normalize   │  Inverted    │  GOB binary       │
-│  Stop words  │  Index       │  Debounced        │
-│  Split       │  Bigram      │  writes           │
+│  Normalize   │  Inverted    │  GOB snapshots    │
+│  Stop words  │  Index       │  Write-Ahead Log  │
+│  Split       │  Bigram      │  Crash recovery   │
 │              │  Prefix      │                    │
 ├──────────────┼──────────────┤                    │
 │    Ranker    │   Filters    │                    │
 │  Fuzzy match │  Field ops   │                    │
-│  Multi-score │  =,!=,>,<    │                    │
-│  OR / NOT    │  >=, <=      │                    │
+│  Field boost │  Geo/Haver.  │                    │
+│  Vector/Cos. │  Facets      │                    │
+│  Sorting     │  OR / NOT    │                    │
 ├──────────────┴──────────────┤                    │
 │          LRU Cache          │                    │
 │  1024 entries, prefix       │                    │
@@ -279,8 +321,9 @@ results = client.search('movies', 'matrx')
 | Layer | Technology |
 |-------|------------|
 | **Engine** | Go 1.23, zero external dependencies |
-| **Search** | Inverted index, Damerau-Levenshtein, bigram prefix indexing |
-| **Storage** | GOB binary encoding, debounced persistence |
+| **Search** | Inverted index, Damerau-Levenshtein, bigram prefix, cosine similarity |
+| **Ranking** | Field weighting, dynamic fuzziness, hybrid text+vector scoring |
+| **Storage** | GOB snapshots + Write-Ahead Log (WAL), debounced persistence |
 | **Cache** | LRU (doubly-linked list + map), auto-invalidation |
 | **API** | net/http, token bucket rate limiter |
 | **Frontend** | React 19, TypeScript, Vite 6, Tailwind CSS 4 |

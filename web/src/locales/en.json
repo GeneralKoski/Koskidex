@@ -127,7 +127,9 @@
           "documents": "Documents",
           "documents_desc": "Documents are JSON objects. Koskidex is schemaless — every document only needs a unique 'id' field.",
           "search": "Search & Ranking",
-          "search_desc": "Powered by an inverted index with Damerau-Levenshtein fuzzy matching, bigram prefix indexing, and a multi-factor ranking pipeline."
+          "search_desc": "Inverted index with Damerau-Levenshtein fuzzy matching, bigram prefix indexing, field weighting, dynamic fuzziness, explicit sorting, faceted search, geospatial filtering, and hybrid vector search.",
+          "storage": "Storage & Durability",
+          "storage_desc": "GOB binary snapshots with a Write-Ahead Log (WAL) for crash recovery. Every mutation is appended to the WAL before returning, ensuring zero data loss."
         }
       }
     }

@@ -550,9 +550,10 @@ print(results['hits'])`}</CodeBlock>
                             ["POST", "/indexes/{name}/documents", "Add documents (single, array, or file upload)"],
                             ["GET", "/indexes/{name}/documents/{id}", "Get document by ID"],
                             ["DELETE", "/indexes/{name}/documents/{id}", "Delete document"],
-                            ["GET", "/indexes/{name}/search?q=", "Full-text search"],
+                            ["GET", "/indexes/{name}/search?q=", "Full-text search (GET)"],
+                            ["POST", "/indexes/{name}/search", "Full-text search (POST body)"],
                             ["GET", "/indexes/{name}/settings", "Get index settings"],
-                            ["PUT", "/indexes/{name}/settings", "Update settings (synonyms, stop words, etc.)"],
+                            ["PUT", "/indexes/{name}/settings", "Update settings"],
                             ["GET", "/health", "Health check (no auth required)"],
                           ].map(([method, endpoint, desc]) => (
                             <tr key={`${method}-${endpoint}`} className="border-b border-white/5 hover:bg-white/[0.02]">
@@ -591,11 +592,27 @@ curl "http://localhost:7700/indexes/movies/search?q=matrix&limit=10&offset=0"
 curl "http://localhost:7700/indexes/movies/search?q=matrix&filter=genre=Sci-Fi"
 curl "http://localhost:7700/indexes/movies/search?q=movie&filter=year>2000,genre=Action"
 
-# OR operator
-curl "http://localhost:7700/indexes/movies/search?q=matrix OR inception"
+# Dynamic fuzziness (0 = exact, 1 = one typo, 2 = two typos, AUTO = adaptive)
+curl "http://localhost:7700/indexes/movies/search?q=matrx&fuzziness=AUTO"
 
-# NOT operator (prefix with -)
-curl "http://localhost:7700/indexes/movies/search?q=movie -horror"`}</CodeBlock>
+# Explicit sorting (comma-separated, :asc or :desc)
+curl "http://localhost:7700/indexes/movies/search?q=nolan&sort=year:desc"
+curl "http://localhost:7700/indexes/products/search?q=apple&sort=price:asc,rating:desc"
+
+# Faceted search (returns counts per distinct value)
+curl "http://localhost:7700/indexes/movies/search?q=the&facets=genre,director"
+
+# Geospatial filtering (Haversine distance in meters)
+curl "http://localhost:7700/indexes/places/search?q=pizza&filter=distance(_geo,45.46,9.19)<5000"
+
+# OR / NOT operators
+curl "http://localhost:7700/indexes/movies/search?q=matrix OR inception"
+curl "http://localhost:7700/indexes/movies/search?q=movie -horror"
+
+# POST search (for complex queries or vector search)
+curl -X POST http://localhost:7700/indexes/movies/search \\
+  -H 'Content-Type: application/json' \\
+  -d '{"q":"matrix","fuzziness":"AUTO","sort":"year:desc","facets":"genre"}'`}</CodeBlock>
                   </div>
                 </div>
               </SectionCard>
@@ -640,6 +657,15 @@ curl "http://localhost:7700/indexes/movies/search?q=movie -horror"`}</CodeBlock>
                     </h4>
                     <p className="text-slate-400 text-sm leading-relaxed">
                       {t("docs.sections.architecture.concepts.search_desc")}
+                    </p>
+                  </div>
+                  <div className="p-5 bg-white/5 rounded-xl border border-white/5">
+                    <h4 className="text-white font-bold mb-2 flex items-center gap-2 text-sm">
+                      <Box className="w-4 h-4 text-yellow-400" />
+                      {t("docs.sections.architecture.concepts.storage")}
+                    </h4>
+                    <p className="text-slate-400 text-sm leading-relaxed">
+                      {t("docs.sections.architecture.concepts.storage_desc")}
                     </p>
                   </div>
                 </div>
