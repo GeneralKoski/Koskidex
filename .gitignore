@@ -45,3 +45,8 @@ Thumbs.db
 # Temporary files
 tmp/
 /Users/martintrajkovski/Desktop/Progetti-personali/Koskidex/.gemini/
+
+# AI Assistant Instructions
+.cursorrules
+.clauderules
+.github/copilot-instructions.md
