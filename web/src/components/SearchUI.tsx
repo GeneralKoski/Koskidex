@@ -249,7 +249,7 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
             </p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-2" aria-label="Search results">
+          <ul className="flex flex-col gap-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar" aria-label="Search results">
             {results?.hits?.map((hit: Hit, index: number) => {
               let titleLine = '';
               let metaItems: { icon: React.ReactNode; text: string }[] = [];
