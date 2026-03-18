@@ -30,7 +30,6 @@ func randomString(arr []string) string {
 
 func main() {
 	flag.Parse()
-	rand.Seed(time.Now().UnixNano())
 
 	fmt.Printf("🎯 Target API: %s\n", *targetURL)
 	fmt.Printf("📦 Creating Index: '%s'\n", *indexName)
@@ -43,7 +42,7 @@ func main() {
 		fmt.Printf("❌ Failed to create index: %v\n", err)
 		return
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
 		fmt.Println("✅ Index ready.")
 	} else {
@@ -79,7 +78,7 @@ func main() {
 				fmt.Printf("\n❌ Error sending chunk: %v\n", err)
 				return
 			}
-			chunkResp.Body.Close()
+			_ = chunkResp.Body.Close()
 			
 			fmt.Printf("📤 Seeded %d/%d documents (Took %v)\n", i, *docCount, time.Since(reqStart))
 			docs = nil // Reset chunk
