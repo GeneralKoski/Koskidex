@@ -81,7 +81,7 @@ func TestLoadNonExistent(t *testing.T) {
 func TestCorruptedFile(t *testing.T) {
 	dir := tempDir(t)
 	// Write garbage
-	os.WriteFile(filepath.Join(dir, "koskidex.db"), []byte("not a gob file"), 0644)
+	_ = os.WriteFile(filepath.Join(dir, "koskidex.db"), []byte("not a gob file"), 0644)
 
 	p := NewPersistence(Options{DataDir: dir})
 	defer p.Wait()
