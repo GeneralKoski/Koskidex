@@ -16,6 +16,7 @@ type RateLimiter struct {
 	clients map[string]*bucket
 	rate    float64
 	burst   float64
+	stop    chan struct{}
 }
 
 func NewRateLimiter(ratePerSecond int) *RateLimiter {
@@ -23,9 +24,15 @@ func NewRateLimiter(ratePerSecond int) *RateLimiter {
 		clients: make(map[string]*bucket),
 		rate:    float64(ratePerSecond),
 		burst:   float64(ratePerSecond * 2),
+		stop:    make(chan struct{}),
 	}
 	go rl.cleanup()
 	return rl
+}
+
+// Stop terminates the background cleanup goroutine.
+func (rl *RateLimiter) Stop() {
+	close(rl.stop)
 }
 
 func (rl *RateLimiter) Allow(ip string) bool {
@@ -58,15 +65,20 @@ func (rl *RateLimiter) Allow(ip string) bool {
 func (rl *RateLimiter) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
-		rl.mu.Lock()
-		cutoff := time.Now().Add(-10 * time.Minute)
-		for ip, b := range rl.clients {
-			if b.lastCheck.Before(cutoff) {
-				delete(rl.clients, ip)
+	for {
+		select {
+		case <-rl.stop:
+			return
+		case <-ticker.C:
+			rl.mu.Lock()
+			cutoff := time.Now().Add(-10 * time.Minute)
+			for ip, b := range rl.clients {
+				if b.lastCheck.Before(cutoff) {
+					delete(rl.clients, ip)
+				}
 			}
+			rl.mu.Unlock()
 		}
-		rl.mu.Unlock()
 	}
 }
 

@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/GeneralKoski/Koskidex/internal/manager"
 	"github.com/GeneralKoski/Koskidex/internal/server"
@@ -14,14 +19,32 @@ import (
 
 var version = "dev"
 
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func envIntOr(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
 func main() {
-	port := flag.String("port", "7700", "HTTP port")
-	dataDir := flag.String("data-dir", "./data", "Data directory for persistence")
-	apiKey := flag.String("api-key", "", "Optional API key for authentication")
-	logLevelStr := flag.String("log-level", "info", "Log level: debug, info, warn, error")
-	rateLimit := flag.Int("rate-limit", 0, "Max requests per second per IP (0 = disabled)")
-	tlsCert := flag.String("tls-cert", "", "Path to TLS certificate file")
-	tlsKey := flag.String("tls-key", "", "Path to TLS key file")
+	// Flags take precedence over environment variables (which act as defaults).
+	port := flag.String("port", envOr("KOSKIDEX_PORT", "7700"), "HTTP port")
+	dataDir := flag.String("data-dir", envOr("KOSKIDEX_DATA_DIR", "./data"), "Data directory for persistence")
+	apiKey := flag.String("api-key", envOr("KOSKIDEX_API_KEY", ""), "Optional API key for authentication")
+	logLevelStr := flag.String("log-level", envOr("KOSKIDEX_LOG_LEVEL", "info"), "Log level: debug, info, warn, error")
+	rateLimit := flag.Int("rate-limit", envIntOr("KOSKIDEX_RATE_LIMIT", 0), "Max requests per second per IP (0 = disabled)")
+	corsOrigin := flag.String("cors-origin", envOr("KOSKIDEX_CORS_ORIGIN", "*"), "Allowed CORS origin (* = any)")
+	tlsCert := flag.String("tls-cert", envOr("KOSKIDEX_TLS_CERT", ""), "Path to TLS certificate file")
+	tlsKey := flag.String("tls-key", envOr("KOSKIDEX_TLS_KEY", ""), "Path to TLS key file")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
@@ -67,22 +90,48 @@ func main() {
 	defer mgr.Close()
 
 	// Initialize HTTP server
-	srv := server.NewServer(mgr, *apiKey, *rateLimit)
+	srv := server.NewServer(mgr, *apiKey, *rateLimit, *corsOrigin)
+	defer srv.Close()
 
-	// Start serving
 	addr := ":" + *port
-	slog.Info("HTTP server listening", "address", addr)
+	httpServer := &http.Server{
+		Addr:              addr,
+		Handler:           srv,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 
+	// Graceful shutdown on SIGINT/SIGTERM.
+	shutdownErr := make(chan error, 1)
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		<-sigChan
+
+		slog.Info("Shutdown signal received, draining connections")
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		shutdownErr <- httpServer.Shutdown(ctx)
+	}()
+
+	slog.Info("HTTP server listening", "address", addr)
+	var serveErr error
 	if *tlsCert != "" {
 		slog.Info("TLS enabled", "cert", *tlsCert)
-		if err := http.ListenAndServeTLS(addr, *tlsCert, *tlsKey, srv); err != nil {
-			slog.Error("Server error", "error", err)
-			os.Exit(1)
-		}
+		serveErr = httpServer.ListenAndServeTLS(*tlsCert, *tlsKey)
 	} else {
-		if err := http.ListenAndServe(addr, srv); err != nil {
-			slog.Error("Server error", "error", err)
-			os.Exit(1)
-		}
+		serveErr = httpServer.ListenAndServe()
 	}
+
+	if serveErr != nil && serveErr != http.ErrServerClosed {
+		slog.Error("Server error", "error", serveErr)
+		os.Exit(1)
+	}
+
+	if err := <-shutdownErr; err != nil {
+		slog.Error("Graceful shutdown failed", "error", err)
+	}
+	slog.Info("Server stopped")
 }

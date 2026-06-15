@@ -3,8 +3,7 @@ FROM golang:1.23-alpine AS builder
 WORKDIR /app
 
 # Download dependencies
-COPY go.mod ./
-# COPY go.sum ./ # If go.sum exists
+COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy source files
@@ -17,8 +16,9 @@ RUN CGO_ENABLED=0 go build -ldflags="-w -s -X main.version=${VERSION}" -o koskid
 # Final slim image
 FROM alpine:3.19
 
-# Create necessary directories
-RUN mkdir -p /data
+# Run as a non-root user for security.
+RUN addgroup -S koskidex && adduser -S koskidex -G koskidex \
+    && mkdir -p /data && chown -R koskidex:koskidex /data
 
 # Copy binary from builder
 COPY --from=builder /app/koskidex /usr/local/bin/
@@ -28,6 +28,8 @@ EXPOSE 7700
 
 # Volume for persistence
 VOLUME /data
+
+USER koskidex
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \

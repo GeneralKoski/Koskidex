@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -15,19 +16,24 @@ type Server struct {
 	mux         *http.ServeMux
 	mgr         *manager.Manager
 	apiKey      string
+	corsOrigin  string
 	startTime   time.Time
 	rateLimiter *RateLimiter
 	cache       *engine.LRUCache
 }
 
 // NewServer initializes the HTTP routing
-func NewServer(mgr *manager.Manager, apiKey string, rateLimit int) *Server {
+func NewServer(mgr *manager.Manager, apiKey string, rateLimit int, corsOrigin string) *Server {
+	if corsOrigin == "" {
+		corsOrigin = "*"
+	}
 	s := &Server{
-		mux:       http.NewServeMux(),
-		mgr:       mgr,
-		apiKey:    apiKey,
-		startTime: time.Now(),
-		cache:     engine.NewLRUCache(1024),
+		mux:        http.NewServeMux(),
+		mgr:        mgr,
+		apiKey:     apiKey,
+		corsOrigin: corsOrigin,
+		startTime:  time.Now(),
+		cache:      engine.NewLRUCache(1024),
 	}
 	if rateLimit > 0 {
 		s.rateLimiter = NewRateLimiter(rateLimit)
@@ -37,12 +43,22 @@ func NewServer(mgr *manager.Manager, apiKey string, rateLimit int) *Server {
 	return s
 }
 
+// Close releases background resources held by the server.
+func (s *Server) Close() {
+	if s.rateLimiter != nil {
+		s.rateLimiter.Stop()
+	}
+}
+
 // ServeHTTP implements http.Handler interface
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// CORS Headers
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Origin", s.corsOrigin)
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS, DELETE")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	if s.corsOrigin != "*" {
+		w.Header().Set("Vary", "Origin")
+	}
 
 	// Preflight check
 	if r.Method == http.MethodOptions {
@@ -95,6 +111,7 @@ func (s *Server) routes() {
 
 	// Documents
 	s.mux.HandleFunc("POST /indexes/{name}/documents", s.handleAddDocuments)
+	s.mux.HandleFunc("GET /indexes/{name}/documents", s.handleListDocuments)
 	s.mux.HandleFunc("GET /indexes/{name}/documents/{id}", s.handleGetDocument)
 	s.mux.HandleFunc("DELETE /indexes/{name}/documents/{id}", s.handleDeleteDocument)
 
@@ -114,4 +131,11 @@ func sendJSON(w http.ResponseWriter, status int, data interface{}) {
 
 func sendError(w http.ResponseWriter, status int, message string) {
 	sendJSON(w, status, map[string]string{"error": message})
+}
+
+// sendInternalError logs the real error internally and returns a generic
+// message to the client, avoiding leaking internal details in the response.
+func sendInternalError(w http.ResponseWriter, op string, err error) {
+	slog.Error("internal server error", "op", op, "error", err)
+	sendError(w, http.StatusInternalServerError, "Internal server error")
 }

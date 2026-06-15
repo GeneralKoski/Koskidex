@@ -25,7 +25,7 @@ func setupTestServerWithAuth(t *testing.T, apiKey string) (*server.Server, func(
 		t.Fatalf("Failed to initialize manager: %v", err)
 	}
 
-	srv := server.NewServer(mgr, apiKey, 0)
+	srv := server.NewServer(mgr, apiKey, 0, "*")
 
 	cleanup := func() {
 		mgr.Close()

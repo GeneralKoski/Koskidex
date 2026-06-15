@@ -36,7 +36,29 @@ func NewInvertedIndex() *InvertedIndex {
 func (idx *InvertedIndex) AddDocument(docID string, doc map[string]interface{}, settings Settings) {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
+	idx.addDocumentLocked(docID, doc, settings)
+}
 
+// Reindex rebuilds the entire index in place using the given settings.
+// It holds the write lock for the whole rebuild, so concurrent reads and
+// writes are serialized safely and no documents can be lost mid-rebuild.
+func (idx *InvertedIndex) Reindex(settings Settings) {
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+
+	docs := idx.docs
+	idx.index = make(map[string][]Posting)
+	idx.docs = make(map[string]map[string]interface{})
+	idx.docToTerms = make(map[string][]string)
+	idx.prefixMap = make(map[string][]string)
+
+	for docID, doc := range docs {
+		idx.addDocumentLocked(docID, doc, settings)
+	}
+}
+
+// addDocumentLocked indexes a document. The caller must hold idx.mu.
+func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interface{}, settings Settings) {
 	// Store document
 	idx.docs[docID] = doc
 

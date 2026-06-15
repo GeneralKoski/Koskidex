@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/GeneralKoski/Koskidex/internal/engine"
@@ -167,11 +168,16 @@ func (m *Manager) DeleteIndex(name string) error {
 	return m.triggerSaveLocked()
 }
 
-// AddDocuments adds documents to an index and saves to disk
-func (m *Manager) AddDocuments(indexName string, docs []map[string]interface{}) error {
-	idx, err := m.GetIndex(indexName)
-	if err != nil {
-		return err
+// AddDocuments adds documents to an index and saves to disk.
+// It returns how many documents were indexed and how many were skipped
+// because they lacked a valid string "id" (or "_id") field.
+func (m *Manager) AddDocuments(indexName string, docs []map[string]interface{}) (added, skipped int, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	idx, exists := m.indexes[indexName]
+	if !exists {
+		return 0, 0, ErrIndexNotFound
 	}
 
 	for _, doc := range docs {
@@ -179,23 +185,64 @@ func (m *Manager) AddDocuments(indexName string, docs []map[string]interface{}) 
 		if !ok {
 			idVal = doc["_id"] // fallback
 		}
-		if idStr, ok := idVal.(string); ok {
-			if err := m.persistence.AppendWAL(storage.WALOperation{Op: "ADD_DOC", Index: indexName, DocID: idStr, DocData: doc}); err != nil {
-				return fmt.Errorf("WAL write failed: %w", err)
-			}
-			idx.Engine.AddDocument(idStr, doc, idx.Settings)
+		idStr, ok := idVal.(string)
+		if !ok || idStr == "" {
+			skipped++
+			continue
 		}
+		if err := m.persistence.AppendWAL(storage.WALOperation{Op: "ADD_DOC", Index: indexName, DocID: idStr, DocData: doc}); err != nil {
+			return added, skipped, fmt.Errorf("WAL write failed: %w", err)
+		}
+		idx.Engine.AddDocument(idStr, doc, idx.Settings)
+		added++
 	}
 
 	m.invalidateCache(indexName)
-	return m.triggerSave()
+	return added, skipped, m.triggerSaveLocked()
+}
+
+// ListDocuments returns a page of documents from an index, ordered by ID,
+// along with the total number of documents in the index.
+func (m *Manager) ListDocuments(indexName string, limit, offset int) ([]map[string]interface{}, int, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	idx, exists := m.indexes[indexName]
+	if !exists {
+		return nil, 0, ErrIndexNotFound
+	}
+
+	all := idx.Engine.GetAllDocs()
+	ids := make([]string, 0, len(all))
+	for id := range all {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	total := len(ids)
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+
+	page := make([]map[string]interface{}, 0, end-offset)
+	for _, id := range ids[offset:end] {
+		page = append(page, all[id])
+	}
+	return page, total, nil
 }
 
 // DeleteDocument removes a single document from an index
 func (m *Manager) DeleteDocument(indexName, docID string) error {
-	idx, err := m.GetIndex(indexName)
-	if err != nil {
-		return err
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	idx, exists := m.indexes[indexName]
+	if !exists {
+		return ErrIndexNotFound
 	}
 
 	if err := m.persistence.AppendWAL(storage.WALOperation{Op: "DELETE_DOC", Index: indexName, DocID: docID}); err != nil {
@@ -203,50 +250,35 @@ func (m *Manager) DeleteDocument(indexName, docID string) error {
 	}
 	idx.Engine.DeleteDocument(docID)
 	m.invalidateCache(indexName)
-	return m.triggerSave()
+	return m.triggerSaveLocked()
 }
 
-// UpdateSettings updates index configuration
+// UpdateSettings updates index configuration and re-indexes all documents.
 func (m *Manager) UpdateSettings(indexName string, settings engine.Settings) error {
-	idx, err := m.GetIndex(indexName)
-	if err != nil {
-		return err
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	idx, exists := m.indexes[indexName]
+	if !exists {
+		return ErrIndexNotFound
 	}
 
-	m.mu.Lock()
 	idx.Settings = settings
-	m.mu.Unlock()
-	
+
 	if err := m.persistence.AppendWAL(storage.WALOperation{Op: "UPDATE_SETTINGS", Index: indexName, Settings: &settings}); err != nil {
 		return fmt.Errorf("WAL write failed: %w", err)
 	}
 
-	// Re-indexing is technically needed for synonyms/searchable fields changes
-	// For simplicity, we just save and advise users to re-add docs or we could trigger re-indexing here
-	// In a real product, we'd iterate over all docs and re-index them.
-
-	// Re-index all docs with new settings
-	allDocs := idx.Engine.GetAllDocs()
-	newEngine := engine.NewInvertedIndex()
-	for id, doc := range allDocs {
-		newEngine.AddDocument(id, doc, settings)
-	}
-
-	m.mu.Lock()
-	idx.Engine = newEngine
-	m.mu.Unlock()
+	// Re-index all docs in place with the new settings (synonyms, searchable
+	// fields, etc.). Reindex holds the engine lock for the whole rebuild.
+	idx.Engine.Reindex(settings)
 
 	m.invalidateCache(indexName)
-	return m.triggerSave()
-}
-
-// Trigger Save saves all data to disk using debounced save in the persistence layer.
-func (m *Manager) triggerSave() error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
 	return m.triggerSaveLocked()
 }
 
+// triggerSaveLocked saves all data to disk using the debounced save in the
+// persistence layer. The caller must hold m.mu.
 func (m *Manager) triggerSaveLocked() error {
 	// Extract data to save
 	saveData := make(map[string]storage.IndexData)

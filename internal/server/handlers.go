@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -16,16 +17,67 @@ import (
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	uptime := time.Since(s.startTime).Round(time.Second).String()
-	sendJSON(w, http.StatusOK, map[string]string{
-		"status": "ok",
-		"uptime": uptime,
+
+	indexes := s.mgr.ListIndexes()
+	totalDocs := 0
+	for _, name := range indexes {
+		if idx, err := s.mgr.GetIndex(name); err == nil {
+			totalDocs += idx.Engine.GetDocCount()
+		}
+	}
+
+	sendJSON(w, http.StatusOK, map[string]interface{}{
+		"status":    "ok",
+		"uptime":    uptime,
+		"indexes":   len(indexes),
+		"documents": totalDocs,
 	})
+}
+
+// maxSitemapURLs is the sitemap protocol limit per file.
+const maxSitemapURLs = 50000
+
+// Request body size limits.
+const (
+	maxJSONBody     = 1 << 20  // 1MB for control payloads (create index, settings, search)
+	maxDocumentBody = 64 << 20 // 64MB for bulk document uploads
+)
+
+var xmlEscaper = strings.NewReplacer(
+	"&", "&amp;",
+	"<", "&lt;",
+	">", "&gt;",
+	`"`, "&quot;",
+	"'", "&apos;",
+)
+
+// requestBaseURL reconstructs the public scheme://host of the request,
+// honoring a reverse proxy's X-Forwarded-Proto when present.
+func requestBaseURL(r *http.Request) string {
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		scheme = proto
+	}
+	return scheme + "://" + r.Host
 }
 
 func (s *Server) handleRobots(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
-	// Prevent crawlers from exhausting the API search endpoint and wasting crawl budget
-	_, _ = w.Write([]byte("User-agent: *\nDisallow: /indexes/*/search\n"))
+
+	var b strings.Builder
+	b.WriteString("User-agent: *\n")
+	// Prevent crawlers from exhausting the API search endpoint and wasting crawl budget.
+	b.WriteString("Disallow: /indexes/*/search\n")
+
+	base := requestBaseURL(r)
+	for _, name := range s.mgr.ListIndexes() {
+		fmt.Fprintf(&b, "Sitemap: %s/indexes/%s/sitemap.xml\n", base, url.PathEscape(name))
+	}
+
+	_, _ = w.Write([]byte(b.String()))
 }
 
 func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
@@ -41,6 +93,7 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Sitemap base_url not configured for this index in settings", http.StatusBadRequest)
 		return
 	}
+	baseUrl = strings.TrimRight(baseUrl, "/")
 
 	urlField := idx.Settings.Sitemap.UrlField
 	if urlField == "" {
@@ -52,26 +105,28 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 		freq = "weekly"
 	}
 
+	lastmod := time.Now().UTC().Format("2006-01-02")
+
 	w.Header().Set("Content-Type", "application/xml")
 	_, _ = w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>` + "\n"))
 	_, _ = w.Write([]byte(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n"))
 
 	docs := idx.Engine.GetAllDocs()
+	count := 0
 	for id, doc := range docs {
-		loc := ""
+		if count >= maxSitemapURLs {
+			break
+		}
+		var loc string
 		if val, ok := doc[urlField]; ok {
-			loc = baseUrl + fmt.Sprintf("%v", val)
+			loc = baseUrl + "/" + strings.TrimLeft(fmt.Sprintf("%v", val), "/")
 		} else {
-			// fallback relative ID path
 			loc = baseUrl + "/" + id
 		}
 
-		// Ensure proper formatting if baseUrl ends with / and value starts with /
-		loc = strings.ReplaceAll(loc, "///", "/")
-		loc = strings.ReplaceAll(loc, "https:/", "https://")
-		loc = strings.ReplaceAll(loc, "http:/", "http://")
-
-		_, _ = fmt.Fprintf(w, "  <url>\n    <loc>%s</loc>\n    <changefreq>%s</changefreq>\n  </url>\n", loc, freq)
+		fmt.Fprintf(w, "  <url>\n    <loc>%s</loc>\n    <lastmod>%s</lastmod>\n    <changefreq>%s</changefreq>\n  </url>\n",
+			xmlEscaper.Replace(loc), lastmod, xmlEscaper.Replace(freq))
+		count++
 	}
 
 	_, _ = w.Write([]byte(`</urlset>` + "\n"))
@@ -82,14 +137,20 @@ type createIndexReq struct {
 }
 
 func (s *Server) handleCreateIndex(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 	var req createIndexReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendError(w, http.StatusBadRequest, "Invalid JSON payload")
 		return
 	}
 
+	req.Name = strings.TrimSpace(req.Name)
 	if req.Name == "" {
 		sendError(w, http.StatusBadRequest, "Index name is required")
+		return
+	}
+	if len(req.Name) > 255 || strings.ContainsAny(req.Name, "/\\") || strings.Contains(req.Name, "..") {
+		sendError(w, http.StatusBadRequest, "Invalid index name")
 		return
 	}
 
@@ -98,7 +159,7 @@ func (s *Server) handleCreateIndex(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusConflict, "Index already exists")
 		return
 	} else if err != nil {
-		sendError(w, http.StatusInternalServerError, err.Error())
+		sendInternalError(w, "create index", err)
 		return
 	}
 
@@ -117,7 +178,7 @@ func (s *Server) handleGetIndex(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusNotFound, "Index not found")
 		return
 	} else if err != nil {
-		sendError(w, http.StatusInternalServerError, err.Error())
+		sendInternalError(w, "get index", err)
 		return
 	}
 
@@ -134,7 +195,7 @@ func (s *Server) handleDeleteIndex(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusNotFound, "Index not found")
 		return
 	} else if err != nil {
-		sendError(w, http.StatusInternalServerError, err.Error())
+		sendInternalError(w, "delete index", err)
 		return
 	}
 
@@ -142,6 +203,7 @@ func (s *Server) handleDeleteIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAddDocuments(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxDocumentBody)
 	name := r.PathValue("name")
 	var docs []map[string]interface{}
 
@@ -187,16 +249,53 @@ func (s *Server) handleAddDocuments(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := s.mgr.AddDocuments(name, docs); err != nil {
+	added, skipped, err := s.mgr.AddDocuments(name, docs)
+	if err != nil {
 		if err == manager.ErrIndexNotFound {
 			sendError(w, http.StatusNotFound, "Index not found")
 			return
 		}
-		sendError(w, http.StatusInternalServerError, err.Error())
+		sendInternalError(w, "add documents", err)
 		return
 	}
 
-	sendJSON(w, http.StatusAccepted, map[string]interface{}{"message": "Documents added", "count": len(docs)})
+	sendJSON(w, http.StatusAccepted, map[string]interface{}{
+		"message": "Documents added",
+		"added":   added,
+		"skipped": skipped,
+	})
+}
+
+func (s *Server) handleListDocuments(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+
+	limit := 20
+	offset := 0
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 {
+		limit = l
+	}
+	if o, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && o >= 0 {
+		offset = o
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	docs, total, err := s.mgr.ListDocuments(name, limit, offset)
+	if err == manager.ErrIndexNotFound {
+		sendError(w, http.StatusNotFound, "Index not found")
+		return
+	} else if err != nil {
+		sendInternalError(w, "list documents", err)
+		return
+	}
+
+	sendJSON(w, http.StatusOK, map[string]interface{}{
+		"documents": docs,
+		"total":     total,
+		"limit":     limit,
+		"offset":    offset,
+	})
 }
 
 func (s *Server) handleGetDocument(w http.ResponseWriter, r *http.Request) {
@@ -227,7 +326,7 @@ func (s *Server) handleDeleteDocument(w http.ResponseWriter, r *http.Request) {
 			sendError(w, http.StatusNotFound, "Index not found")
 			return
 		}
-		sendError(w, http.StatusInternalServerError, err.Error())
+		sendInternalError(w, "delete document", err)
 		return
 	}
 
@@ -242,7 +341,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 			sendError(w, http.StatusNotFound, "Index not found")
 			return
 		}
-		sendError(w, http.StatusInternalServerError, err.Error())
+		sendInternalError(w, "get settings", err)
 		return
 	}
 
@@ -250,6 +349,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 	name := r.PathValue("name")
 	var settings engine.Settings
 	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
@@ -262,7 +362,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 			sendError(w, http.StatusNotFound, "Index not found")
 			return
 		}
-		sendError(w, http.StatusInternalServerError, err.Error())
+		sendInternalError(w, "update settings", err)
 		return
 	}
 
@@ -310,6 +410,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method == http.MethodPost {
+		r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 		var req SearchRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
 			if req.Q != "" { query = req.Q }
@@ -321,6 +422,11 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			if req.Offset >= 0 { offset = req.Offset }
 			if len(req.Vector) > 0 { vector = req.Vector }
 		}
+	}
+
+	if len(query) > 1000 {
+		sendError(w, http.StatusBadRequest, "Query too long (max 1000 characters)")
+		return
 	}
 
 	if fuzziness != "" && fuzziness != "0" && fuzziness != "1" && fuzziness != "2" && fuzziness != "AUTO" {
