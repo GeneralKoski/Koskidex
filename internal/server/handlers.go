@@ -74,7 +74,7 @@ func (s *Server) handleRobots(w http.ResponseWriter, r *http.Request) {
 
 	base := requestBaseURL(r)
 	for _, name := range s.mgr.ListIndexes() {
-		fmt.Fprintf(&b, "Sitemap: %s/indexes/%s/sitemap.xml\n", base, url.PathEscape(name))
+		_, _ = fmt.Fprintf(&b, "Sitemap: %s/indexes/%s/sitemap.xml\n", base, url.PathEscape(name))
 	}
 
 	_, _ = w.Write([]byte(b.String()))
@@ -124,7 +124,7 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 			loc = baseUrl + "/" + id
 		}
 
-		fmt.Fprintf(w, "  <url>\n    <loc>%s</loc>\n    <lastmod>%s</lastmod>\n    <changefreq>%s</changefreq>\n  </url>\n",
+		_, _ = fmt.Fprintf(w, "  <url>\n    <loc>%s</loc>\n    <lastmod>%s</lastmod>\n    <changefreq>%s</changefreq>\n  </url>\n",
 			xmlEscaper.Replace(loc), lastmod, xmlEscaper.Replace(freq))
 		count++
 	}
