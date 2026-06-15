@@ -35,7 +35,7 @@ services:
     restart: unless-stopped
 
   seeder:
-    image: golang:1.23-alpine
+    image: golang:1.25-alpine
     container_name: koskidex_seeder
     depends_on:
       backend:
