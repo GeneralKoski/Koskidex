@@ -3,6 +3,7 @@ import DemoSetup from "../components/DemoSetup";
 import Hero from "../components/Hero";
 import IntegrationSnippets from "../components/IntegrationSnippets";
 import SearchUI from "../components/SearchUI";
+import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
 interface HomeProps {
   activeIndex: string;
@@ -16,6 +17,13 @@ export default function Home({
   onClear,
 }: HomeProps) {
   const { t } = useTranslation();
+
+  useDocumentMeta({
+    title: "Koskidex | Blazing Fast, Lightweight Go Search Engine",
+    description:
+      "Koskidex is a lightning-fast, sub-15MB full-text search engine written in Go. Self-hosted, REST-based, and typo-tolerant with zero dependencies.",
+    path: "/",
+  });
 
   return (
     <>

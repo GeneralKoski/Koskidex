@@ -1,9 +1,15 @@
 import { Home, SearchX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
 export default function NotFound() {
   const { t } = useTranslation();
+
+  useDocumentMeta({
+    title: "404 — Page Not Found | Koskidex",
+    description: "The page you are looking for does not exist.",
+  });
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6">

@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
+import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
 function CodeBlock({ children, label }: { children: string; label?: string }) {
   return (
@@ -61,6 +62,13 @@ export default function Documentation() {
   const [activeSection, setActiveSection] = useState("quickstart");
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const mobileNavRef = useRef<HTMLDivElement>(null);
+
+  useDocumentMeta({
+    title: "Documentation | Koskidex",
+    description:
+      "Complete API reference and integration guides for Koskidex: indexing, search, filters, facets, geo and vector search, settings and client libraries.",
+    path: "/docs",
+  });
 
   useEffect(() => {
     window.scrollTo(0, 0);

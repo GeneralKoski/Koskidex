@@ -5,6 +5,11 @@ import { Link } from "react-router-dom";
 export default function Hero() {
   const { t } = useTranslation();
 
+  const scrollToDemo = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
     <section className="pt-32 md:pt-48 pb-16 md:pb-24 text-center container mx-auto px-4 relative">
       <h1 className="text-4xl sm:text-6xl md:text-8xl font-black leading-[1.1] mb-6 md:mb-8 tracking-tighter text-white">
@@ -22,6 +27,7 @@ export default function Hero() {
       <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-3 sm:gap-6 mb-12 md:mb-16">
         <a
           href="#demo"
+          onClick={scrollToDemo}
           className="group relative inline-flex items-center justify-center px-7 py-4 sm:px-10 sm:py-5 font-bold text-white transition-all duration-300 bg-blue-600 rounded-2xl hover:bg-blue-500 hover:scale-105 active:scale-95 shadow-xl shadow-blue-500/20"
         >
           <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-300"></div>
