@@ -20,4 +20,9 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             docker compose down
-            docker compose up -d --build
+            docker compose build
+            # The backend now runs as a non-root user; make sure the persisted
+            # data dir is owned by that user before starting (idempotent).
+            docker compose run --rm --no-deps --user root --entrypoint sh backend \
+              -c "chown -R koskidex:koskidex /data"
+            docker compose up -d
