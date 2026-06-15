@@ -29,9 +29,9 @@ docker compose up -d
 
 That's it. Two services are now running:
 
-| Service | URL | Description |
-|---------|-----|-------------|
-| **API** | `http://localhost:7700` | Search engine REST API |
+| Service          | URL                       | Description            |
+| ---------------- | ------------------------- | ---------------------- |
+| **API**    | `http://localhost:7700` | Search engine REST API |
 | **Web UI** | `http://localhost:8080` | Interactive playground |
 
 ```bash
@@ -57,30 +57,30 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 
 ## Features
 
-| | Feature | Details |
-|---|---------|---------|
-| **Performance** | Sub-5ms response times on reasonable datasets |
-| **Lightweight** | Binary <15MB, RAM <20MB idle, zero runtime dependencies |
-| **Typo tolerance** | Damerau-Levenshtein fuzzy matching with dynamic fuzziness (`0`, `1`, `2`, `AUTO`) |
-| **Smart ranking** | Multi-factor pipeline: exactness, typo count, field weight, term frequency |
-| **Field weighting** | Boost specific fields via `field_weights` settings (e.g. `name: 5`, `description: 1`) |
-| **Explicit sorting** | Sort results by any field: `sort=price:asc,rating:desc` |
-| **Faceted search** | Aggregate counts per field: `facets=genre,category` |
-| **Geospatial** | Haversine distance filtering: `filter=distance(_geo,45.46,9.19)<50000` |
-| **Vector search** | Cosine similarity on `_vector` fields, hybrid mode with full-text scoring |
-| **WAL** | Write-Ahead Log for crash recovery — zero data loss on unexpected shutdowns |
-| **Search operators** | `AND` (default), `OR`, `NOT` (prefix `-`) |
-| **Field filters** | `filter=genre=Sci-Fi,year>2000` with `=`, `!=`, `>`, `<`, `>=`, `<=` |
-| **Pagination** | `limit` and `offset` params, `total_hits` in response |
-| **Multi-index** | Create and manage independent indexes with their own settings |
-| **Schemaless** | Index any JSON object — only requires a unique `id` field |
-| **Synonyms** | Configure per-index synonym mappings |
-| **Auth** | Optional API key via `--api-key` flag, Bearer token auth |
-| **Rate limiting** | Per-IP token bucket via `--rate-limit` flag |
-| **TLS** | Native HTTPS via `--tls-cert` and `--tls-key` flags |
-| **LRU cache** | Query results cached, auto-invalidated on writes |
-| **Docker ready** | Multi-stage Alpine build, healthcheck included |
-| **Client libraries** | PHP/Laravel, Node.js, Python — ready to copy |
+|                            | Feature                                                                                     | Details |
+| -------------------------- | ------------------------------------------------------------------------------------------- | ------- |
+| **Performance**      | Sub-5ms response times on reasonable datasets                                               |         |
+| **Lightweight**      | Binary <15MB, RAM <20MB idle, zero runtime dependencies                                     |         |
+| **Typo tolerance**   | Damerau-Levenshtein fuzzy matching with dynamic fuzziness (`0`, `1`, `2`, `AUTO`)   |         |
+| **Smart ranking**    | Multi-factor pipeline: exactness, typo count, field weight, term frequency                  |         |
+| **Field weighting**  | Boost specific fields via `field_weights` settings (e.g. `name: 5`, `description: 1`) |         |
+| **Explicit sorting** | Sort results by any field:`sort=price:asc,rating:desc`                                    |         |
+| **Faceted search**   | Aggregate counts per field:`facets=genre,category`                                        |         |
+| **Geospatial**       | Haversine distance filtering:`filter=distance(_geo,45.46,9.19)<50000`                     |         |
+| **Vector search**    | Cosine similarity on `_vector` fields, hybrid mode with full-text scoring                 |         |
+| **WAL**              | Write-Ahead Log for crash recovery — zero data loss on unexpected shutdowns                |         |
+| **Search operators** | `AND` (default), `OR`, `NOT` (prefix `-`)                                           |         |
+| **Field filters**    | `filter=genre=Sci-Fi,year>2000` with `=`, `!=`, `>`, `<`, `>=`, `<=`          |         |
+| **Pagination**       | `limit` and `offset` params, `total_hits` in response                                 |         |
+| **Multi-index**      | Create and manage independent indexes with their own settings                               |         |
+| **Schemaless**       | Index any JSON object — only requires a unique `id` field                                |         |
+| **Synonyms**         | Configure per-index synonym mappings                                                        |         |
+| **Auth**             | Optional API key via `--api-key` flag, Bearer token auth                                  |         |
+| **Rate limiting**    | Per-IP token bucket via `--rate-limit` flag                                               |         |
+| **TLS**              | Native HTTPS via `--tls-cert` and `--tls-key` flags                                     |         |
+| **LRU cache**        | Query results cached, auto-invalidated on writes                                            |         |
+| **Docker ready**     | Multi-stage Alpine build, healthcheck included                                              |         |
+| **Client libraries** | PHP/Laravel, Node.js, Python — ready to copy                                               |         |
 
 ---
 
@@ -88,20 +88,21 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 
 ### Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/indexes` | Create an index |
-| `GET` | `/indexes` | List all indexes |
-| `GET` | `/indexes/{name}` | Get index info |
-| `DELETE` | `/indexes/{name}` | Delete index |
-| `POST` | `/indexes/{name}/documents` | Add documents (single, array, or file upload) |
-| `GET` | `/indexes/{name}/documents/{id}` | Get document by ID |
-| `DELETE` | `/indexes/{name}/documents/{id}` | Delete document |
-| `GET` | `/indexes/{name}/search?q=` | Full-text search |
-| `POST` | `/indexes/{name}/search` | Full-text search (POST body) |
-| `GET` | `/indexes/{name}/settings` | Get index settings |
-| `PUT` | `/indexes/{name}/settings` | Update settings (synonyms, stop words, etc.) |
-| `GET` | `/health` | Health check (no auth required) |
+| Method     | Endpoint                           | Description                                   |
+| ---------- | ---------------------------------- | --------------------------------------------- |
+| `POST`   | `/indexes`                       | Create an index                               |
+| `GET`    | `/indexes`                       | List all indexes                              |
+| `GET`    | `/indexes/{name}`                | Get index info                                |
+| `DELETE` | `/indexes/{name}`                | Delete index                                  |
+| `POST`   | `/indexes/{name}/documents`      | Add documents (single, array, or file upload) |
+| `GET`    | `/indexes/{name}/documents`      | List documents (paginated: `limit`, `offset`) |
+| `GET`    | `/indexes/{name}/documents/{id}` | Get document by ID                            |
+| `DELETE` | `/indexes/{name}/documents/{id}` | Delete document                               |
+| `GET`    | `/indexes/{name}/search?q=`      | Full-text search                              |
+| `POST`   | `/indexes/{name}/search`         | Full-text search (POST body)                  |
+| `GET`    | `/indexes/{name}/settings`       | Get index settings                            |
+| `PUT`    | `/indexes/{name}/settings`       | Update settings (synonyms, stop words, etc.)  |
+| `GET`    | `/health`                        | Health check (no auth required)               |
 
 ### Search
 
@@ -291,59 +292,65 @@ results = client.search('movies', 'matrx')
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                   HTTP Server                    │
+│                   HTTP Server                   │
 │  CORS → Rate Limiter → Auth → Router            │
 ├─────────────────────────────────────────────────┤
-│                 Index Manager                    │
-│  Create / Delete / List indexes                  │
-│  Cache invalidation on writes                    │
+│                 Index Manager                   │
+│  Create / Delete / List indexes                 │
+│  Cache invalidation on writes                   │
 ├──────────────┬──────────────┬───────────────────┤
 │   Tokenizer  │    Engine    │    Persistence    │
 │  Normalize   │  Inverted    │  GOB snapshots    │
 │  Stop words  │  Index       │  Write-Ahead Log  │
 │  Split       │  Bigram      │  Crash recovery   │
-│              │  Prefix      │                    │
-├──────────────┼──────────────┤                    │
-│    Ranker    │   Filters    │                    │
-│  Fuzzy match │  Field ops   │                    │
-│  Field boost │  Geo/Haver.  │                    │
-│  Vector/Cos. │  Facets      │                    │
-│  Sorting     │  OR / NOT    │                    │
-├──────────────┴──────────────┤                    │
-│          LRU Cache          │                    │
-│  1024 entries, prefix       │                    │
-│  invalidation               │                    │
+│              │  Prefix      │                   │
+├──────────────┼──────────────┤                   │
+│    Ranker    │   Filters    │                   │
+│  Fuzzy match │  Field ops   │                   │
+│  Field boost │  Geo/Haver.  │                   │
+│  Vector/Cos. │  Facets      │                   │
+│  Sorting     │  OR / NOT    │                   │
+├──────────────┴──────────────┤                   │
+│          LRU Cache          │                   │
+│  1024 entries, prefix       │                   │
+│  invalidation               │                   │
 └─────────────────────────────┴───────────────────┘
 ```
 
 ### Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| **Engine** | Go 1.23, zero external dependencies |
-| **Search** | Inverted index, Damerau-Levenshtein, bigram prefix, cosine similarity |
-| **Ranking** | Field weighting, dynamic fuzziness, hybrid text+vector scoring |
-| **Storage** | GOB snapshots + Write-Ahead Log (WAL), debounced persistence |
-| **Cache** | LRU (doubly-linked list + map), auto-invalidation |
-| **API** | net/http, token bucket rate limiter |
-| **Frontend** | React 19, TypeScript, Vite 6, Tailwind CSS 4 |
-| **i18n** | English, Italian |
-| **Deploy** | Docker multi-stage Alpine, docker-compose |
+| Layer              | Technology                                                            |
+| ------------------ | --------------------------------------------------------------------- |
+| **Engine**   | Go 1.23, zero external dependencies                                   |
+| **Search**   | Inverted index, Damerau-Levenshtein, bigram prefix, cosine similarity |
+| **Ranking**  | Field weighting, dynamic fuzziness, hybrid text+vector scoring        |
+| **Storage**  | GOB snapshots + Write-Ahead Log (WAL), debounced persistence          |
+| **Cache**    | LRU (doubly-linked list + map), auto-invalidation                     |
+| **API**      | net/http, token bucket rate limiter                                   |
+| **Frontend** | React 19, TypeScript, Vite 6, Tailwind CSS 4                          |
+| **i18n**     | English, Italian                                                      |
+| **Deploy**   | Docker multi-stage Alpine, docker-compose                             |
 
 ---
 
 ## Configuration
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--port` | `7700` | HTTP port |
-| `--data-dir` | `./data` | Data directory for persistence |
-| `--api-key` | _(empty)_ | API key for authentication |
-| `--rate-limit` | `0` | Max requests/sec per IP (0 = disabled) |
-| `--tls-cert` | _(empty)_ | Path to TLS certificate |
-| `--tls-key` | _(empty)_ | Path to TLS key |
-| `--log-level` | `info` | Log level: debug, info, warn, error |
-| `--version` | | Print version and exit |
+| Flag             | Default     | Description                            |
+| ---------------- | ----------- | -------------------------------------- |
+| `--port`       | `7700`    | HTTP port                              |
+| `--data-dir`   | `./data`  | Data directory for persistence         |
+| `--api-key`    | _(empty)_ | API key for authentication             |
+| `--rate-limit` | `0`       | Max requests/sec per IP (0 = disabled) |
+| `--cors-origin`| `*`       | Allowed CORS origin (`*` = any)        |
+| `--tls-cert`   | _(empty)_ | Path to TLS certificate                |
+| `--tls-key`    | _(empty)_ | Path to TLS key                        |
+| `--log-level`  | `info`    | Log level: debug, info, warn, error    |
+| `--version`    |             | Print version and exit                 |
+
+Every flag can also be set via an environment variable (flags take precedence):
+`KOSKIDEX_PORT`, `KOSKIDEX_DATA_DIR`, `KOSKIDEX_API_KEY`, `KOSKIDEX_LOG_LEVEL`,
+`KOSKIDEX_RATE_LIMIT`, `KOSKIDEX_CORS_ORIGIN`, `KOSKIDEX_TLS_CERT`, `KOSKIDEX_TLS_KEY`.
+See [`.env.example`](.env.example).
 
 ---
 
