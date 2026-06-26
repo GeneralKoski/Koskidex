@@ -42,9 +42,9 @@ Legenda: ✅ fatto · 🚧 in corso · ⬜ da fare
   limit, TLS).
 - ✅ **CONTRIBUTING.md** — linee guida per i contributor.
 - ⬜ **CHANGELOG.md** — storico versioni (Keep a Changelog).
-- ✅ **CI: test + security scan** — aggiunto step `npm test` nel job frontend e
-  `govulncheck` nel job backend (`ci.yml`).
-- ⬜ **CI: push immagine su registry** — `deploy.yml` usa SSH ma non pubblica l'immagine.
+- ℹ️ **GitHub Actions rimosse** — CI (`ci.yml`) e deploy (`deploy.yml`) eliminati.
+  Il deploy è ora manuale via lo script centralizzato `deploy.sh` (SSH + `docker compose`
+  sul VPS); test e `govulncheck` vanno lanciati in locale.
 
 ## Produzione & SEO (audit completo)
 
@@ -78,7 +78,6 @@ Legenda: ✅ fatto · 🚧 in corso · ⬜ da fare
 
 ## Priorità bassa (residuo)
 
-- ⬜ CI: push immagine su registry (GHCR) in `deploy.yml`.
 - ⬜ Documentazione formato WAL/GOB e runbook backup/recovery.
 - ⬜ Completare i pacchetti client in `examples/` (laravel, nodejs, python).
 - ⬜ CSP in nginx (richiede test: inline styles Tailwind + Google Fonts).
