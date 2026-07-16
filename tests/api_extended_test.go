@@ -223,3 +223,71 @@ func TestSearchFilter(t *testing.T) {
 		t.Fatalf("Expected 1 hit with genre=sci-fi filter, got %v", res["total_hits"])
 	}
 }
+
+func TestProtectedIndex(t *testing.T) {
+	// Public instance: no API key configured.
+	srv, cleanup := setupTestServerWithAuth(t, "")
+	defer cleanup()
+
+	// Create the index to protect plus an open one.
+	for _, name := range []string{"massive", "movies"} {
+		body, _ := json.Marshal(map[string]string{"name": name})
+		req := httptest.NewRequest("POST", "/indexes", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		srv.ServeHTTP(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("create %s: expected 201, got %d", name, w.Code)
+		}
+	}
+
+	srv.SetProtectedIndexes([]string{"massive"})
+
+	docs, _ := json.Marshal([]map[string]interface{}{{"id": "1", "title": "x"}})
+
+	// Destructive/reconfiguring ops on a protected index are forbidden.
+	cases := []struct {
+		method, path string
+		body         []byte
+	}{
+		{"DELETE", "/indexes/massive", nil},
+		{"DELETE", "/indexes/massive/documents/1", nil},
+		{"PUT", "/indexes/massive/settings", []byte(`{}`)},
+	}
+	for _, c := range cases {
+		var r *http.Request
+		if c.body != nil {
+			r = httptest.NewRequest(c.method, c.path, bytes.NewReader(c.body))
+		} else {
+			r = httptest.NewRequest(c.method, c.path, nil)
+		}
+		w := httptest.NewRecorder()
+		srv.ServeHTTP(w, r)
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("%s %s: expected 403, got %d", c.method, c.path, w.Code)
+		}
+	}
+
+	// Reads on a protected index still work.
+	req := httptest.NewRequest("GET", "/indexes/massive/search?q=hello", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("search protected index: expected 200, got %d", w.Code)
+	}
+
+	// Adding documents stays open even on a protected index (seeder path).
+	req = httptest.NewRequest("POST", "/indexes/massive/documents", bytes.NewReader(docs))
+	w = httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("add doc to protected index: expected 202, got %d", w.Code)
+	}
+
+	// A non-protected index can be deleted freely.
+	req = httptest.NewRequest("DELETE", "/indexes/movies", nil)
+	w = httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete open index: expected 200, got %d", w.Code)
+	}
+}

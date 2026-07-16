@@ -190,6 +190,9 @@ func (s *Server) handleGetIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteIndex(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
+	if s.blockProtected(w, r, name) {
+		return
+	}
 	err := s.mgr.DeleteIndex(name)
 	if err == manager.ErrIndexNotFound {
 		sendError(w, http.StatusNotFound, "Index not found")
@@ -321,6 +324,10 @@ func (s *Server) handleDeleteDocument(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	id := r.PathValue("id")
 
+	if s.blockProtected(w, r, name) {
+		return
+	}
+
 	if err := s.mgr.DeleteDocument(name, id); err != nil {
 		if err == manager.ErrIndexNotFound {
 			sendError(w, http.StatusNotFound, "Index not found")
@@ -351,6 +358,9 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
 	name := r.PathValue("name")
+	if s.blockProtected(w, r, name) {
+		return
+	}
 	var settings engine.Settings
 	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
 		sendError(w, http.StatusBadRequest, "Invalid JSON settings")
@@ -465,8 +475,16 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	cacheKey := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%s", name, query, filterRaw, fuzziness, sortParam, facetsParam, limit, offset, vecKey)
 	if cached, ok := s.cache.Get(cacheKey); ok {
 		if resp, ok := cached.(map[string]interface{}); ok {
-			resp["processing_time_ms"] = time.Since(start).Milliseconds()
-			sendJSON(w, http.StatusOK, resp)
+			// The LRU returns the stored map by reference. Copy it before
+			// setting processing_time_ms: mutating the shared map directly
+			// races with concurrent identical queries (fatal "concurrent map
+			// writes") and with the miss-path JSON marshal.
+			out := make(map[string]interface{}, len(resp))
+			for k, v := range resp {
+				out[k] = v
+			}
+			out["processing_time_ms"] = time.Since(start).Milliseconds()
+			sendJSON(w, http.StatusOK, out)
 			return
 		}
 	}

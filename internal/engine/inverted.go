@@ -59,6 +59,10 @@ func (idx *InvertedIndex) Reindex(settings Settings) {
 
 // addDocumentLocked indexes a document. The caller must hold idx.mu.
 func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interface{}, settings Settings) {
+	// Purge any previous version of this document first, so re-adding the same
+	// id (update) doesn't leave stale postings behind or double-count terms.
+	idx.deleteDocumentLocked(docID)
+
 	// Store document
 	idx.docs[docID] = doc
 
@@ -73,6 +77,9 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 			}
 		}
 	}
+
+	// Distinct terms in this document, recorded once for O(terms) deletion.
+	docTerms := make(map[string]bool)
 
 	// Tokenize searchable fields
 	for _, field := range fields {
@@ -108,9 +115,12 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 						Position: t.Position,
 					}
 					idx.index[t.Term] = append(idx.index[t.Term], post)
-					
-					// Track terms per document for fast deletion
-					idx.docToTerms[docID] = append(idx.docToTerms[docID], t.Term)
+
+					// Track distinct terms per document for fast deletion.
+					if !docTerms[t.Term] {
+						docTerms[t.Term] = true
+						idx.docToTerms[docID] = append(idx.docToTerms[docID], t.Term)
+					}
 					
 					// Substring Indexing (Bigrams):
 					// Instead of just the first 2 chars, we index all 2-char slices.
@@ -165,7 +175,10 @@ func (idx *InvertedIndex) SearchExact(query string, settings Settings) []string 
 	return results
 }
 
-// GetDocument returns a document by ID
+// GetDocument returns a document by ID. The returned map is the live indexed
+// document shared with the index (not a copy) to stay allocation-free on the
+// search hot path: callers MUST treat it as read-only and never mutate it, or
+// they race concurrent readers/writers of the index.
 func (idx *InvertedIndex) GetDocument(docID string) (map[string]interface{}, bool) {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
@@ -228,7 +241,11 @@ func DefaultSettings() Settings {
 func (idx *InvertedIndex) DeleteDocument(docID string) {
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
+	idx.deleteDocumentLocked(docID)
+}
 
+// deleteDocumentLocked removes a document from the index. Caller must hold idx.mu.
+func (idx *InvertedIndex) deleteDocumentLocked(docID string) {
 	// 1. Get terms associated with this document for targeted removal
 	terms, ok := idx.docToTerms[docID]
 	if !ok {
@@ -256,14 +273,6 @@ func (idx *InvertedIndex) DeleteDocument(docID string) {
 	delete(idx.docToTerms, docID)
 }
 
-func getPrefix(term string) string {
-	runes := []rune(term)
-	if len(runes) >= 2 {
-		return string(runes[:2])
-	}
-	return term
-}
-
 func (idx *InvertedIndex) addToPrefixMap(prefix, term string) {
 	for _, t := range idx.prefixMap[prefix] {
 		if t == term {
@@ -273,7 +282,9 @@ func (idx *InvertedIndex) addToPrefixMap(prefix, term string) {
 	idx.prefixMap[prefix] = append(idx.prefixMap[prefix], term)
 }
 
-// GetAllDocs returns all documents in the index
+// GetAllDocs returns all documents in the index. The outer map is a fresh copy
+// safe to range over, but the inner document maps are shared with the index and
+// MUST be treated as read-only (see GetDocument).
 func (idx *InvertedIndex) GetAllDocs() map[string]map[string]interface{} {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()

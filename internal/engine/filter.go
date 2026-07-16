@@ -78,30 +78,33 @@ func ApplyFilters(doc map[string]interface{}, filters []Filter) bool {
 		if strings.HasPrefix(f.Field, "distance(") && strings.HasSuffix(f.Field, ")") {
 			argsStr := f.Field[9 : len(f.Field)-1]
 			args := strings.Split(argsStr, ",")
-			if len(args) == 3 {
-				geoField := strings.TrimSpace(args[0])
-				lat, _ := strconv.ParseFloat(strings.TrimSpace(args[1]), 64)
-				lng, _ := strconv.ParseFloat(strings.TrimSpace(args[2]), 64)
+			if len(args) != 3 {
+				// Malformed distance() filter: ignore this clause rather than
+				// silently excluding every document.
+				continue
+			}
+			geoField := strings.TrimSpace(args[0])
+			lat, _ := strconv.ParseFloat(strings.TrimSpace(args[1]), 64)
+			lng, _ := strconv.ParseFloat(strings.TrimSpace(args[2]), 64)
 
-				geoVal, ok := doc[geoField]
-				if !ok {
-					return false
-				}
-				
-				if geoMap, ok := geoVal.(map[string]interface{}); ok {
-					docLat, lOk := toFloat64(geoMap["lat"])
-					docLng, gOk := toFloat64(geoMap["lng"])
-					if lOk && gOk {
-						dist := haversineDistance(docLat, docLng, lat, lng)
-						filterDist, _ := strconv.ParseFloat(f.Value, 64)
-						if !compareNumeric(dist, f.Operator, filterDist) {
-							return false
-						}
-						continue
-					}
-				}
+			geoVal, ok := doc[geoField]
+			if !ok {
 				return false
 			}
+
+			if geoMap, ok := geoVal.(map[string]interface{}); ok {
+				docLat, lOk := toFloat64(geoMap["lat"])
+				docLng, gOk := toFloat64(geoMap["lng"])
+				if lOk && gOk {
+					dist := haversineDistance(docLat, docLng, lat, lng)
+					filterDist, _ := strconv.ParseFloat(f.Value, 64)
+					if !compareNumeric(dist, f.Operator, filterDist) {
+						return false
+					}
+					continue
+				}
+			}
+			return false
 		}
 
 		val, ok := doc[f.Field]

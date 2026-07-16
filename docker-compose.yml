@@ -7,6 +7,13 @@ services:
     volumes:
       - ./data:/data
     restart: unless-stopped
+    # The API is exposed publicly without an API key so the web playground can
+    # create/search demo indexes. Protect the large seeded index from destructive
+    # ops (delete index/document, update settings) by anonymous callers. Adding
+    # documents stays open so the seeder below can populate it on first run;
+    # movies/products stay fully open for the demo.
+    environment:
+      - KOSKIDEX_PROTECTED_INDEXES=massive
     command: ["/app/koskidex", "--port", "7700", "--data-dir", "/data"]
     healthcheck:
       test:

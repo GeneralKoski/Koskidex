@@ -57,11 +57,19 @@ func min3(a, b, c int) int {
 	return min2(a, min2(b, c))
 }
 
-// FuzzySearch lookup matching terms from prefix logic
+// FuzzySearchTerms looks up terms matching queryTerm within maxDistance edits.
+// It takes the read lock; internal callers that already hold it must use
+// fuzzySearchTermsLocked instead to avoid recursive read-locking (which can
+// deadlock against a concurrent writer).
 func (idx *InvertedIndex) FuzzySearchTerms(queryTerm string, maxDistance int, exactness bool) []string {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
+	return idx.fuzzySearchTermsLocked(queryTerm, maxDistance, exactness)
+}
 
+// fuzzySearchTermsLocked is the lock-free body of FuzzySearchTerms. Caller must
+// hold idx.mu (read or write).
+func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance int, exactness bool) []string {
 	var matchedTerms []string
 
 	// Direct match optimization
@@ -73,8 +81,10 @@ func (idx *InvertedIndex) FuzzySearchTerms(queryTerm string, maxDistance int, ex
 		}
 	}
 
-	prefix := getPrefix(queryTerm)
-	candidates := idx.prefixMap[prefix]
+	// Gather candidates from every bigram of the query term, not just the first
+	// one: documents index all their bigrams, so probing only the leading bigram
+	// would miss matches whose typo lands in the first two characters.
+	candidates := idx.fuzzyCandidates(queryTerm)
 
 	for _, candidate := range candidates {
 		if candidate == queryTerm {
@@ -96,6 +106,35 @@ func (idx *InvertedIndex) FuzzySearchTerms(queryTerm string, maxDistance int, ex
 	}
 
 	return matchedTerms
+}
+
+// fuzzyCandidates returns the distinct terms sharing at least one bigram with
+// queryTerm, mirroring how addDocumentLocked indexes every bigram into
+// prefixMap. Caller must hold idx.mu.
+func (idx *InvertedIndex) fuzzyCandidates(queryTerm string) []string {
+	seen := make(map[string]bool)
+	var candidates []string
+	add := func(term string) {
+		if !seen[term] {
+			seen[term] = true
+			candidates = append(candidates, term)
+		}
+	}
+
+	runes := []rune(queryTerm)
+	if len(runes) < 2 {
+		for _, t := range idx.prefixMap[queryTerm] {
+			add(t)
+		}
+		return candidates
+	}
+	for i := 0; i <= len(runes)-2; i++ {
+		bigram := string(runes[i : i+2])
+		for _, t := range idx.prefixMap[bigram] {
+			add(t)
+		}
+	}
+	return candidates
 }
 
 // MaxTypos is standard logic for allowed typos based on word length

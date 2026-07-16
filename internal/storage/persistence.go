@@ -83,7 +83,7 @@ func (p *Persistence) worker() {
 					timer.Stop()
 				}
 				if latestData != nil {
-					p.writeToDisk(latestData)
+					_ = p.writeToDisk(latestData) // best-effort flush on shutdown
 				}
 				return
 			}
@@ -97,34 +97,43 @@ func (p *Persistence) worker() {
 		case <-timer.C:
 			timerRunning = false
 			if latestData != nil {
-				p.writeToDisk(latestData)
-				p.truncateWAL()
-				latestData = nil
+				if err := p.writeToDisk(latestData); err != nil {
+					// Snapshot failed: keep latestData and the WAL intact so
+					// nothing is lost, and retry on the next tick.
+					timer.Reset(1 * time.Second)
+					timerRunning = true
+				} else {
+					// Snapshot is durable; the WAL is now redundant.
+					p.truncateWAL()
+					latestData = nil
+				}
 			}
 		}
 	}
 }
 
-func (p *Persistence) writeToDisk(data map[string]IndexData) {
+func (p *Persistence) writeToDisk(data map[string]IndexData) error {
 	slog.Debug("Saving to disk", "file", p.filePath)
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 	if err := enc.Encode(data); err != nil {
 		slog.Error("Failed to encode data", "error", err)
-		return
+		return err
 	}
 
 	// Write to temp file then rename for atomic write
 	tmpFile := p.filePath + ".tmp"
 	if err := os.WriteFile(tmpFile, buf.Bytes(), 0644); err != nil {
 		slog.Error("Failed to write temp file", "error", err)
-		return
+		return err
 	}
 
 	if err := os.Rename(tmpFile, p.filePath); err != nil {
 		slog.Error("Failed to rename file", "error", err)
+		return err
 	}
+	return nil
 }
 
 func (p *Persistence) Save(data map[string]IndexData) {

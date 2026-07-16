@@ -13,13 +13,14 @@ import (
 
 // Server wraps the API routes and manager
 type Server struct {
-	mux         *http.ServeMux
-	mgr         *manager.Manager
-	apiKey      string
-	corsOrigin  string
-	startTime   time.Time
-	rateLimiter *RateLimiter
-	cache       *engine.LRUCache
+	mux              *http.ServeMux
+	mgr              *manager.Manager
+	apiKey           string
+	corsOrigin       string
+	startTime        time.Time
+	rateLimiter      *RateLimiter
+	cache            *engine.LRUCache
+	protectedIndexes map[string]bool
 }
 
 // NewServer initializes the HTTP routing
@@ -41,6 +42,44 @@ func NewServer(mgr *manager.Manager, apiKey string, rateLimit int, corsOrigin st
 	mgr.SetCacheInvalidator(s.cache)
 	s.routes()
 	return s
+}
+
+// SetProtectedIndexes shields index names from destructive operations over the
+// API: deleting the index, deleting a document and updating settings are
+// rejected unless the request carries a valid API key. Adding documents and
+// searching stay open, so the seeder and the public playground keep working.
+// Meant to protect seeded/demo data on a publicly exposed instance. Call once
+// at startup before serving.
+func (s *Server) SetProtectedIndexes(names []string) {
+	set := make(map[string]bool, len(names))
+	for _, n := range names {
+		n = strings.TrimSpace(n)
+		if n != "" {
+			set[n] = true
+		}
+	}
+	s.protectedIndexes = set
+}
+
+// isAuthenticated reports whether the request carries the configured API key.
+// When no API key is configured it returns false: there is no way to prove
+// authorization, so protected indexes stay locked for mutations.
+func (s *Server) isAuthenticated(r *http.Request) bool {
+	if s.apiKey == "" {
+		return false
+	}
+	auth := r.Header.Get("Authorization")
+	return strings.HasPrefix(auth, "Bearer ") && strings.TrimPrefix(auth, "Bearer ") == s.apiKey
+}
+
+// blockProtected writes a 403 and returns true if name is a protected index
+// and the request is not authenticated.
+func (s *Server) blockProtected(w http.ResponseWriter, r *http.Request, name string) bool {
+	if s.protectedIndexes[name] && !s.isAuthenticated(r) {
+		sendError(w, http.StatusForbidden, "This index is protected")
+		return true
+	}
+	return false
 }
 
 // Close releases background resources held by the server.

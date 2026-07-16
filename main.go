@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -45,6 +46,7 @@ func main() {
 	corsOrigin := flag.String("cors-origin", envOr("KOSKIDEX_CORS_ORIGIN", "*"), "Allowed CORS origin (* = any)")
 	tlsCert := flag.String("tls-cert", envOr("KOSKIDEX_TLS_CERT", ""), "Path to TLS certificate file")
 	tlsKey := flag.String("tls-key", envOr("KOSKIDEX_TLS_KEY", ""), "Path to TLS key file")
+	protectedIndexes := flag.String("protected-indexes", envOr("KOSKIDEX_PROTECTED_INDEXES", ""), "Comma-separated index names that are read-only over the API (destructive ops require a valid API key)")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
@@ -91,6 +93,9 @@ func main() {
 
 	// Initialize HTTP server
 	srv := server.NewServer(mgr, *apiKey, *rateLimit, *corsOrigin)
+	if *protectedIndexes != "" {
+		srv.SetProtectedIndexes(strings.Split(*protectedIndexes, ","))
+	}
 	defer srv.Close()
 
 	addr := ":" + *port

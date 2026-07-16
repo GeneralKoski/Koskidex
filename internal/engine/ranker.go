@@ -69,7 +69,9 @@ func ParseQuery(raw string, stopWords map[string]bool) ParsedQuery {
 
 func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highlights map[string][]string, fuzziness string) map[string]*TokenDocMatch {
 	maxTypos := MaxTypos(token.Term, settings.TypoTolerance, fuzziness)
-	matchedTerms := idx.FuzzySearchTerms(token.Term, maxTypos, false)
+	// Search already holds idx.mu (read); use the lock-free variant to avoid
+	// recursive read-locking, which can deadlock against a concurrent writer.
+	matchedTerms := idx.fuzzySearchTermsLocked(token.Term, maxTypos, false)
 
 	tokenDocBest := make(map[string]*TokenDocMatch)
 
@@ -264,20 +266,67 @@ func removeDuplicateTerms(terms []string) []string {
 	return final
 }
 
-// Highlight replaces matched terms in a text string with <em>tags</em>
+// Highlight wraps every occurrence of the matched terms in <em>…</em>.
+// matchedTerms come from the index, so they are already lowercased and
+// accent-stripped; the text is normalized the same way (per rune, keeping a
+// byte->original-rune map) so matching is accent-insensitive and the wrapping
+// always lands on whole original runes (never slicing mid-rune).
 func Highlight(text string, matchedTerms []string) string {
-	res := text
+	if text == "" || len(matchedTerms) == 0 {
+		return text
+	}
+
+	origRunes := []rune(text)
+
+	var norm strings.Builder
+	byteToRune := make([]int, 0, len(text))
+	for i, r := range origRunes {
+		n := removeAccents(strings.ToLower(string(r)))
+		for b := 0; b < len(n); b++ {
+			byteToRune = append(byteToRune, i)
+		}
+		norm.WriteString(n)
+	}
+	normStr := norm.String()
+
+	highlighted := make([]bool, len(origRunes))
 	for _, term := range matchedTerms {
-		// Simple case insensitive replace
-		// A full implementation would use regex or a token-aware replacer to avoid partial word matches
-		lowerRes := strings.ToLower(res)
-		idx := strings.Index(lowerRes, term)
-		if idx != -1 {
-			orig := res[idx : idx+len(term)]
-			res = res[:idx] + "<em>" + orig + "</em>" + res[idx+len(term):]
+		if term == "" {
+			continue
+		}
+		from := 0
+		for from <= len(normStr)-len(term) {
+			at := strings.Index(normStr[from:], term)
+			if at == -1 {
+				break
+			}
+			start := from + at
+			end := start + len(term) - 1
+			if start < len(byteToRune) && end < len(byteToRune) {
+				for ri := byteToRune[start]; ri <= byteToRune[end]; ri++ {
+					highlighted[ri] = true
+				}
+			}
+			from = start + len(term)
 		}
 	}
-	return res
+
+	var out strings.Builder
+	open := false
+	for i, r := range origRunes {
+		if highlighted[i] && !open {
+			out.WriteString("<em>")
+			open = true
+		} else if !highlighted[i] && open {
+			out.WriteString("</em>")
+			open = false
+		}
+		out.WriteRune(r)
+	}
+	if open {
+		out.WriteString("</em>")
+	}
+	return out.String()
 }
 
 func cosineSimilarity(a, b []float64) float64 {
