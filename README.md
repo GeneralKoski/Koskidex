@@ -5,8 +5,8 @@
 <h1 align="center">Koskidex</h1>
 
 <p align="center">
-  A lightning-fast, self-hosted full-text search engine written in Go.<br/>
-  Sub-15MB binary. Sub-5ms queries. Zero dependencies. Drop it into any stack.
+  A self-hosted full-text search engine written in Go.<br/>
+  Single static binary, no runtime dependencies. Drop it into any stack.
 </p>
 
 <p align="center">
@@ -49,7 +49,7 @@ curl -X POST http://localhost:7700/indexes/movies/documents \
   {"id": "3", "title": "Interstellar", "genre": "Sci-Fi", "year": 2014}
 ]'
 
-# Search — try a typo!
+# Search, with a typo on purpose
 curl "http://localhost:7700/indexes/movies/search?q=matrx"
 ```
 
@@ -59,8 +59,8 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 
 |                            | Feature                                                                                     | Details |
 | -------------------------- | ------------------------------------------------------------------------------------------- | ------- |
-| **Performance**      | Sub-5ms response times on reasonable datasets                                               |         |
-| **Lightweight**      | Binary <15MB, RAM <20MB idle, zero runtime dependencies                                     |         |
+| **In-memory index**  | Inverted index held in memory, persisted to disk, no external datastore                     |         |
+| **Lightweight**      | Single static Go binary, zero runtime dependencies                                          |         |
 | **Typo tolerance**   | Damerau-Levenshtein fuzzy matching with dynamic fuzziness (`0`, `1`, `2`, `AUTO`)   |         |
 | **Smart ranking**    | Multi-factor pipeline: exactness, typo count, field weight, term frequency                  |         |
 | **Field weighting**  | Boost specific fields via `field_weights` settings (e.g. `name: 5`, `description: 1`) |         |
@@ -68,19 +68,19 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 | **Faceted search**   | Aggregate counts per field:`facets=genre,category`                                        |         |
 | **Geospatial**       | Haversine distance filtering:`filter=distance(_geo,45.46,9.19)<50000`                     |         |
 | **Vector search**    | Cosine similarity on `_vector` fields, hybrid mode with full-text scoring                 |         |
-| **WAL**              | Write-Ahead Log for crash recovery — zero data loss on unexpected shutdowns                |         |
+| **WAL**              | Write-Ahead Log for crash recovery, avoiding data loss on unexpected shutdown                |         |
 | **Search operators** | `AND` (default), `OR`, `NOT` (prefix `-`)                                           |         |
 | **Field filters**    | `filter=genre=Sci-Fi,year>2000` with `=`, `!=`, `>`, `<`, `>=`, `<=`          |         |
 | **Pagination**       | `limit` and `offset` params, `total_hits` in response                                 |         |
 | **Multi-index**      | Create and manage independent indexes with their own settings                               |         |
-| **Schemaless**       | Index any JSON object — only requires a unique `id` field                                |         |
+| **Schemaless**       | Index any JSON object, only a unique `id` field is required                                |         |
 | **Synonyms**         | Configure per-index synonym mappings                                                        |         |
 | **Auth**             | Optional API key via `--api-key` flag, Bearer token auth                                  |         |
 | **Rate limiting**    | Per-IP token bucket via `--rate-limit` flag                                               |         |
 | **TLS**              | Native HTTPS via `--tls-cert` and `--tls-key` flags                                     |         |
 | **LRU cache**        | Query results cached, auto-invalidated on writes                                            |         |
 | **Docker ready**     | Multi-stage Alpine build, healthcheck included                                              |         |
-| **Client libraries** | PHP/Laravel, Node.js, Python — ready to copy                                               |         |
+| **Client libraries** | PHP/Laravel, Node.js, Python, ready to copy                                               |         |
 
 ---
 
@@ -232,7 +232,7 @@ KOSKIDEX_API_KEY=your-secret-key
 
 ### PHP / Laravel
 
-Copy the integration files and add the `Searchable` trait to your models — they auto-sync on every `save()`, `update()`, and `delete()`.
+Copy the integration files and add the `Searchable` trait to your models, which then auto-sync on every `save()`, `update()`, and `delete()`.
 
 ```bash
 cp koskidex/examples/laravel/app/Services/KoskidexClient.php app/Services/
