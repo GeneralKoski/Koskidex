@@ -661,3 +661,90 @@ fanno ancora 48 entrambi perché senza IDF un token condiviso da tutti e due pes
 quanto uno che li separerebbe. È esattamente il primo difetto, e questa query è
 il caso di prova pronto per la Fase 1: quando arriva BM25, i due punteggi devono
 divergere, e di quanto è un numero da mettere in tesi.
+
+---
+
+## 23/09/2026 - Il corpus di dominio arriva, e porta due trappole
+
+L'azienda ha abbandonato Documentale, quindi il corpus non viene piu' dal suo
+archivio ma da albi pretori pubblici: 563 atti del Comune di Crispiano col PDF e
+il testo integrale, 9.457 atti della Regione Friuli Venezia Giulia con le sole
+schede. Importati in Documentale dal suo modello vero, riesportati col suo
+comando: **10.018 documenti**, in due varianti che differiscono in esattamente
+563 testi e in nient'altro. Provenienza e licenze in `eval/corpora/c3-albo/SOURCE.md`.
+
+Le due varianti sono le due opzioni del Task C0, e la loro differenza e' la
+misura di quanto vale indicizzare il corpo dei documenti. Prima di misurarla
+sono saltate fuori due cose.
+
+### Trappola 1: `scripts/compare` leggeva la chiave sbagliata, in silenzio
+
+Il primo confronto sul corpus vero ha dato **1 risultato su 10.018 documenti**,
+sempre lo stesso, per query diverse.
+
+Causa: `scripts/compare` dichiarava `json:"id"`, ma da quando l'export di
+Documentale scrive in formato BEIR la chiave e' `_id`. Tutti i documenti
+arrivavano con id vuoto, `AddDocument("")` li sovrascriveva l'uno sull'altro, e
+l'indice si riduceva a un documento solo. Nessun errore, nessun avviso: lo
+strumento stampava tabelle di confronto come se niente fosse.
+
+**Il confronto Elasticsearch/Koskidex del 23/09 non e' invalidato.** Verificato
+nella storia di Documentale: quando e' stato fatto, l'export scriveva ancora
+`id`, e il passaggio a `_id` e' di poche ore dopo (commit `6aa6d7b`). Ma
+chiunque avesse rilanciato quel confronto dopo, me compreso, avrebbe ottenuto
+numeri falsi senza un solo segnale.
+
+Corretto: `_id`, piu' il `title` indicizzato come campo a se' con peso 5 come fa
+Elasticsearch, invece di essere impastato nel testo. E soprattutto
+`controllaIdentificatori`, che rifiuta di partire se il corpus ha id vuoti o
+ripetuti. **La lezione e' che un identificatore sbagliato non fa rumore da solo:
+va fatto rumoreggiare.**
+
+### Trappola 2: su un corpus bimodale BM25 non misura la pertinenza
+
+Corretto il primo difetto, il confronto gira davvero, e dice una cosa che non mi
+aspettavo. Su tre query di prova, contando quanti dei primi 10 risultati sono
+documenti col testo integrale (che sono il 5,4% del corpus):
+
+| Query | and + euristico | or + euristico | or + BM25 |
+|---|---|---|---|
+| `determina noleggio veicolo` | 9 su 10 | 7 su 10 | **0 su 10** |
+| `fornitura libri di testo scuole` | 2 su 10 | 2 su 10 | **0 su 10** |
+| `ordinanza circolazione stradale` | 10 su 10 | 10 su 10 | **0 su 10** |
+
+Zero su trenta. Non e' pertinenza, e' la normalizzazione della lunghezza: con
+9.455 schede da ~200 caratteri e 563 documenti da ~9.000, la lunghezza media del
+corpus e' tirata giu' dalle schede, e il fattore `b = 0,75` penalizza
+sistematicamente tutto quello che e' lungo. BM25 sta facendo esattamente il suo
+mestiere; e' il corpus a essere due corpora messi in un indice solo.
+
+Guardando i primi risultati si vede a occhio: l'euristico mette in testa le
+determine di noleggio veicoli, BM25 mette una determina sul *fermo
+amministrativo di un veicolo* e due sul *noleggio di estintori e bagni chimici*
+a una fiera - documenti corti che contengono le parole giuste.
+
+**Conseguenza operativa: i due corpora non si misurano in un indice unico.**
+Vanno tenuti separati, e la domanda del C0 va posta come confronto fra due
+misure sullo stesso insieme di documenti - i 563 di Crispiano, una volta con la
+sola scheda e una volta col testo - non fra due sottoinsiemi di un indice misto.
+Se avessi misurato prima e guardato dopo, la risposta sarebbe stata "il testo
+integrale peggiora il recupero", che e' falso ed e' un artefatto di `b`.
+
+### Cosa e' scritto **prima** di misurare
+
+Quando si misurera' sul serio, sui soli 563 di Crispiano e con query e giudizi
+veri, l'ipotesi e' questa:
+
+1. Il testo integrale **aumenta il richiamo** e basta: fa trovare documenti che
+   la scheda non nomina. Sul nDCG@10 mi aspetto un guadagno piccolo, perche' la
+   scheda di un atto amministrativo e' gia' un buon riassunto - l'oggetto di una
+   determina e' scritto apposta per dire cos'e'.
+2. Il guadagno e' **piu' grande sulle query lunghe** che su quelle di una o due
+   parole, per la stessa ragione per cui il recupero disgiuntivo ha reso tanto:
+   piu' parole ci sono, piu' e' probabile che qualcuna stia solo nel corpo.
+3. Sulle query di tipo known-item con il numero d'atto il testo integrale **non
+   serve a niente**, perche' il numero sta gia' nel titolo. Se invece rendesse,
+   vuol dire che il titolo non e' indicizzato come credo, e va guardato li'.
+4. `b` andra' rimisurato sul corpus di soli documenti lunghi: il valore 0,75 e'
+   un default tarato su collezioni di articoli, e su un archivio dove tutti i
+   documenti si somigliano in lunghezza dovrebbe contare meno.

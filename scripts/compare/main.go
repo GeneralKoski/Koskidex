@@ -27,10 +27,12 @@ import (
 )
 
 // documento is one line of the JSONL produced by Documentale's
-// app:export-eval-corpus.
+// app:export-eval-corpus, which writes BEIR keys: the id is "_id", and the
+// name of the document travels in "title", separate from "text".
 type documento struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
+	ID    string `json:"_id"`
+	Title string `json:"title"`
+	Text  string `json:"text"`
 }
 
 type configurazione struct {
@@ -61,6 +63,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
 	}
+	if err := controllaIdentificatori(docs); err != nil {
+		fmt.Fprintln(os.Stderr, "errore:", err)
+		os.Exit(1)
+	}
+
 	domande, err := leggiRighe(*queries)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
@@ -140,15 +147,19 @@ type risultato struct {
 // riusa fra configurazioni diverse.
 func indicizza(docs []documento, c configurazione, refusi string) (*engine.InvertedIndex, engine.Settings) {
 	s := engine.DefaultSettings()
-	s.SearchableFields = []string{"text"}
-	s.FieldWeights = map[string]float64{"text": 1.0}
+	// Due campi con i pesi di Documentale: Elasticsearch cerca su name^5 e sui
+	// campi dei metadati con peso minore. Impastare titolo e testo in un campo
+	// solo darebbe al titolo il peso del corpo, e il confronto misurerebbe una
+	// configurazione che nessuno usa.
+	s.SearchableFields = []string{"title", "text"}
+	s.FieldWeights = map[string]float64{"title": 5.0, "text": 1.0}
 	s.TypoTolerance.Enabled = refusi != "0"
 	s.RetrievalMode = c.recupero
 	s.ScoringMode = c.punteggio
 
 	idx := engine.NewInvertedIndex()
 	for _, d := range docs {
-		idx.AddDocument(d.ID, map[string]interface{}{"text": d.Text}, s)
+		idx.AddDocument(d.ID, map[string]interface{}{"title": d.Title, "text": d.Text}, s)
 	}
 
 	return idx, s
@@ -157,11 +168,38 @@ func indicizza(docs []documento, c configurazione, refusi string) (*engine.Inver
 func etichetta(docs []documento, id string) string {
 	for _, d := range docs {
 		if d.ID == id {
+			if d.Title != "" {
+				return d.Title
+			}
 			prima, _, _ := strings.Cut(d.Text, "\n")
 			return prima
 		}
 	}
 	return id
+}
+
+// Un id vuoto o ripetuto non fa rumore: AddDocument sovrascrive, e l'indice si
+// riduce in silenzio a un documento solo. E' successo leggendo un corpus BEIR
+// con la chiave sbagliata - 10.018 documenti diventati 1, e il confronto
+// continuava a stampare tabelle come se niente fosse.
+func controllaIdentificatori(docs []documento) error {
+	visti := make(map[string]bool, len(docs))
+	vuoti, ripetuti := 0, 0
+	for _, d := range docs {
+		if d.ID == "" {
+			vuoti++
+			continue
+		}
+		if visti[d.ID] {
+			ripetuti++
+		}
+		visti[d.ID] = true
+	}
+	if vuoti > 0 || ripetuti > 0 {
+		return fmt.Errorf("corpus inutilizzabile: %d documenti senza id, %d con id ripetuto, %d distinti su %d righe",
+			vuoti, ripetuti, len(visti), len(docs))
+	}
+	return nil
 }
 
 func leggiCorpus(path string) ([]documento, error) {
