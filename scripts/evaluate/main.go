@@ -8,10 +8,12 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/GeneralKoski/Koskidex/internal/engine"
 	"github.com/GeneralKoski/Koskidex/internal/eval"
@@ -88,16 +90,30 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi string
 		collezione, len(docs), len(daValutare), len(queries), modo, punteggio, analisi)
 
 	fmt.Print("indicizzo... ")
+	t0 := time.Now()
 	searcher := eval.NewKoskidexSearcher(docs, func(st *engine.Settings) {
 		st.RetrievalMode = modo
 		st.ScoringMode = punteggio
 		analisiLessicali[analisi](st)
 	})
-	fmt.Println("fatto")
+	indicizzazione := time.Since(t0)
+	fmt.Println(indicizzazione.Round(time.Millisecond))
 
 	fmt.Print("valuto... ")
 	res := eval.Run(searcher, nomeRun, collezione, daValutare, qrels)
 	fmt.Println(res.Elapsed)
+
+	res.Timings.IndexMs = float64(indicizzazione.Nanoseconds()) / 1e6
+	res.Config = eval.Provenienza(".")
+	res.Config["collezione"] = collezione
+	res.Config["documenti"] = fmt.Sprint(len(docs))
+	res.Config["recupero"] = modo
+	res.Config["punteggio"] = punteggio
+	res.Config["analisi"] = analisi
+	res.Config["refusi"] = "0"
+	if impronta, err := eval.ImprontaFile(filepath.Join(dir, "corpus.jsonl")); err == nil {
+		res.Config["corpus_sha256"] = impronta
+	}
 
 	if err := os.MkdirAll(uscita, 0o755); err != nil {
 		return err
@@ -108,8 +124,16 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi string
 		return err
 	}
 	defer f.Close()
-	if err := res.WriteJSON(f); err != nil {
+	var buf bytes.Buffer
+	if err := res.WriteJSON(&buf); err != nil {
 		return err
+	}
+	if _, err := f.Write(buf.Bytes()); err != nil {
+		return err
+	}
+	archiviato, err := eval.Archivia("koskidex-beir", fmt.Sprintf("%s-%s", collezione, nomeRun), buf.Bytes())
+	if err != nil {
+		return fmt.Errorf("archiviazione fallita: %w", err)
 	}
 
 	fmt.Printf("\n  nDCG@10    %.4f\n  Recall@100 %.4f\n  MRR@10     %.4f\n",
@@ -123,5 +147,11 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi string
 		fmt.Printf(", %d saltate perche' senza documenti rilevanti", res.SkippedNoRel)
 	}
 	fmt.Printf("\n\nscritto in %s\n", path)
+	if archiviato != "" {
+		fmt.Printf("archiviato in %s\n", archiviato)
+	} else {
+		fmt.Printf("\n!!! RISULTATO NON ARCHIVIATO: %s non e' impostata.\n", eval.VarArchivio)
+		fmt.Println("!!! Il file qui sopra verra' sovrascritto alla prossima esecuzione.")
+	}
 	return nil
 }

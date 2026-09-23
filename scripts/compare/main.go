@@ -21,9 +21,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/GeneralKoski/Koskidex/internal/engine"
+	"github.com/GeneralKoski/Koskidex/internal/eval"
 )
 
 // documento is one line of the JSONL produced by Documentale's
@@ -45,7 +48,7 @@ func main() {
 	corpus := flag.String("corpus", "", "file JSONL esportato da Documentale")
 	queries := flag.String("queries", "", "file con una query per riga")
 	quante := flag.Int("top", 5, "quanti risultati mostrare per query")
-	uscita := flag.String("json", "", "se valorizzato, scrive i ranking anche in questo file")
+	uscita := flag.String("json", "", "se valorizzato, scrive il rapporto anche in questo file (l'archivio della tesi lo riceve comunque)")
 	// Il default e' "auto" perche' Documentale cerca con fuzziness AUTO: con la
 	// tolleranza spenta i due motori recuperano insiemi diversi e la tabella
 	// sembra dire che Koskidex si comporta diversamente, mentre sta solo
@@ -83,27 +86,51 @@ func main() {
 	fmt.Printf("%d documenti, %d query, tolleranza refusi %q\n", len(docs), len(domande), *refusi)
 
 	vuote := make([]int, len(configurazioni))
-	raccolta := map[string]map[string][]risultato{}
+
+	// Un indice per configurazione, costruito una volta sola e cronometrato.
+	// Prima si ricostruiva a ogni query: era lento, e soprattutto rendeva
+	// impossibile dire quanto costa indicizzare e quanto costa cercare.
+	indici := make([]*engine.InvertedIndex, len(configurazioni))
+	impostazioni := make([]engine.Settings, len(configurazioni))
+	rap := rapporto{
+		RanAt:  time.Now().UTC().Format(time.RFC3339),
+		Config: eval.Provenienza("."),
+	}
+	rap.Config["corpus"] = *corpus
+	rap.Config["documenti"] = fmt.Sprint(len(docs))
+	rap.Config["refusi"] = *refusi
+	if impronta, err := eval.ImprontaFile(*corpus); err == nil {
+		rap.Config["corpus_sha256"] = impronta
+	}
+	for i, c := range configurazioni {
+		t0 := time.Now()
+		indici[i], impostazioni[i] = indicizza(docs, c, *refusi)
+		ms := ms(time.Since(t0))
+		rap.Configurazioni = append(rap.Configurazioni, infoConfigurazione{c.etichetta, c.recupero, c.punteggio, ms})
+		fmt.Printf("indice %-24s %8.0f ms\n", c.etichetta, ms)
+	}
 
 	for _, q := range domande {
-		raccolta[q] = map[string][]risultato{}
+		riga := esitoQuery{Query: q, Esiti: map[string]esito{}}
 		fmt.Printf("\n\n== %s  (%d parole)\n", q, len(strings.Fields(q)))
 		for i, c := range configurazioni {
-			idx, s := indicizza(docs, c, *refusi)
-			trovati, _ := idx.SearchScored(q, s, *refusi, nil)
+			t0 := time.Now()
+			trovati, _ := indici[i].SearchScored(q, impostazioni[i], *refusi, nil)
+			durata := ms(time.Since(t0))
 			if len(trovati) == 0 {
 				vuote[i]++
 			}
 
+			// Solo id e punteggi: i titoli degli atti possono contenere nomi di
+			// persone, e questi file finiscono nel repository della tesi.
+			e := esito{IDs: []string{}, Punteggi: []float64{}, Ms: durata}
 			for _, m := range trovati {
-				raccolta[q][c.etichetta] = append(raccolta[q][c.etichetta], risultato{
-					DocID:      m.DocID,
-					Punteggio:  m.Score,
-					Intestaz10: etichetta(docs, m.DocID),
-				})
+				e.IDs = append(e.IDs, m.DocID)
+				e.Punteggi = append(e.Punteggi, m.Score)
 			}
+			riga.Esiti[c.etichetta] = e
 
-			fmt.Printf("\n  %-24s %d risultati\n", c.etichetta, len(trovati))
+			fmt.Printf("\n  %-24s %d risultati  (%.2f ms)\n", c.etichetta, len(trovati), durata)
 			for n, m := range trovati {
 				if n >= *quante {
 					fmt.Printf("      ... e altri %d\n", len(trovati)-*quante)
@@ -112,6 +139,7 @@ func main() {
 				fmt.Printf("      %d. %-6.3f %s\n", n+1, m.Score, etichetta(docs, m.DocID))
 			}
 		}
+		rap.Query = append(rap.Query, riga)
 	}
 
 	fmt.Printf("\n\n== query a vuoto su %d\n", len(domande))
@@ -119,27 +147,60 @@ func main() {
 		fmt.Printf("  %-24s %d\n", c.etichetta, vuote[i])
 	}
 
+	dati, err := json.MarshalIndent(rap, "", "  ")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "errore:", err)
+		os.Exit(1)
+	}
 	if *uscita != "" {
-		f, err := os.Create(*uscita)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "errore:", err)
-			os.Exit(1)
-		}
-		defer f.Close()
-		enc := json.NewEncoder(f)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(raccolta); err != nil {
+		if err := os.WriteFile(*uscita, dati, 0o644); err != nil {
 			fmt.Fprintln(os.Stderr, "errore:", err)
 			os.Exit(1)
 		}
 	}
+	nome := filepath.Base(filepath.Dir(*corpus)) + "-koskidex"
+	archiviato, err := eval.Archivia("confronto", nome, dati)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "errore di archiviazione:", err)
+		os.Exit(1)
+	}
+	if archiviato != "" {
+		fmt.Printf("\narchiviato in %s\n", archiviato)
+	} else {
+		fmt.Printf("\n!!! RISULTATO NON ARCHIVIATO: %s non e' impostata.\n", eval.VarArchivio)
+	}
 }
 
-// risultato e' una riga di ranking come finisce nel file JSON.
-type risultato struct {
-	DocID      string  `json:"doc_id"`
-	Punteggio  float64 `json:"punteggio"`
-	Intestaz10 string  `json:"titolo"`
+// rapporto e' il file che finisce nell'archivio della tesi: configurazione,
+// provenienza del codice, tempi di indicizzazione e, per ogni query, ranking e
+// latenza di ciascuna configurazione.
+type rapporto struct {
+	RanAt          string               `json:"ran_at"`
+	Config         map[string]string    `json:"config"`
+	Configurazioni []infoConfigurazione `json:"configurazioni"`
+	Query          []esitoQuery         `json:"query"`
+}
+
+type infoConfigurazione struct {
+	Etichetta string  `json:"etichetta"`
+	Recupero  string  `json:"recupero"`
+	Punteggio string  `json:"punteggio"`
+	IndexMs   float64 `json:"index_ms"`
+}
+
+type esitoQuery struct {
+	Query string           `json:"query"`
+	Esiti map[string]esito `json:"esiti"`
+}
+
+type esito struct {
+	IDs      []string  `json:"ids"`
+	Punteggi []float64 `json:"punteggi"`
+	Ms       float64   `json:"ms"`
+}
+
+func ms(d time.Duration) float64 {
+	return float64(d.Nanoseconds()) / 1e6
 }
 
 // indicizza costruisce un indice per configurazione. Le statistiche BM25

@@ -190,3 +190,35 @@ func TestRunRecordsTheCandidateCountBeforeTheCutoff(t *testing.T) {
 		t.Fatalf("i candidati vanno registrati interi, non tagliati: attesi 250, ottenuti %d", r.PerQuery[0].Candidates)
 	}
 }
+
+// Every evaluated query gets a latency, and skipped ones get none: a latency
+// for a query that was never asked would end up averaged into the charts.
+func TestRunRecordsALatencyForEveryEvaluatedQuery(t *testing.T) {
+	queries := map[string]string{"q1": "prima", "q2": "seconda"}
+	qrels := Qrels{"q1": {"d1": 1}, "q2": {"d2": 0}}
+	r := Run(&searcherFinto{perQuery: map[string][]string{"prima": {"d1"}}}, "prova", "finta", queries, qrels)
+
+	if len(r.Timings.PerQueryMs) != 1 {
+		t.Fatalf("attesa 1 latenza, ottenute %d: %v", len(r.Timings.PerQueryMs), r.Timings.PerQueryMs)
+	}
+	if _, ok := r.Timings.PerQueryMs["q1"]; !ok {
+		t.Fatalf("manca la latenza della query valutata: %v", r.Timings.PerQueryMs)
+	}
+	if r.Timings.ElapsedMs <= 0 {
+		t.Fatalf("il tempo totale deve essere registrato come numero, e' %v", r.Timings.ElapsedMs)
+	}
+}
+
+// Timings change on every run, metrics must not. They live in separate blocks
+// so that two runs of the same configuration still have identical per_query.
+func TestTimingsDoNotLeakIntoThePerQueryMetrics(t *testing.T) {
+	queries := map[string]string{"q1": "prima", "q2": "seconda"}
+	qrels := Qrels{"q1": {"d1": 1}, "q2": {"d2": 1}}
+	s := map[string][]string{"prima": {"d1"}, "seconda": {"x", "d2"}}
+
+	a, _ := json.Marshal(Run(&searcherFinto{perQuery: s}, "p", "f", queries, qrels).PerQuery)
+	b, _ := json.Marshal(Run(&searcherFinto{perQuery: s}, "p", "f", queries, qrels).PerQuery)
+	if !bytes.Equal(a, b) {
+		t.Fatalf("per_query deve essere identico fra due esecuzioni:\n%s\n%s", a, b)
+	}
+}

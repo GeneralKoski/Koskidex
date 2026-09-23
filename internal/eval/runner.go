@@ -46,18 +46,40 @@ type QueryResult struct {
 // Results is what gets written to a versioned file. Every number in the thesis
 // has to come from one of these, never from a run nobody recorded.
 type Results struct {
-	Run           string        `json:"run"`
-	Collection    string        `json:"collection"`
-	RanAt         string        `json:"ran_at"`
-	GoVersion     string        `json:"go_version"`
-	Queries       int           `json:"queries"`
-	SkippedNoRel  int           `json:"skipped_no_relevant"`
-	ZeroResults   int           `json:"zero_results"`
-	MeanNDCG10    float64       `json:"mean_ndcg@10"`
-	MeanRecall100 float64       `json:"mean_recall@100"`
-	MeanMRR10     float64       `json:"mean_mrr@10"`
-	Elapsed       string        `json:"elapsed"`
-	PerQuery      []QueryResult `json:"per_query"`
+	Run string `json:"run"`
+	// Config is every setting that shaped the run, plus where the code came
+	// from. The run label alone is not enough: two files called
+	// scifact-bm25.json written on different days are not the same run.
+	Config        map[string]string `json:"config,omitempty"`
+	Collection    string            `json:"collection"`
+	RanAt         string            `json:"ran_at"`
+	GoVersion     string            `json:"go_version"`
+	Queries       int               `json:"queries"`
+	SkippedNoRel  int               `json:"skipped_no_relevant"`
+	ZeroResults   int               `json:"zero_results"`
+	MeanNDCG10    float64           `json:"mean_ndcg@10"`
+	MeanRecall100 float64           `json:"mean_recall@100"`
+	MeanMRR10     float64           `json:"mean_mrr@10"`
+	Elapsed       string            `json:"elapsed"`
+	PerQuery      []QueryResult     `json:"per_query"`
+	// Timings are kept apart from PerQuery on purpose. Latencies change on
+	// every run; the metrics must not. With the two mixed, a diff between two
+	// result files would be all noise and would hide the one score that moved.
+	Timings Timings `json:"timings"`
+}
+
+// Timings are in milliseconds, as numbers, so they can be plotted without
+// parsing. IndexMs is filled in by the caller, who owns the indexing.
+type Timings struct {
+	IndexMs    float64            `json:"index_ms"`
+	ElapsedMs  float64            `json:"elapsed_ms"`
+	PerQueryMs map[string]float64 `json:"per_query_ms"`
+}
+
+// Nanosecond precision: Microseconds() truncates, and a query faster than a
+// microsecond would be recorded as taking zero time.
+func millisecondi(d time.Duration) float64 {
+	return float64(d.Nanoseconds()) / 1e6
 }
 
 // Run scores a Searcher over every judged query and returns the means.
@@ -96,6 +118,7 @@ func Run(s Searcher, nomeRun, collezione string, queries map[string]string, qrel
 		RanAt:      time.Now().UTC().Format(time.RFC3339),
 		GoVersion:  runtime.Version(),
 		PerQuery:   make([]QueryResult, 0, len(ids)),
+		Timings:    Timings{PerQueryMs: make(map[string]float64, len(ids))},
 	}
 
 	var sommaNDCG, sommaRecall, sommaMRR float64
@@ -107,7 +130,9 @@ func Run(s Searcher, nomeRun, collezione string, queries map[string]string, qrel
 			continue
 		}
 
+		t0 := time.Now()
 		ranked, candidati := s.Search(queries[qid], profondita)
+		out.Timings.PerQueryMs[qid] = millisecondi(time.Since(t0))
 		if len(ranked) == 0 {
 			out.ZeroResults++
 		}
@@ -136,6 +161,7 @@ func Run(s Searcher, nomeRun, collezione string, queries map[string]string, qrel
 		out.MeanMRR10 = sommaMRR / n
 	}
 	out.Elapsed = time.Since(inizio).Round(time.Millisecond).String()
+	out.Timings.ElapsedMs = millisecondi(time.Since(inizio))
 
 	return out
 }
