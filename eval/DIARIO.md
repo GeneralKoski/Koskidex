@@ -19,6 +19,49 @@ Regole, da `piano-autunno-2026.md`:
 
 ---
 
+## 2026-09-23 - Recupero disgiuntivo (difetto 0)
+
+**Flag:** `Settings.RetrievalMode`, `"all"` di default (comportamento attuale),
+`"any"` per il disgiuntivo. Stringa vuota trattata come `"all"`: le settings
+vengono persistite su disco, e un indice salvato prima di oggi non ha il campo.
+**Tocca:** `internal/engine/inverted.go` (Settings), `ranker.go` (il filtro
+`requiredMatches`)
+
+### Perché
+
+Misurato sopra: 290 query su 300 a vuoto su SciFact. Il filtro attuale tiene
+solo i documenti che contengono **tutti** i termini della query.
+
+### Prima di misurare
+
+1. **Le query a vuoto crollano quasi a zero** su entrambe le collezioni. È
+   quasi una tautologia, serve solo a confermare che il flag è collegato.
+2. **SciFact: nDCG@10 sale molto sopra 0,0246 ma resta molto sotto 0,6789.**
+   Tiro un numero: **fra 0,10 e 0,45**. Senza IDF un documento che contiene
+   dieci termini comuni batte quello che contiene l'unico termine raro che
+   conta, ed è esattamente il difetto 1. Se arrivasse vicino al riferimento,
+   vorrebbe dire che l'IDF conta poco e la Fase 1 varrebbe meno.
+3. **Recall@100 su SciFact sale tantissimo, sopra 0,50.** È l'effetto
+   principale: il disgiuntivo è un cambiamento di recupero, non di ordinamento.
+   Se il recall non salisse, il flag non starebbe facendo quello che credo.
+4. **Su NFCorpus il nDCG potrebbe PEGGIORARE, e non sarebbe un errore.** Le
+   query sono da 2-3 parole e lì l'AND funzionava da filtro di precisione: il
+   50% di query a vuoto è il prezzo, ma quelle che rispondevano rispondevano
+   bene (MRR@10 a 0,2644, più alto del nDCG). In disgiuntivo entrano molti
+   documenti mediocri. Mi aspetto **recall su, nDCG incerto**.
+5. `TestBaselineRankingIsFrozen` passa a default **senza modifiche al test**.
+
+La 4 è quella su cui non so la risposta, ed è la più interessante: se il nDCG
+peggiora su query corte e migliora su query lunghe, la conclusione di tesi non è
+"il disgiuntivo è meglio" ma "la modalità giusta dipende dalla lunghezza della
+query", che è un risultato più forte e si lega alla Fase 3.
+
+### Dopo
+
+Da compilare a misura fatta.
+
+---
+
 ## 2026-09-23 - Prima misura del baseline legacy su C1
 
 **Flag:** nessuna modifica al motore. È la prima misura, non un cambiamento.
