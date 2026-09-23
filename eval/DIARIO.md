@@ -19,6 +19,58 @@ Regole, da `piano-autunno-2026.md`:
 
 ---
 
+## 2026-09-23 - BM25 al posto del punteggio euristico (difetto 1)
+
+**Flag:** `Settings.ScoringMode`, `"legacy"` di default, `"bm25"` per il nuovo.
+Vuoto trattato come `"legacy"`, stessa ragione del `RetrievalMode`: le settings
+sono persistite.
+**Parametri:** `k1=1.2`, `b=0.75`, i default di Lucene. **Non calibrati**: la
+calibrazione è Fase 3, qui si misura la formula standard.
+
+### Cosa sostituisce
+
+Oggi il punteggio di un termine è `(10 - refusi + 2*esatti) * peso_campo`.
+Nessun IDF, nessuna frequenza di termine, nessuna normalizzazione sulla
+lunghezza. Un termine rarissimo pesa quanto uno comunissimo.
+
+### Cosa manca nell'indice
+
+Tre cose che BM25 richiede e che oggi non esistono:
+
+- **df(t)**, in quanti documenti compare un termine. Ricavabile contando i
+  `DocID` distinti nei postings, ma è O(postings) per termine comune: va
+  mantenuta durante l'indicizzazione.
+- **|D|**, la lunghezza del documento in token. `docToTerms` non serve, è
+  **deduplicato**: contiene i termini distinti, non le occorrenze.
+- **tf(t,D)**. Il campo `Posting.TF` esiste con scritto *"calculated later"* e
+  non è mai stato riempito; `addDocumentLocked` calcola perfino un `termCounts`
+  e poi lo butta via.
+
+### Prima di misurare
+
+1. **SciFact sale da 0,4936 verso il riferimento 0,6789.** Dichiaro la fascia:
+   **fra 0,55 e 0,70**. Se restasse sotto 0,55, l'IDF conta meno di quanto la
+   tesi assume e il capitolo va ripensato.
+2. **NFCorpus sale da 0,2246 verso 0,3218.** Fascia: **fra 0,25 e 0,33**.
+3. **Recall@100 resta praticamente fermo, entro ±0,02 su entrambe.** Questa è la
+   più importante e non è una previsione, è una **guardia**: BM25 cambia come si
+   ordina, non cosa si recupera. Se il recall si muove, ho cambiato il recupero
+   per sbaglio e il numero sul nDCG non vale niente.
+4. **`TestBaselineIdentifierTieBreaksByDocID` fallisce.** Oggi `d1` e `d3` fanno
+   48 entrambi sulla query `2026/0173`. Con la normalizzazione sulla lunghezza i
+   due si separano: è il test scritto apposta per rompersi qui, ed è il momento
+   in cui deve rompersi.
+5. **`TestBaselineRankingIsFrozen` passa a default, senza modifiche al test.**
+
+La 3 è quella che può salvarmi da un risultato falso. La 4 è quella che chiude
+il cerchio aperto il 23 settembre sul pareggio dei pari merito.
+
+### Dopo
+
+Da compilare a misura fatta.
+
+---
+
 ## 2026-09-23 - Recupero disgiuntivo (difetto 0)
 
 **Flag:** `Settings.RetrievalMode`, `"all"` di default (comportamento attuale),
