@@ -67,4 +67,39 @@ Se la 2 fosse smentita, la modifica va annullata e ricontrollata, non sanata.
 
 ### Dopo
 
-Da compilare a fix applicato.
+Fix: un ultimo criterio in `sort.Slice`, `results[i].DocID < results[j].DocID`.
+Sette righe, di cui cinque di commento.
+
+**Tutte e tre le predizioni confermate.**
+
+1. L'ordine si è fermato su `[d1 d3]`, come previsto. **40 esecuzioni su 40.**
+2. **Nessun altro caso congelato è cambiato.** Verificato nel modo giusto, cioè
+   lanciando `TestBaselineRankingIsFrozen` e `TestBaselineHybridIsFrozen`
+   **senza toccarli**, 20 volte: sempre verdi. Solo dopo ho aggiunto la classe
+   `identificatore` fra quelle congelate.
+3. Suite completa verde: 86 test, 0 falliti.
+
+**Nessuna sorpresa.** È il risultato noioso che ci si aspetta da un fix di
+determinismo, ed è quello giusto: se fosse cambiato qualcos'altro avrebbe voluto
+dire che il criterio nuovo veniva raggiunto in casi dove non doveva.
+
+### Una cosa che avevo sbagliato
+
+Quando avevo scritto `TestBaselineIdentifierTieIsNotDeterministic` avevo detto
+che sarebbe "fallito rumorosamente" una volta risolto il pareggio. **Non è
+vero**, e me ne sono accorto applicando il fix: quel test verificava la parità
+dei *punteggi*, non l'ordine, e i punteggi sono rimasti identici (48 entrambi).
+Sarebbe rimasto verde, lasciando credere che il problema fosse ancora aperto.
+
+L'ho sostituito con `TestBaselineIdentifierTieBreaksByDocID`, che dice la cosa
+giusta: i punteggi sono ancora in parità, l'ordine ora lo decide il DocID, e il
+test fallirà quando **BM25** separerà davvero i due documenti. Quello sì che è
+il momento in cui deve rompersi.
+
+### Cosa resta aperto, ed è il punto
+
+Il pareggio **non è stato risolto, è stato solo reso stabile.** `d1` e `d3`
+fanno ancora 48 entrambi perché senza IDF un token condiviso da tutti e due pesa
+quanto uno che li separerebbe. È esattamente il primo difetto, e questa query è
+il caso di prova pronto per la Fase 1: quando arriva BM25, i due punteggi devono
+divergere, e di quanto è un numero da mettere in tesi.

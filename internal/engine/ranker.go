@@ -240,7 +240,15 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 		if results[i].Typos != results[j].Typos {
 			return results[i].Typos < results[j].Typos
 		}
-		return results[i].ExactMatches > results[j].ExactMatches
+		if results[i].ExactMatches != results[j].ExactMatches {
+			return results[i].ExactMatches > results[j].ExactMatches
+		}
+		// Last criterion, deliberately arbitrary: results come out of a map and
+		// sort.Slice is not stable, so without this documents that tie on every
+		// other criterion come back in a different order on every run, and no
+		// evaluation is reproducible. This expresses no opinion on relevance:
+		// the engine already considers them equivalent.
+		return results[i].DocID < results[j].DocID
 	})
 
 	for docID, terms := range highlights {
