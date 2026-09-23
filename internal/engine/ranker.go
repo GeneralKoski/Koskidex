@@ -156,14 +156,20 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 			docMatches[docID].WordsMatched++
 			docMatches[docID].Typos += match.Typos
 			docMatches[docID].ExactMatches += match.ExactMatches
-			
+
 			tokenScore := (10.0 - float64(match.Typos) + float64(match.ExactMatches*2)) * match.MaxWeight
 			docMatches[docID].Score += tokenScore
 		}
 	}
 
-	// Filter: only docs matching ALL must terms
+	// Filter: how many of the must terms a document has to carry.
+	// In RetrievalAny one is enough, so the filter below lets everything
+	// through: a document is already in docMatches only if it matched at
+	// least one term.
 	requiredMatches := len(allTokens)
+	if settings.RetrievalMode == RetrievalAny {
+		requiredMatches = 1
+	}
 	if requiredMatches > 0 {
 		for docID, m := range docMatches {
 			if m.WordsMatched < requiredMatches {
@@ -183,7 +189,7 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 				docMatches[docID].WordsMatched++
 				docMatches[docID].Typos += match.Typos
 				docMatches[docID].ExactMatches += match.ExactMatches
-				
+
 				tokenScore := (10.0 - float64(match.Typos) + float64(match.ExactMatches*2)) * match.MaxWeight
 				docMatches[docID].Score += tokenScore
 			}

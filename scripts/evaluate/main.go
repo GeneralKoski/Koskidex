@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/GeneralKoski/Koskidex/internal/engine"
 	"github.com/GeneralKoski/Koskidex/internal/eval"
 )
 
@@ -21,15 +22,21 @@ func main() {
 	nomeRun := flag.String("run", "legacy", "etichetta della configurazione misurata, finisce nel file dei risultati")
 	radice := flag.String("corpora", "eval/corpora/c1-public", "cartella delle collezioni")
 	uscita := flag.String("out", "eval/results", "cartella dove scrivere il file dei risultati")
+	modo := flag.String("mode", engine.RetrievalAll, "modalita' di recupero: all (congiuntivo) oppure any (disgiuntivo)")
 	flag.Parse()
 
-	if err := esegui(*radice, *collezione, *nomeRun, *uscita); err != nil {
+	if *modo != engine.RetrievalAll && *modo != engine.RetrievalAny {
+		fmt.Fprintf(os.Stderr, "modalita' %q sconosciuta, usa %q o %q\n", *modo, engine.RetrievalAll, engine.RetrievalAny)
+		os.Exit(1)
+	}
+
+	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
 	}
 }
 
-func esegui(radice, collezione, nomeRun, uscita string) error {
+func esegui(radice, collezione, nomeRun, uscita, modo string) error {
 	dir := filepath.Join(radice, collezione)
 	if _, err := os.Stat(dir); err != nil {
 		return fmt.Errorf("collezione %q non trovata in %s, lancia eval/corpora/fetch.sh", collezione, radice)
@@ -52,11 +59,13 @@ func esegui(radice, collezione, nomeRun, uscita string) error {
 		return err
 	}
 
-	fmt.Printf("%s: %d documenti, %d query da valutare (su %d nel file)\n",
-		collezione, len(docs), len(daValutare), len(queries))
+	fmt.Printf("%s: %d documenti, %d query da valutare (su %d nel file), recupero %q\n",
+		collezione, len(docs), len(daValutare), len(queries), modo)
 
 	fmt.Print("indicizzo... ")
-	searcher := eval.NewKoskidexSearcher(docs, nil)
+	searcher := eval.NewKoskidexSearcher(docs, func(st *engine.Settings) {
+		st.RetrievalMode = modo
+	})
 	fmt.Println("fatto")
 
 	fmt.Print("valuto... ")

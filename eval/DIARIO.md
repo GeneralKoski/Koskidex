@@ -58,7 +58,71 @@ query", che è un risultato più forte e si lega alla Fase 3.
 
 ### Dopo
 
-Da compilare a misura fatta.
+File: `eval/results/{scifact,nfcorpus}-any.json`.
+
+| SciFact | legacy (`all`) | **`any`** | riferimento BM25 |
+|---|---|---|---|
+| nDCG@10 | 0,0246 | **0,4936** | 0,6789 |
+| Recall@100 | 0,0242 | **0,7571** | - |
+| MRR@10 | 0,0267 | **0,4641** | - |
+| Query a vuoto | 290 su 300 | **0** | - |
+
+| NFCorpus | legacy (`all`) | **`any`** | riferimento BM25 |
+|---|---|---|---|
+| nDCG@10 | 0,1659 | **0,2246** | 0,3218 |
+| Recall@100 | 0,0967 | **0,1898** | - |
+| MRR@10 | 0,2644 | **0,3774** | - |
+| Query a vuoto | 160 su 323 | **24 su 323** | - |
+
+SciFact fa **20 volte** il nDCG di prima e **31 volte** il recall. Entrambe le
+collezioni arrivano intorno al **70-73% del riferimento BM25**, partendo dal 4%
+e dal 52%.
+
+### Cosa avevo previsto giusto e cosa no
+
+Tre su cinque.
+
+- **1, query a vuoto crollano:** giusto. Zero su SciFact, 24 su NFCorpus.
+- **2, SciFact fra 0,10 e 0,45:** **sbagliato**, ha fatto 0,4936, sopra la
+  fascia che avevo dichiarato. Avevo sottostimato.
+- **3, recall SciFact sopra 0,50:** giusto, 0,7571.
+- **4, NFCorpus poteva peggiorare:** **sbagliato**. È migliorato su tutte e tre
+  le metriche. Ed è l'errore più istruttivo dei due.
+- **5, baseline congelato verde a default senza toccare il test:** giusto.
+
+### Perché mi sbagliavo sulla 4, che è la cosa da mettere in tesi
+
+Pensavo che l'AND facesse da filtro di precisione sulle query corte, e che
+toglierlo avrebbe fatto entrare documenti mediocri peggiorando l'ordine. Non
+succede, e il motivo è che **il filtro congiuntivo era ridondante rispetto al
+punteggio che c'era già**: chi trova più termini prende più punti, quindi i
+documenti con tutti i termini restano in testa da soli. Il filtro non li
+promuoveva, si limitava a cancellare tutto il resto, compresi i documenti che
+sarebbero stati in seconda o terza posizione a buon diritto.
+
+Detto altrimenti: l'AND non aggiungeva precisione, toglieva recall. È una
+conclusione più netta di quella che mi aspettavo e vale un paragrafo.
+
+### Il residuo: 24 query NFCorpus ancora vuote
+
+Sono tutte da un termine solo e raro: `eggnog`, `halibut`, `okra`, `Fosamax`,
+`Mevacor`, `deafness`, `mesquite`, `myelopathy`, `Peoria`, `leeks`.
+
+Controllato contro il vocabolario del corpus: **9 su 10 non compaiono proprio**,
+in nessuna forma. Sono buchi veri di vocabolario, non difetti del motore, e
+nemmeno Lucene troverebbe niente. L'unica recuperabile è `leeks`, perché il
+corpus contiene `leek`: quella la prenderebbe uno stemmer, che Koskidex non ha.
+
+Non è un problema aperto, è una nota: parte della distanza residua dal
+riferimento è stemming, non ranking.
+
+### Dove resta il divario
+
+SciFact 0,4936 contro 0,6789. Il pezzo grosso che manca è **l'IDF**, cioè il
+difetto 1: senza, un documento che contiene dieci termini comuni batte quello
+che contiene l'unico termine raro che decide la query. È esattamente quello che
+la Fase 1 deve misurare, e ora ha un baseline sensato contro cui farlo invece di
+uno 0,0246 che non voleva dire niente.
 
 ---
 

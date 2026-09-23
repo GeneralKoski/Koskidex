@@ -15,11 +15,11 @@ type Posting struct {
 // InvertedIndex maps terms to their occurrences in documents
 // and also stores the documents themselves.
 type InvertedIndex struct {
-	mu           sync.RWMutex
-	index        map[string][]Posting
-	docs         map[string]map[string]interface{} // docID -> original document
-	docToTerms   map[string][]string               // docID -> list of terms in it (for fast deletion)
-	prefixMap    map[string][]string               // first 2 chars -> list of terms for fuzzy search
+	mu         sync.RWMutex
+	index      map[string][]Posting
+	docs       map[string]map[string]interface{} // docID -> original document
+	docToTerms map[string][]string               // docID -> list of terms in it (for fast deletion)
+	prefixMap  map[string][]string               // first 2 chars -> list of terms for fuzzy search
 }
 
 // NewInvertedIndex creates a new inverted index
@@ -104,7 +104,7 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 						}
 					}
 				}
-				
+
 				// Group by term to calculate basic TF
 				termCounts := make(map[string]int)
 				for _, t := range expandedTokens {
@@ -121,7 +121,7 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 						docTerms[t.Term] = true
 						idx.docToTerms[docID] = append(idx.docToTerms[docID], t.Term)
 					}
-					
+
 					// Substring Indexing (Bigrams):
 					// Instead of just the first 2 chars, we index all 2-char slices.
 					// This allows matching "amsung" to "samsung".
@@ -154,7 +154,7 @@ func (idx *InvertedIndex) SearchExact(query string, settings Settings) []string 
 	docIDCounts := make(map[string]int)
 	for _, t := range tokens {
 		postings := idx.index[t.Term]
-		
+
 		seenDocsForTerm := make(map[string]bool)
 		for _, p := range postings {
 			if !seenDocsForTerm[p.DocID] {
@@ -203,7 +203,21 @@ type Settings struct {
 	TypoTolerance    TypoSettings        `json:"typo_tolerance"`
 	FieldWeights     map[string]float64  `json:"field_weights"`
 	Sitemap          SitemapSettings     `json:"sitemap"`
+	RetrievalMode    string              `json:"retrieval_mode"`
 }
+
+// How many of the query terms a document has to carry to be retrieved.
+//
+//	RetrievalAll ("all", the default) - conjunctive: every term is required.
+//	RetrievalAny ("any")              - disjunctive: one term is enough, and a
+//	                                    document matching more scores more.
+//
+// An empty value means RetrievalAll. Settings are persisted to disk, so an
+// index saved before this field existed must keep behaving as it did.
+const (
+	RetrievalAll = "all"
+	RetrievalAny = "any"
+)
 
 type SitemapSettings struct {
 	BaseUrl    string `json:"base_url"`
@@ -230,7 +244,8 @@ func DefaultSettings() Settings {
 			MinWordLengthOneTypo:  4,
 			MinWordLengthTwoTypos: 8,
 		},
-		FieldWeights: make(map[string]float64),
+		FieldWeights:  make(map[string]float64),
+		RetrievalMode: RetrievalAll,
 		Sitemap: SitemapSettings{
 			ChangeFreq: "weekly",
 		},
@@ -288,7 +303,7 @@ func (idx *InvertedIndex) addToPrefixMap(prefix, term string) {
 func (idx *InvertedIndex) GetAllDocs() map[string]map[string]interface{} {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
-	
+
 	docsCopy := make(map[string]map[string]interface{})
 	for k, v := range idx.docs {
 		docsCopy[k] = v
