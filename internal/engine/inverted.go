@@ -20,6 +20,13 @@ type InvertedIndex struct {
 	docs       map[string]map[string]interface{} // docID -> original document
 	docToTerms map[string][]string               // docID -> list of terms in it (for fast deletion)
 	prefixMap  map[string][]string               // first 2 chars -> list of terms for fuzzy search
+
+	// Collection statistics BM25 needs. Maintained while indexing rather than
+	// derived at query time: df would cost O(postings) for a common term, and
+	// docToTerms cannot give the length because it is deduplicated.
+	docFreq    map[string]int // term -> number of documents containing it
+	docLengths map[string]int // docID -> number of indexed tokens, occurrences included
+	totalLen   int            // sum of docLengths, for the average
 }
 
 // NewInvertedIndex creates a new inverted index
@@ -29,6 +36,8 @@ func NewInvertedIndex() *InvertedIndex {
 		docs:       make(map[string]map[string]interface{}),
 		docToTerms: make(map[string][]string),
 		prefixMap:  make(map[string][]string),
+		docFreq:    make(map[string]int),
+		docLengths: make(map[string]int),
 	}
 }
 
@@ -51,6 +60,9 @@ func (idx *InvertedIndex) Reindex(settings Settings) {
 	idx.docs = make(map[string]map[string]interface{})
 	idx.docToTerms = make(map[string][]string)
 	idx.prefixMap = make(map[string][]string)
+	idx.docFreq = make(map[string]int)
+	idx.docLengths = make(map[string]int)
+	idx.totalLen = 0
 
 	for docID, doc := range docs {
 		idx.addDocumentLocked(docID, doc, settings)
@@ -116,10 +128,18 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 					}
 					idx.index[t.Term] = append(idx.index[t.Term], post)
 
-					// Track distinct terms per document for fast deletion.
+					// One posting is one occurrence: this is the document
+					// length BM25 normalises by.
+					idx.docLengths[docID]++
+					idx.totalLen++
+
+					// Track distinct terms per document for fast deletion, and
+					// take the chance to count document frequency: this branch
+					// runs exactly once per (document, term).
 					if !docTerms[t.Term] {
 						docTerms[t.Term] = true
 						idx.docToTerms[docID] = append(idx.docToTerms[docID], t.Term)
+						idx.docFreq[t.Term]++
 					}
 
 					// Substring Indexing (Bigrams):
@@ -267,8 +287,14 @@ func (idx *InvertedIndex) deleteDocumentLocked(docID string) {
 		return
 	}
 
-	// 2. Remove from inverted index
+	// 2. Remove from inverted index. terms is deduplicated, so each iteration
+	// is one document leaving that term's posting list: exactly one decrement.
 	for _, term := range terms {
+		idx.docFreq[term]--
+		if idx.docFreq[term] <= 0 {
+			delete(idx.docFreq, term)
+		}
+
 		postings := idx.index[term]
 		newPostings := make([]Posting, 0, len(postings))
 		for _, p := range postings {
@@ -284,8 +310,41 @@ func (idx *InvertedIndex) deleteDocumentLocked(docID string) {
 	}
 
 	// 3. Cleanup document maps
+	idx.totalLen -= idx.docLengths[docID]
+	delete(idx.docLengths, docID)
 	delete(idx.docs, docID)
 	delete(idx.docToTerms, docID)
+}
+
+// DocFrequency returns how many documents contain a term.
+func (idx *InvertedIndex) DocFrequency(term string) int {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	return idx.docFreq[term]
+}
+
+// DocLength returns a document's length in indexed tokens, occurrences
+// included.
+func (idx *InvertedIndex) DocLength(docID string) int {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	return idx.docLengths[docID]
+}
+
+// AverageDocLength returns the mean document length, 0 on an empty index.
+// Callers inside Search must use averageDocLengthLocked instead: taking the
+// read lock again can deadlock against a waiting writer.
+func (idx *InvertedIndex) AverageDocLength() float64 {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	return idx.averageDocLengthLocked()
+}
+
+func (idx *InvertedIndex) averageDocLengthLocked() float64 {
+	if len(idx.docLengths) == 0 {
+		return 0
+	}
+	return float64(idx.totalLen) / float64(len(idx.docLengths))
 }
 
 func (idx *InvertedIndex) addToPrefixMap(prefix, term string) {
