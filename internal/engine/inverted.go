@@ -224,7 +224,28 @@ type Settings struct {
 	FieldWeights     map[string]float64  `json:"field_weights"`
 	Sitemap          SitemapSettings     `json:"sitemap"`
 	RetrievalMode    string              `json:"retrieval_mode"`
+	ScoringMode      string              `json:"scoring_mode"`
+	BM25K1           float64             `json:"bm25_k1"`
+	BM25B            float64             `json:"bm25_b"`
 }
+
+// How a term's contribution to a document's score is computed.
+//
+//	ScoringLegacy ("legacy", the default) - (10 - typos + 2*exact) * weight
+//	ScoringBM25   ("bm25")                - Robertson/Lucene BM25
+//
+// An empty value means ScoringLegacy, for the same reason RetrievalMode has
+// one: settings are persisted, and an index saved earlier must not change
+// behaviour on upgrade.
+const (
+	ScoringLegacy = "legacy"
+	ScoringBM25   = "bm25"
+
+	// Lucene's defaults. Not calibrated here on purpose: calibration is its
+	// own phase, and a number tuned before it is measured is not a result.
+	DefaultBM25K1 = 1.2
+	DefaultBM25B  = 0.75
+)
 
 // How many of the query terms a document has to carry to be retrieved.
 //
@@ -266,6 +287,9 @@ func DefaultSettings() Settings {
 		},
 		FieldWeights:  make(map[string]float64),
 		RetrievalMode: RetrievalAll,
+		ScoringMode:   ScoringLegacy,
+		BM25K1:        DefaultBM25K1,
+		BM25B:         DefaultBM25B,
 		Sitemap: SitemapSettings{
 			ChangeFreq: "weekly",
 		},

@@ -12,8 +12,14 @@ import (
 // interface is what lets the metrics be tested with no index involved, and
 // what will let a future run compare two rankers without touching this file.
 type Searcher interface {
-	// Search returns document IDs, best first, at most k of them.
-	Search(query string, k int) []string
+	// Search returns document IDs, best first, at most k of them, and the
+	// total number of documents that matched before the cutoff.
+	//
+	// The total is returned alongside instead of being derivable from the
+	// slice because once the slice is truncated the information is gone, and
+	// it is the only order-independent way to check that a ranking change did
+	// not also change what gets retrieved.
+	Search(query string, k int) (ids []string, matched int)
 }
 
 // Cutoffs for the reported metrics. nDCG@10 is the number BEIR publishes and
@@ -32,7 +38,9 @@ type QueryResult struct {
 	Recall100 float64 `json:"recall@100"`
 	MRR10     float64 `json:"mrr@10"`
 	Retrieved int     `json:"retrieved"`
-	Relevant  int     `json:"relevant"`
+	// Candidates is how many documents matched in total, before the cutoff.
+	Candidates int `json:"candidates"`
+	Relevant   int `json:"relevant"`
 }
 
 // Results is what gets written to a versioned file. Every number in the thesis
@@ -99,18 +107,19 @@ func Run(s Searcher, nomeRun, collezione string, queries map[string]string, qrel
 			continue
 		}
 
-		ranked := s.Search(queries[qid], profondita)
+		ranked, candidati := s.Search(queries[qid], profondita)
 		if len(ranked) == 0 {
 			out.ZeroResults++
 		}
 
 		q := QueryResult{
-			QueryID:   qid,
-			NDCG10:    NDCG(ranked, rel, NDCGCut),
-			Recall100: Recall(ranked, rel, RecallCut),
-			MRR10:     MRR(ranked, rel, MRRCut),
-			Retrieved: len(ranked),
-			Relevant:  rilevanti,
+			QueryID:    qid,
+			NDCG10:     NDCG(ranked, rel, NDCGCut),
+			Recall100:  Recall(ranked, rel, RecallCut),
+			MRR10:      MRR(ranked, rel, MRRCut),
+			Retrieved:  len(ranked),
+			Candidates: candidati,
+			Relevant:   rilevanti,
 		}
 		out.PerQuery = append(out.PerQuery, q)
 

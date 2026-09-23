@@ -67,7 +67,101 @@ il cerchio aperto il 23 settembre sul pareggio dei pari merito.
 
 ### Dopo
 
-Da compilare a misura fatta.
+| | legacy | any | **bm25** | riferimento |
+|---|---|---|---|---|
+| SciFact nDCG@10 | 0,0246 | 0,4936 | **0,6197** | 0,6789 |
+| SciFact Recall@100 | 0,0242 | 0,7571 | **0,8746** | - |
+| SciFact MRR@10 | 0,0267 | 0,4641 | **0,5868** | - |
+| NFCorpus nDCG@10 | 0,1659 | 0,2246 | **0,2810** | 0,3218 |
+| NFCorpus Recall@100 | 0,0967 | 0,1898 | **0,2280** | - |
+| NFCorpus MRR@10 | 0,2644 | 0,3774 | **0,4710** | - |
+
+Query a vuoto invariate rispetto al disgiuntivo: 0 su SciFact, 24 su 323 su
+NFCorpus. Il punteggio non cambia chi viene trovato, e infatti non lo cambia.
+
+Previsioni:
+
+1. **Presa.** SciFact 0,6197, dentro la fascia 0,55-0,70, il 91% del
+   riferimento. Il divario che resta è quello che SOURCE.md aveva previsto:
+   tokenizer diverso e nessuno stemmer.
+2. **Presa.** NFCorpus 0,2810, dentro la fascia 0,25-0,33, l'87% del
+   riferimento.
+3. **Smentita.** Il recall si è mosso, e parecchio: +0,117 su SciFact, +0,038
+   su NFCorpus, contro un ±0,02 dichiarato. Sotto sta l'indagine, perché una
+   guardia che scatta o vuol dire che il risultato è falso o vuol dire che la
+   guardia era scritta male.
+4. **Mal posta da me.** `TestBaselineIdentifierTieBreaksByDocID` gira a
+   settings di default, e il default è `legacy`: non poteva fallire. Il
+   contenuto della previsione era però giusto, e sta in un test nuovo,
+   `TestBM25BreaksTheIdentifierTieTheLegacyScorerCouldNot`: su `2026/0173` il
+   legacy dà 48 a pari merito a `d1` e `d3`, BM25 li separa e mette davanti
+   `d3` (2,850 contro 2,328), il documento più corto il cui titolo è
+   sostanzialmente l'identificativo. È la normalizzazione sulla lunghezza che
+   fa esattamente il suo mestiere, e chiude il pareggio congelato in mattinata.
+5. **Presa.** `TestBaselineRankingIsFrozen` verde a default, tre esecuzioni
+   consecutive, test non toccato.
+
+#### Perché la guardia è scattata
+
+L'ipotesi benevola era che `recall@100` sia sensibile all'ordine quando i
+documenti che corrispondono sono più di 100. Andava verificata, non assunta,
+perché l'ipotesi malevola - ho cambiato il recupero per sbaglio - produce lo
+stesso sintomo.
+
+Tre riscontri, in ordine di forza crescente:
+
+- **Il taglio morde.** Su SciFact tutte e 300 le query arrivano al tetto dei
+  100 risultati; su NFCorpus 202 su 323.
+- **Sotto il taglio non si muove niente.** Le 121 query di NFCorpus che
+  restituiscono meno di 100 documenti hanno recall **identico al dodicesimo
+  decimale** fra `any` e `bm25`. Se il recupero fosse cambiato, sarebbero
+  cambiate loro per prime: lì dentro l'ordine non può influire, ci stanno tutti.
+  Le 202 sopra il taglio sono quelle che si muovono, 127 di esse.
+- **Il codice non lo consente.** In `SearchScored` il filtro che decide chi
+  resta legge solo `WordsMatched`; l'unica altra cancellazione sono i termini
+  in NOT. Il punteggio non elimina mai nessuno. L'insieme dei candidati è
+  indipendente da `ScoringMode` per costruzione.
+
+Quindi: il recupero è invariato, la guardia era scritta male. `recall@k` non
+misura "quanto ho recuperato", misura "quanti rilevanti sono entrati nei primi
+k", e quando i candidati sono molti più di k è una **metrica di ordinamento**
+come il nDCG. Su SciFact in modalità disgiuntiva la query mediana pesca 5182
+documenti su 5183: dentro il taglio ci entra l'1,9% dei candidati. Aspettarsi
+che il recall stesse fermo mentre l'ordinamento migliorava era una pretesa
+incoerente.
+
+Il +0,117 di SciFact, letto bene, non è un allarme: è il secondo risultato di
+questa voce. BM25 non trova più documenti rilevanti, li **porta dentro i primi
+cento** - da 75,7 a 87,5 su cento rilevanti esistenti.
+
+#### La guardia nella forma corretta
+
+Una guardia che si può controllare a mano una volta non è una guardia. Il
+numero che serve - quanti documenti corrispondono in tutto, prima del taglio -
+veniva buttato via dal troncamento, quindi ora il runner lo registra:
+`Searcher.Search` restituisce anche il totale e ogni query nel file dei
+risultati ha il campo `candidates`.
+
+> **Guardia, d'ora in avanti:** una modifica al *punteggio* non deve cambiare
+> `candidates` per nessuna query. Una modifica al *recupero* lo cambierà, ed è
+> lì che va guardato. `recall@k` non è una guardia sul recupero quando
+> `candidates > k`.
+
+Applicata a questa voce: **0 query su 300 (SciFact) e 0 su 323 (NFCorpus)**
+cambiano il numero di candidati fra `any` e `bm25`. Il recupero è intatto,
+misurato e non argomentato.
+
+I sei file dei risultati sono stati rigenerati con il campo nuovo: tutte le
+metriche, per query e in media, sono venute identiche. Riproducibilità
+verificata di sbieco.
+
+#### Cosa resta sul tavolo
+
+Il 9-13% che manca al riferimento non è rumore. Le due cause note - nessuno
+stemmer, tokenizer diverso - sono già scritte in SOURCE.md e sono la materia
+della Fase 2. Le 24 query vuote di NFCorpus restano tali: 9 su 10 dei loro
+termini non esistono nel corpus in nessuna forma, e `leeks`→`leek` è l'unico
+caso che uno stemmer salverebbe.
 
 ---
 

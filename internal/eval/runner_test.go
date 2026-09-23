@@ -14,14 +14,14 @@ type searcherFinto struct {
 	ultimoK  int
 }
 
-func (s *searcherFinto) Search(query string, k int) []string {
+func (s *searcherFinto) Search(query string, k int) ([]string, int) {
 	s.chiamate = append(s.chiamate, query)
 	s.ultimoK = k
 	r := s.perQuery[query]
 	if len(r) > k {
-		return r[:k]
+		return r[:k], len(r)
 	}
-	return r
+	return r, len(r)
 }
 
 func TestRunComputesMeansOverJudgedQueries(t *testing.T) {
@@ -166,5 +166,27 @@ func TestRunCountsQueriesThatCameBackEmpty(t *testing.T) {
 	}
 	if r.Queries != 2 {
 		t.Fatalf("una query a vuoto va comunque valutata e conta nella media: %d", r.Queries)
+	}
+}
+
+// The guard that failed on 2026-09-23. recall@100 is a ranking metric whenever
+// a query matches more than 100 documents, so it cannot answer "did the
+// retrieved set change?". The count of matching documents can, and it is
+// order-independent, but only if it is recorded before the cutoff truncates
+// it.
+func TestRunRecordsTheCandidateCountBeforeTheCutoff(t *testing.T) {
+	molti := make([]string, 250)
+	for i := range molti {
+		molti[i] = "d" + string(rune('a'+i%26)) + string(rune('a'+i/26))
+	}
+	s := &searcherFinto{perQuery: map[string][]string{"larga": molti}}
+
+	r := Run(s, "prova", "finta", map[string]string{"q1": "larga"}, Qrels{"q1": {molti[0]: 1}})
+
+	if r.PerQuery[0].Retrieved != RecallCut {
+		t.Fatalf("i documenti visti dalle metriche sono tagliati a %d, ne risultano %d", RecallCut, r.PerQuery[0].Retrieved)
+	}
+	if r.PerQuery[0].Candidates != 250 {
+		t.Fatalf("i candidati vanno registrati interi, non tagliati: attesi 250, ottenuti %d", r.PerQuery[0].Candidates)
 	}
 }

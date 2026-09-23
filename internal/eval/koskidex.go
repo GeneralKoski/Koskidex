@@ -46,17 +46,19 @@ func NewKoskidexSearcher(docs []Document, modifica func(*engine.Settings)) *Kosk
 	return &KoskidexSearcher{idx: idx, settings: s}
 }
 
-// Search returns at most k document IDs, best first.
+// Search returns at most k document IDs, best first, and how many documents
+// matched in total.
 //
 // Fuzziness is pinned to "0", which MaxTypos treats as an explicit zero
 // regardless of the settings. Relying on TypoTolerance.Enabled alone would not
 // be enough: an explicit fuzziness overrides it, so the two are set together.
-func (k *KoskidexSearcher) Search(query string, limite int) []string {
+func (k *KoskidexSearcher) Search(query string, limite int) ([]string, int) {
 	ids, _ := k.idx.Search(query, k.settings, "0", nil)
-	if len(ids) > limite {
-		return ids[:limite]
+	trovati := len(ids)
+	if trovati > limite {
+		return ids[:limite], trovati
 	}
-	return ids
+	return ids, trovati
 }
 
 // Settings exposes the configuration actually used, so a run can record it

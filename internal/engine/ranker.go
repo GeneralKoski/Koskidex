@@ -19,6 +19,14 @@ type TokenDocMatch struct {
 	Typos        int
 	ExactMatches int
 	MaxWeight    float64
+
+	// For BM25. MatchedTerm is the index term that actually matched, which is
+	// not always the query token: with typo tolerance on, "manutenzine" can
+	// match "manutenzione", and the document frequency that matters is the
+	// one of the term found in the index. TF counts its occurrences in this
+	// document.
+	MatchedTerm string
+	TF          int
 }
 
 // ParsedQuery represents a parsed query with AND/OR/NOT semantics
@@ -99,14 +107,26 @@ func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highl
 			}
 
 			if _, ok := tokenDocBest[p.DocID]; !ok {
-				tokenDocBest[p.DocID] = &TokenDocMatch{DocID: p.DocID, Typos: matchDist, MaxWeight: weight}
+				tokenDocBest[p.DocID] = &TokenDocMatch{
+					DocID: p.DocID, Typos: matchDist, MaxWeight: weight,
+					MatchedTerm: mTerm,
+				}
 			} else {
 				if matchDist < tokenDocBest[p.DocID].Typos {
 					tokenDocBest[p.DocID].Typos = matchDist
+					// The closer term wins: its statistics are the ones to use.
+					tokenDocBest[p.DocID].MatchedTerm = mTerm
+					tokenDocBest[p.DocID].TF = 0
 				}
 				if weight > tokenDocBest[p.DocID].MaxWeight {
 					tokenDocBest[p.DocID].MaxWeight = weight
 				}
+			}
+
+			// One posting is one occurrence, but only of the term currently
+			// credited to this document.
+			if tokenDocBest[p.DocID].MatchedTerm == mTerm {
+				tokenDocBest[p.DocID].TF++
 			}
 
 			if dist == 0 {
@@ -157,8 +177,7 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 			docMatches[docID].Typos += match.Typos
 			docMatches[docID].ExactMatches += match.ExactMatches
 
-			tokenScore := (10.0 - float64(match.Typos) + float64(match.ExactMatches*2)) * match.MaxWeight
-			docMatches[docID].Score += tokenScore
+			docMatches[docID].Score += idx.tokenScoreLocked(match, settings)
 		}
 	}
 
@@ -190,8 +209,7 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 				docMatches[docID].Typos += match.Typos
 				docMatches[docID].ExactMatches += match.ExactMatches
 
-				tokenScore := (10.0 - float64(match.Typos) + float64(match.ExactMatches*2)) * match.MaxWeight
-				docMatches[docID].Score += tokenScore
+				docMatches[docID].Score += idx.tokenScoreLocked(match, settings)
 			}
 		}
 	}
@@ -274,6 +292,46 @@ func (idx *InvertedIndex) Search(query string, settings Settings, fuzziness stri
 		docIDs = append(docIDs, r.DocID)
 	}
 	return docIDs, highlights
+}
+
+// tokenScoreLocked is one term's contribution to a document's score. The
+// caller must hold idx.mu.
+func (idx *InvertedIndex) tokenScoreLocked(match *TokenDocMatch, settings Settings) float64 {
+	if settings.ScoringMode == ScoringBM25 {
+		return idx.bm25Locked(match, settings) * match.MaxWeight
+	}
+	// Heuristic scorer, the behaviour up to now: no term frequency, no
+	// document frequency, no length normalisation.
+	return (10.0 - float64(match.Typos) + float64(match.ExactMatches*2)) * match.MaxWeight
+}
+
+// bm25Locked computes the Robertson/Lucene BM25 weight of one term in one
+// document. The caller must hold idx.mu.
+//
+//	idf = ln(1 + (N - df + 0.5) / (df + 0.5))
+//	w   = idf * tf*(k1+1) / (tf + k1*(1 - b + b*|D|/avgdl))
+//
+// The idf form is Lucene's, which adds 1 inside the logarithm so the weight
+// can never go negative: the textbook form turns negative for a term present
+// in more than half the collection, and a term would then subtract score for
+// being common rather than merely add little.
+func (idx *InvertedIndex) bm25Locked(match *TokenDocMatch, settings Settings) float64 {
+	n := float64(len(idx.docs))
+	if n == 0 {
+		return 0
+	}
+
+	df := float64(idx.docFreq[match.MatchedTerm])
+	idf := math.Log(1 + (n-df+0.5)/(df+0.5))
+
+	tf := float64(match.TF)
+	avgdl := idx.averageDocLengthLocked()
+	norma := 1.0
+	if avgdl > 0 {
+		norma = 1 - settings.BM25B + settings.BM25B*float64(idx.docLengths[match.DocID])/avgdl
+	}
+
+	return idf * (tf * (settings.BM25K1 + 1)) / (tf + settings.BM25K1*norma)
 }
 
 func removeDuplicateTerms(terms []string) []string {

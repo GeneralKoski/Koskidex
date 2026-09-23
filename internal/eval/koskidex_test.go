@@ -17,12 +17,12 @@ func documentiDiProva() []Document {
 func TestKoskidexSearcherFindsAndTruncates(t *testing.T) {
 	s := NewKoskidexSearcher(documentiDiProva(), nil)
 
-	got := s.Search("manutenzione", 10)
+	got, _ := s.Search("manutenzione", 10)
 	if len(got) != 2 {
 		t.Fatalf("attesi 2 risultati, ottenuti %v", got)
 	}
 
-	if uno := s.Search("manutenzione", 1); len(uno) != 1 {
+	if uno, _ := s.Search("manutenzione", 1); len(uno) != 1 {
 		t.Fatalf("il limite non e' rispettato: %v", uno)
 	}
 }
@@ -32,10 +32,10 @@ func TestKoskidexSearcherFindsAndTruncates(t *testing.T) {
 func TestKoskidexSearcherIndexesTitleAndText(t *testing.T) {
 	s := NewKoskidexSearcher(documentiDiProva(), nil)
 
-	if got := s.Search("delibera", 10); len(got) != 1 || got[0] != "d2" {
+	if got, _ := s.Search("delibera", 10); len(got) != 1 || got[0] != "d2" {
 		t.Fatalf("termine presente solo nel titolo non trovato: %v", got)
 	}
-	if got := s.Search("interventi", 10); len(got) != 1 || got[0] != "d3" {
+	if got, _ := s.Search("interventi", 10); len(got) != 1 || got[0] != "d3" {
 		t.Fatalf("termine presente solo nel testo non trovato: %v", got)
 	}
 }
@@ -67,13 +67,13 @@ func TestKoskidexSearcherDoesNotMatchTypos(t *testing.T) {
 
 	// "manutenzine" is one deletion away from "manutenzione": with tolerance on
 	// it would match, and here it must not.
-	if got := s.Search("manutenzine", 10); len(got) != 0 {
+	if got, _ := s.Search("manutenzine", 10); len(got) != 0 {
 		t.Fatalf("un refuso ha prodotto risultati: %v", got)
 	}
 
 	// The correct spelling still has to work, otherwise the test above would
 	// pass on a searcher that simply finds nothing.
-	if got := s.Search("manutenzione", 10); len(got) == 0 {
+	if got, _ := s.Search("manutenzione", 10); len(got) == 0 {
 		t.Fatal("la parola scritta bene non trova piu' niente")
 	}
 }
@@ -95,5 +95,19 @@ func TestKoskidexSearcherAppliesTheSettingsHook(t *testing.T) {
 	}
 	if s.Settings().TypoTolerance.Enabled {
 		t.Fatal("la modifica non deve poter riaccendere i refusi per sbaglio")
+	}
+}
+
+// Truncating the slice throws away the number the guard needs, so the searcher
+// has to report it separately.
+func TestKoskidexSearcherReportsMatchesBeyondTheLimit(t *testing.T) {
+	s := NewKoskidexSearcher(documentiDiProva(), nil)
+
+	ids, trovati := s.Search("manutenzione", 1)
+	if len(ids) != 1 {
+		t.Fatalf("il limite non e' rispettato: %v", ids)
+	}
+	if trovati != 2 {
+		t.Fatalf("i documenti trovati sono 2, il searcher ne dichiara %d", trovati)
 	}
 }

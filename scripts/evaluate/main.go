@@ -23,6 +23,7 @@ func main() {
 	radice := flag.String("corpora", "eval/corpora/c1-public", "cartella delle collezioni")
 	uscita := flag.String("out", "eval/results", "cartella dove scrivere il file dei risultati")
 	modo := flag.String("mode", engine.RetrievalAll, "modalita' di recupero: all (congiuntivo) oppure any (disgiuntivo)")
+	punteggio := flag.String("scoring", engine.ScoringLegacy, "modalita' di punteggio: legacy oppure bm25")
 	flag.Parse()
 
 	if *modo != engine.RetrievalAll && *modo != engine.RetrievalAny {
@@ -30,13 +31,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo); err != nil {
+	if *punteggio != engine.ScoringLegacy && *punteggio != engine.ScoringBM25 {
+		fmt.Fprintf(os.Stderr, "punteggio %q sconosciuto, usa %q o %q\n", *punteggio, engine.ScoringLegacy, engine.ScoringBM25)
+		os.Exit(1)
+	}
+
+	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
 	}
 }
 
-func esegui(radice, collezione, nomeRun, uscita, modo string) error {
+func esegui(radice, collezione, nomeRun, uscita, modo, punteggio string) error {
 	dir := filepath.Join(radice, collezione)
 	if _, err := os.Stat(dir); err != nil {
 		return fmt.Errorf("collezione %q non trovata in %s, lancia eval/corpora/fetch.sh", collezione, radice)
@@ -59,12 +65,13 @@ func esegui(radice, collezione, nomeRun, uscita, modo string) error {
 		return err
 	}
 
-	fmt.Printf("%s: %d documenti, %d query da valutare (su %d nel file), recupero %q\n",
-		collezione, len(docs), len(daValutare), len(queries), modo)
+	fmt.Printf("%s: %d documenti, %d query da valutare (su %d nel file), recupero %q, punteggio %q\n",
+		collezione, len(docs), len(daValutare), len(queries), modo, punteggio)
 
 	fmt.Print("indicizzo... ")
 	searcher := eval.NewKoskidexSearcher(docs, func(st *engine.Settings) {
 		st.RetrievalMode = modo
+		st.ScoringMode = punteggio
 	})
 	fmt.Println("fatto")
 
