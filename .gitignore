@@ -55,3 +55,7 @@ tmp/
 /eval/corpora/c1-public/*
 !/eval/corpora/c1-public/SOURCE.md
 /eval/corpora/c2-documentale/
+
+# Corpus di dominio: si riscarica con eval/corpora/fetch-albo.py
+/eval/corpora/c3-albo/*
+!/eval/corpora/c3-albo/SOURCE.md
