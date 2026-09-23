@@ -66,7 +66,7 @@ func TestTokenize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Tokenize(tt.text, tt.field, tt.stopwords)
+			got := Tokenize(tt.text, tt.field, Settings{StopWords: tt.stopwords})
 			if !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("Tokenize() \nGot:  %+v\nWant: %+v", got, tt.expected)
 			}

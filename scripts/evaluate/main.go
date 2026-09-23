@@ -24,6 +24,7 @@ func main() {
 	uscita := flag.String("out", "eval/results", "cartella dove scrivere il file dei risultati")
 	modo := flag.String("mode", engine.RetrievalAll, "modalita' di recupero: all (congiuntivo) oppure any (disgiuntivo)")
 	punteggio := flag.String("scoring", engine.ScoringLegacy, "modalita' di punteggio: legacy oppure bm25")
+	analisi := flag.String("analyzer", "none", "analisi lessicale: none, stopwords, stemmer, english (stopword + stemmer)")
 	flag.Parse()
 
 	if *modo != engine.RetrievalAll && *modo != engine.RetrievalAny {
@@ -36,13 +37,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio); err != nil {
+	if _, noto := analisiLessicali[*analisi]; !noto {
+		fmt.Fprintf(os.Stderr, "analisi %q sconosciuta, usa none, stopwords, stemmer o english\n", *analisi)
+		os.Exit(1)
+	}
+
+	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
 	}
 }
 
-func esegui(radice, collezione, nomeRun, uscita, modo, punteggio string) error {
+// analisiLessicali sono le quattro combinazioni da misurare separate: senza
+// sapere quale dei due stadi porta cosa, il totale non dice niente su
+// nessuno dei due.
+var analisiLessicali = map[string]func(*engine.Settings){
+	"none":      func(*engine.Settings) {},
+	"stopwords": func(s *engine.Settings) { s.StopWords = engine.EnglishStopWords() },
+	"stemmer":   func(s *engine.Settings) { s.Stemmer = engine.StemmerPorter },
+	"english": func(s *engine.Settings) {
+		s.StopWords = engine.EnglishStopWords()
+		s.Stemmer = engine.StemmerPorter
+	},
+}
+
+func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi string) error {
 	dir := filepath.Join(radice, collezione)
 	if _, err := os.Stat(dir); err != nil {
 		return fmt.Errorf("collezione %q non trovata in %s, lancia eval/corpora/fetch.sh", collezione, radice)
@@ -65,13 +84,14 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio string) error {
 		return err
 	}
 
-	fmt.Printf("%s: %d documenti, %d query da valutare (su %d nel file), recupero %q, punteggio %q\n",
-		collezione, len(docs), len(daValutare), len(queries), modo, punteggio)
+	fmt.Printf("%s: %d documenti, %d query da valutare (su %d nel file), recupero %q, punteggio %q, analisi %q\n",
+		collezione, len(docs), len(daValutare), len(queries), modo, punteggio, analisi)
 
 	fmt.Print("indicizzo... ")
 	searcher := eval.NewKoskidexSearcher(docs, func(st *engine.Settings) {
 		st.RetrievalMode = modo
 		st.ScoringMode = punteggio
+		analisiLessicali[analisi](st)
 	})
 	fmt.Println("fatto")
 

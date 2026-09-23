@@ -38,7 +38,7 @@ type ParsedQuery struct {
 
 // ParseQuery splits a raw query into must/or/exclude terms.
 // Syntax: "term1 term2" = AND, "term1 OR term2" = OR, "-term" = NOT
-func ParseQuery(raw string, stopWords map[string]bool) ParsedQuery {
+func ParseQuery(raw string, settings Settings) ParsedQuery {
 	var pq ParsedQuery
 	words := strings.Fields(raw)
 
@@ -48,7 +48,7 @@ func ParseQuery(raw string, stopWords map[string]bool) ParsedQuery {
 		// OR operator
 		if word == "OR" && i+1 < len(words) {
 			next := words[i+1]
-			tokens := Tokenize(next, "", stopWords)
+			tokens := Tokenize(next, "", settings)
 			pq.OrTerms = append(pq.OrTerms, tokens...)
 			// Also move previous must term to OR if it was the last added
 			if len(pq.MustTerms) > 0 {
@@ -62,13 +62,13 @@ func ParseQuery(raw string, stopWords map[string]bool) ParsedQuery {
 
 		// NOT operator (prefix -)
 		if strings.HasPrefix(word, "-") && len(word) > 1 {
-			tokens := Tokenize(word[1:], "", stopWords)
+			tokens := Tokenize(word[1:], "", settings)
 			pq.ExcludeTerms = append(pq.ExcludeTerms, tokens...)
 			continue
 		}
 
 		// Regular AND term
-		tokens := Tokenize(word, "", stopWords)
+		tokens := Tokenize(word, "", settings)
 		pq.MustTerms = append(pq.MustTerms, tokens...)
 	}
 
@@ -148,14 +148,14 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 
-	pq := ParseQuery(query, settings.StopWords)
+	pq := ParseQuery(query, settings)
 	hasOR := len(pq.OrTerms) > 0
 	hasExclude := len(pq.ExcludeTerms) > 0
 
 	// If no special operators, use all tokens as must terms (original behavior)
 	allTokens := pq.MustTerms
 	if !hasOR && !hasExclude {
-		allTokens = Tokenize(query, "", settings.StopWords)
+		allTokens = Tokenize(query, "", settings)
 	}
 
 	if len(allTokens) == 0 && len(pq.OrTerms) == 0 && len(queryVector) == 0 {

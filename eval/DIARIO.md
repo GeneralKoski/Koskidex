@@ -84,7 +84,131 @@ per costruzione.
 
 ### Dopo
 
-Da compilare a misura fatta.
+**SciFact** (riferimento 0,6789)
+
+| analisi | nDCG@10 | delta | Recall@100 | a vuoto | candidati medi |
+|---|---|---|---|---|---|
+| nessuna | 0,6197 | - | 0,8746 | 0/300 | 4833 |
+| **solo stopword** | **0,6641** | **+0,0444** | 0,8792 | 0/300 | 2522 |
+| solo stemmer | 0,6243 | +0,0046 | 0,8980 | 0/300 | 4908 |
+| entrambi | 0,6585 | +0,0388 | **0,9103** | 0/300 | 3086 |
+
+**NFCorpus** (riferimento 0,3218)
+
+| analisi | nDCG@10 | delta | Recall@100 | a vuoto | candidati medi |
+|---|---|---|---|---|---|
+| nessuna | 0,2810 | - | 0,2280 | 24/323 | 1415 |
+| solo stopword | 0,2900 | +0,0090 | 0,2346 | 24/323 | 600 |
+| solo stemmer | 0,2861 | +0,0051 | 0,2373 | **15/323** | 1466 |
+| **entrambi** | **0,2941** | **+0,0131** | **0,2435** | **15/323** | 696 |
+
+Dal 91% al **97%** del riferimento su SciFact, dall'87% al **91%** su NFCorpus.
+
+Previsioni: **1 presa, 2 presa, 3 demolita e ribaltata, 4 sbagliata,
+5 tenuta, 6 sbagliata.** Tre su sei.
+
+#### La 3, che è quella che vale
+
+Avevo scritto: *lo stemmer porta molto più delle stopword, e le stopword da sole
+quasi niente, sotto +0,01.* È esattamente il contrario. Su SciFact le stopword
+danno **+0,0444** e lo stemmer **+0,0046**: le stopword fanno dieci volte tanto,
+e lo stemmer da solo sta sotto il tetto che avevo messo alle stopword.
+
+Il mio ragionamento era: con BM25 l'IDF schiaccia già i termini frequentissimi,
+quindi toglierli non sposta l'ordinamento. Il ragionamento è giusto **sul
+punteggio** ed è irrilevante, perché il guadagno non viene dal punteggio.
+
+Verificato invece che dedotto. Su SciFact i candidati medi passano da 4833 a
+2522: in modalità disgiuntiva ogni documento che contiene «the» è un candidato.
+Separando le query per quanti candidati hanno perso:
+
+| | delta nDCG medio |
+|---|---|
+| query con taglio sopra la mediana (n=150) | **+0,0523** |
+| query con taglio sotto la mediana (n=150) | +0,0364 |
+| query che non hanno perso **nessun** candidato (n=25) | **+0,0035** |
+
+Le 25 query che non contengono nessuna stopword non guadagnano praticamente
+niente. Il guadagno è **recupero, non punteggio**: togliere le stopword non
+riordina meglio, impedisce a mezzo corpus di entrare.
+
+Quel +0,0035 residuo sulle query che non dovrebbero cambiare affatto è un
+effetto di secondo ordine che vale la pena notare: l'analizzatore accorcia i
+documenti, quindi cambia `|D|` e `avgdl`, quindi cambia la normalizzazione BM25
+**per tutti**, anche per chi non ha stopword nella query. Le statistiche di
+collezione non sono neutre rispetto all'analisi.
+
+#### Lo schema che si ripete, ed è il motivo per cui tengo questo diario
+
+**Due volte nella stessa giornata ho ragionato sul punteggio dimenticando il
+recupero.**
+
+- Stamattina: *«BM25 cambia come si ordina, non cosa si recupera»*, scritto come
+  guardia. È scattata, perché con i candidati molto più numerosi del taglio il
+  recall è una metrica di ordinamento.
+- Stasera: *«le stopword non spostano l'ordinamento perché l'IDF le schiaccia»*.
+  Vero sul punteggio, e irrilevante, perché le stopword agiscono sul recupero.
+
+È lo stesso punto cieco: tratto «cambia il punteggio» e «cambia cosa viene
+recuperato» come separabili, e in modalità disgiuntiva non lo sono. Da qui in
+avanti, prima di scrivere un'ipotesi: **questa modifica tocca chi entra, o solo
+in che ordine?** E se tocca chi entra, il numero da guardare è `candidates`.
+
+#### La 6, e un errore di stamattina
+
+Avevo scritto che delle 24 query vuote di NFCorpus se ne sarebbe recuperata
+**una**, `leeks` → `leek`, sulla base dell'indagine del mattino: «su dieci
+termini assenti, nove non ci sono in nessuna forma». Ne sono state recuperate
+**nove su 24**:
+
+`deafness`, `leeks`, `pineapples`, `turnips`, `whiting`, `airport scanners`,
+`antinutrients`, `bagels`, `canker sores`
+
+Sono quasi tutti plurali il cui singolare nel corpus c'è eccome. L'indagine di
+stamattina guardava un campione e ne ha tratto il caso generale: non era
+sbagliata nel metodo, era sbagliata nella conclusione, e l'avevo scritta come se
+fosse una misura. **Un campione di dieci su ventiquattro non è un censimento.**
+
+#### La 4, sbagliata per come l'ho posta
+
+Avevo scritto «`candidates` aumenta». Aumenta col solo stemmer (4833 → 4908),
+**crolla** con le stopword (4833 → 2522). Avevo in testa lo stemmer e ho scritto
+la previsione sulla modifica intera, che sono due stadi con effetti opposti sul
+recupero. Se le avessi misurate insieme e basta, avrei visto un calo e concluso
+che qualcosa era rotto.
+
+Motivo in più per misurare gli stadi separati: **non per curiosità, per poter
+interpretare il totale.**
+
+#### La 5, la guardia: tenuta
+
+Query a vuoto: SciFact 0 → 0, NFCorpus 24 → 24 con le stopword e 24 → 15 con lo
+stemmer. Non sono salite da nessuna parte. Stavolta la guardia era scritta su
+una quantità che la modifica poteva muovere solo in una direzione sbagliata, ed
+è rimasta ferma.
+
+#### Una cosa che non mi spiego, e la lascio aperta
+
+Su SciFact la configurazione migliore è **solo stopword** (0,6641), non tutte e
+due (0,6585). Aggiungere lo stemmer alle stopword **peggiora** il nDCG@10 di
+0,0056, mentre alza il Recall@100 da 0,8792 a 0,9103. Su NFCorpus invece
+aggiungerlo migliora entrambi.
+
+Lettura plausibile: lo stemmer porta dentro più documenti rilevanti in
+profondità (recall su), ma aggiunge anche rumore in testa (nDCG@10 giù). Resta
+il fatto che il riferimento usa entrambi e arriva più in alto di tutte e quattro
+le mie configurazioni, quindi la spiegazione non è completa. **Non la forzo:**
+va misurata quando servirà, non raccontata adesso.
+
+#### Cosa resta del divario
+
+SciFact è al 97%, NFCorpus al 91%. Le due cause dichiarate in `SOURCE.md` prima
+di misurare erano lo stemmer e il tokenizer: lo stemmer è fatto, e da solo ha
+reso poco. Quello che resta è il tokenizer, e una differenza nota e non
+corretta: Koskidex toglie gli accenti (`removeAccents`), `EnglishAnalyzer` di
+Lucene no. Non l'ho toccata perché per l'italiano togliere gli accenti è
+probabilmente giusto, ed è una decisione da prendere quando arriva
+l'analizzatore italiano, non adesso di straforo.
 
 ---
 

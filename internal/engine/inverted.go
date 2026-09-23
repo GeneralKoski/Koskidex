@@ -100,7 +100,7 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 			strVal, ok := val.(string)
 			if ok {
 				// Tokenize searchable fields
-				tokens := Tokenize(strVal, field, settings.StopWords)
+				tokens := Tokenize(strVal, field, settings)
 
 				// Token Expansion for Synonyms
 				expandedTokens := make([]Token, 0, len(tokens))
@@ -165,7 +165,7 @@ func (idx *InvertedIndex) SearchExact(query string, settings Settings) []string 
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 
-	tokens := Tokenize(query, "", settings.StopWords)
+	tokens := Tokenize(query, "", settings)
 	if len(tokens) == 0 {
 		return nil
 	}
@@ -215,18 +215,21 @@ func (idx *InvertedIndex) GetDocCount() int {
 
 // Settings defines per-index configuration
 type Settings struct {
-	SearchableFields []string            `json:"searchable_fields"`
-	DisplayedFields  []string            `json:"displayed_fields"`
-	RankingRules     []string            `json:"ranking_rules"`
-	StopWords        map[string]bool     `json:"stop_words"`
-	Synonyms         map[string][]string `json:"synonyms"`
-	TypoTolerance    TypoSettings        `json:"typo_tolerance"`
-	FieldWeights     map[string]float64  `json:"field_weights"`
-	Sitemap          SitemapSettings     `json:"sitemap"`
-	RetrievalMode    string              `json:"retrieval_mode"`
-	ScoringMode      string              `json:"scoring_mode"`
-	BM25K1           float64             `json:"bm25_k1"`
-	BM25B            float64             `json:"bm25_b"`
+	SearchableFields []string        `json:"searchable_fields"`
+	DisplayedFields  []string        `json:"displayed_fields"`
+	RankingRules     []string        `json:"ranking_rules"`
+	StopWords        map[string]bool `json:"stop_words"`
+	// Stemmer sceglie l'analizzatore dei termini. Vuoto = nessuno, cioe' il
+	// comportamento di sempre.
+	Stemmer       string              `json:"stemmer"`
+	Synonyms      map[string][]string `json:"synonyms"`
+	TypoTolerance TypoSettings        `json:"typo_tolerance"`
+	FieldWeights  map[string]float64  `json:"field_weights"`
+	Sitemap       SitemapSettings     `json:"sitemap"`
+	RetrievalMode string              `json:"retrieval_mode"`
+	ScoringMode   string              `json:"scoring_mode"`
+	BM25K1        float64             `json:"bm25_k1"`
+	BM25B         float64             `json:"bm25_b"`
 }
 
 // How a term's contribution to a document's score is computed.

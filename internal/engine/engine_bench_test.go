@@ -76,7 +76,7 @@ func BenchmarkTokenize(b *testing.B) {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				Tokenize(tc.text, "field", stopWords)
+				Tokenize(tc.text, "field", Settings{StopWords: stopWords})
 			}
 		})
 	}
