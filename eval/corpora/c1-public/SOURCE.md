@@ -30,15 +30,17 @@ Download diretto, nessuna registrazione, nessuna licenza da accettare.
 | | **SciFact** | **NFCorpus** |
 |---|---|---|
 | Documenti | 5.183 | 3.633 |
-| Query di test | 300 | 323 |
+| Query nel file `queries.jsonl` | 1.109 | 3.237 |
+| Query di test (con giudizi) | 300 | 323 |
 | Giudizi di test | 339 (1,1 per query) | 12.334 (38,2 per query) |
 | Livelli di rilevanza | binaria (solo `1`) | graduata (`1` e `2`) |
 | Lunghezza media documento | 215 parole | - |
 
-Attenzione: `queries.jsonl` contiene le query di **tutti** gli split. NFCorpus ne
-ha 3.237 in totale ma solo 323 di test. **Le query da valutare si ricavano dai
-qrels, non dal file delle query**, altrimenti si misura su query che non hanno
-nessun giudizio.
+Attenzione: `queries.jsonl` contiene le query di **tutti** gli split, e il
+divario e' grosso in entrambe: SciFact ne ha 1.109 in totale contro 300 di test,
+NFCorpus 3.237 contro 323. **Le query da valutare si ricavano dai qrels, non dal
+file delle query**, altrimenti si misura su query che non hanno nessun giudizio
+e ogni media crolla.
 
 ## Formato
 
