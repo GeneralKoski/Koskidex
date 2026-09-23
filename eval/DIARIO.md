@@ -19,6 +19,39 @@ Regole, da `piano-autunno-2026.md`:
 
 ---
 
+## 2026-09-23 - Prima misura del baseline legacy su C1
+
+**Flag:** nessuna modifica al motore. È la prima misura, non un cambiamento.
+**Serve a:** collaudare l'impianto di valutazione e dare al legacy un numero
+contro cui BM25 dovrà staccare.
+
+### Prima di misurare
+
+Configurazione: campo unico `title + text`, peso 1.0, refusi spenti
+(`fuzziness="0"` e `TypoTolerance.Enabled=false`), profondità 100.
+
+Cosa mi aspetto, scritto prima di lanciare:
+
+1. **SciFact starà nettamente sotto 0,6789**, il riferimento BM25. Il punteggio
+   legacy è `(10 - refusi + 2*esatti) * peso_campo` senza nessun IDF, quindi su
+   query di più parole premia chi contiene molti termini comuni. Tiro un numero
+   per non barare a posteriori: **fra 0,30 e 0,55**.
+2. **NFCorpus starà sotto 0,3218**, ma il distacco sarà minore in valore
+   assoluto perché il riferimento stesso è basso.
+3. **Recall@100 sarà molto più alto di nDCG@10** su entrambe: il legacy trova i
+   documenti, il problema è come li ordina. Se anche il recall fosse basso, il
+   problema non sarebbe il ranking ma il matching, e cambierebbe la tesi.
+4. Nessuna query saltata su SciFact: tutti i 339 giudizi hanno rilevanza 1.
+
+La 3 è la più informativa. Se fosse smentita, i tre capitoli previsti
+sarebbero sul difetto sbagliato.
+
+### Dopo
+
+Da compilare a misura fatta.
+
+---
+
 ## 2026-09-23 - Ordinamento deterministico dei pari merito
 
 **Flag:** nessuno. È l'eccezione alla regola 1, motivata sotto.
