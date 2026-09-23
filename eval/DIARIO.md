@@ -19,6 +19,75 @@ Regole, da `piano-autunno-2026.md`:
 
 ---
 
+## 2026-09-23 - Analisi lessicale: stopword e stemmer (Task E1)
+
+**Flag:** `Settings.Analyzer`, vuoto = comportamento di oggi. Terzo campo con
+questa semantica dopo `RetrievalMode` e `ScoringMode`, stessa ragione: le
+settings sono persistite e un indice salvato prima non deve cambiare
+comportamento da solo.
+
+**Non è uno dei quattro difetti.** È ampliamento di perimetro, deciso
+esplicitamente: serve a capire quanto del divario dai riferimenti sia mio e
+quanto sia dell'analizzatore. Un BM25 corretto che resta al 90% del riferimento
+è difendibile solo se so dire perché.
+
+### Cosa cambia
+
+`Tokenize` (`tokenizer.go:27`) oggi fa tre cose: minuscolo, rimozione degli
+accenti, e spezza su tutto ciò che non è lettera o numero. `DefaultSettings`
+(`inverted.go:281`) inizializza `StopWords` a una mappa **vuota**. I riferimenti
+pubblicati girano su Lucene con `EnglishAnalyzer`: stemming Porter più la sua
+lista di stopword.
+
+La firma di `Tokenize` passa a prendere le `Settings` intere invece delle sole
+stopword. Non è estetica: i punti di chiamata sono sette, fra indicizzazione,
+`ParseQuery` e ricerca, e se l'analizzatore arrivasse solo ad alcuni l'indice
+conterrebbe termini che la query non produce più. Il sintomo sarebbe "non trova
+niente", che è il più difficile da ricondurre alla causa. Con le `Settings`
+nella firma, un punto di chiamata dimenticato non compila.
+
+### Prima di misurare
+
+Numeri di partenza: SciFact 0,6197 e NFCorpus 0,2810 di nDCG@10, contro
+riferimenti 0,6789 e 0,3218. Query a vuoto: 0 su SciFact, 24 su 323 su NFCorpus.
+
+1. **SciFact finisce fra 0,63 e 0,70.** Se restasse sotto 0,63 vuol dire che il
+   divario non era l'analizzatore e la spiegazione scritta in `SOURCE.md` prima
+   di misurare era sbagliata.
+2. **NFCorpus finisce fra 0,29 e 0,34.**
+3. **Lo stemmer porta molto più delle stopword, e le stopword da sole quasi
+   niente** - diciamo sotto +0,01 su entrambe. È la previsione che mi aspetto
+   contestata, quindi la scrivo: con BM25 l'IDF già schiaccia i termini
+   frequentissimi, quindi togliere le stopword toglie lavoro all'indice ma non
+   sposta l'ordinamento. Sotto il punteggio euristico sarebbe stato diverso,
+   perché lì un termine comune pesava quanto uno raro. Le tre configurazioni si
+   misurano separate apposta: solo stopword, solo stemmer, tutte e due.
+4. **`candidates` aumenta, ed è giusto così.** Questa è l'opposto della guardia
+   del BM25 di stamattina, e la scrivo per non ripetere l'errore: lì il
+   punteggio non poteva cambiare il recupero, qui lo stemming lo cambia per
+   definizione, perché fonde varianti dello stesso termine. Un `candidates`
+   fermo significherebbe che l'analizzatore non è arrivato all'indicizzazione.
+5. **La guardia vera è un'altra: le query a vuoto non devono aumentare.** Lo
+   stemming può solo rendere il confronto più permissivo, ma la rimozione delle
+   stopword può svuotare una query fatta di sole parole comuni. Se il numero
+   sale, ho tolto troppo.
+6. **Delle 24 query vuote di NFCorpus se ne recupera una, non ventiquattro.**
+   Dall'indagine del 23/09: su dieci termini assenti dal corpus, nove non ci
+   sono in nessuna forma e solo `leeks` → `leek` è una mancanza di stemming.
+   Quindi il numero atteso è 23, non 0. Se scendesse molto più in basso, la mia
+   indagine di stamattina era fatta male.
+7. **`TestBaselineRankingIsFrozen` passa a default, senza modifiche al test.**
+
+La 3 e la 6 sono quelle che possono smentirmi in modo interessante. La 5 è la
+guardia, e stavolta è scritta su una quantità che la modifica non può muovere
+per costruzione.
+
+### Dopo
+
+Da compilare a misura fatta.
+
+---
+
 ## 2026-09-23 - BM25 al posto del punteggio euristico (difetto 1)
 
 **Flag:** `Settings.ScoringMode`, `"legacy"` di default, `"bm25"` per il nuovo.
