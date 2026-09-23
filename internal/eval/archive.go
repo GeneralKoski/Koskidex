@@ -57,7 +57,10 @@ func Provenienza(dir string) map[string]string {
 	if b, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output(); err == nil {
 		out["commit"] = strings.TrimSpace(string(b))
 	}
-	if b, err := exec.Command("git", "-C", dir, "status", "--porcelain").Output(); err == nil {
+	// eval/results e' fuori dal controllo: sono gli output delle esecuzioni, e
+	// contarli vorrebbe dire che dalla seconda esecuzione di una serie in poi
+	// ogni risultato si dichiara prodotto da codice non committato.
+	if b, err := exec.Command("git", "-C", dir, "status", "--porcelain", "--", ".", ":(exclude)eval/results").Output(); err == nil {
 		out["modifiche_non_committate"] = fmt.Sprint(len(strings.TrimSpace(string(b))) > 0)
 	}
 	return out

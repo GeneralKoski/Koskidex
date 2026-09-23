@@ -2,6 +2,7 @@ package eval
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -50,5 +51,34 @@ func TestImprontaFileChangesWithTheContent(t *testing.T) {
 	ib, _ := ImprontaFile(b)
 	if ia == "" || ia == ib {
 		t.Fatalf("impronte non valide: %q e %q", ia, ib)
+	}
+}
+
+// The result files live inside the repository. Counting them as uncommitted
+// code would flag every run after the first one of a batch as dirty.
+func TestProvenienzaIgnoresTheResultFiles(t *testing.T) {
+	dir := t.TempDir()
+	git := func(args ...string) {
+		c := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		c.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	os.MkdirAll(filepath.Join(dir, "eval", "results"), 0o755)
+	os.WriteFile(filepath.Join(dir, "codice.go"), []byte("package x"), 0o644)
+	os.WriteFile(filepath.Join(dir, "eval", "results", "r.json"), []byte("{}"), 0o644)
+	git("add", ".")
+	git("commit", "-q", "-m", "x")
+
+	os.WriteFile(filepath.Join(dir, "eval", "results", "r.json"), []byte(`{"nuovo":1}`), 0o644)
+	if p := Provenienza(dir); p["modifiche_non_committate"] != "false" {
+		t.Fatalf("un risultato riscritto non e' codice modificato: %v", p)
+	}
+
+	os.WriteFile(filepath.Join(dir, "codice.go"), []byte("package y"), 0o644)
+	if p := Provenienza(dir); p["modifiche_non_committate"] != "true" {
+		t.Fatalf("il codice modificato va segnalato: %v", p)
 	}
 }
