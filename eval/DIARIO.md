@@ -48,7 +48,86 @@ sarebbero sul difetto sbagliato.
 
 ### Dopo
 
-Da compilare a misura fatta.
+File: `eval/results/scifact-legacy.json`, `eval/results/nfcorpus-legacy.json`.
+
+| | SciFact | NFCorpus |
+|---|---|---|
+| **nDCG@10** | **0,0246** | **0,1659** |
+| Recall@100 | 0,0242 | 0,0967 |
+| MRR@10 | 0,0267 | 0,2644 |
+| **Query a vuoto** | **290 su 300 (97%)** | **160 su 323 (50%)** |
+| Riferimento BM25 | 0,6789 | 0,3218 |
+
+**La predizione 3 e' sbagliata, e sbagliata nel modo piu' utile possibile.**
+
+Avevo scritto che il recall sarebbe stato molto piu' alto del nDCG, perche' "il
+legacy trova i documenti, il problema e' come li ordina". Su SciFact recall@100
+fa 0,0242 contro un nDCG@10 di 0,0246: sono lo stesso numero. Il motore non
+ordina male. **Non trova.**
+
+Avevo anche scritto cosa avrebbe significato: *"se anche il recall fosse basso,
+il problema non sarebbe il ranking ma il matching, e cambierebbe la tesi"*.
+Ecco, e' successo.
+
+### La causa, verificata nel codice
+
+`ParseQuery` in `internal/engine/ranker.go:33` mette **ogni parola** in
+`MustTerms`, a meno che non si scriva `OR` a mano. Il recupero e' puramente
+**congiuntivo**: un documento deve contenere *tutti* i termini della query.
+Lucene, e quindi il riferimento BM25, e' disgiuntivo con punteggio: un documento
+che ne contiene 8 su 12 si piazza bene.
+
+Su una query SciFact da 12 parole nessun documento le contiene tutte, quindi
+zero risultati. Provato su una query sola: intera 0 risultati, il primo termine
+da solo 7, i primi due 4.
+
+### La prova che e' la lunghezza della query, non altro
+
+Stessa collezione, stesso indice, stessa configurazione:
+
+| | query con risultati | query a vuoto |
+|---|---|---|
+| **NFCorpus** | 163 query, **media 2,0 parole** | 160 query, **media 4,7 parole** |
+| **SciFact** | 10 query, media 8,7 parole | 290 query, media 12,6 parole |
+
+La lunghezza media delle query di test e' 3,3 parole su NFCorpus e 12,5 su
+SciFact, ed e' esattamente la differenza fra il 50% e il 97% di query a vuoto.
+E' una relazione dose-effetto, non una coincidenza.
+
+### Cosa cambia per la tesi
+
+**Non e' un bug, ed e' importante dirlo in questi termini.** L'AND e' una scelta
+ragionevole per il caso d'uso per cui Koskidex era nato: la barra di ricerca di
+un e-commerce, due o tre parole, dove restituire chi le contiene tutte e'
+giusto. E' il tipo di query a rivelarlo.
+
+Ma cambia due cose:
+
+1. **C'e' un quarto difetto, e viene prima degli altri tre.** Con il 97% di
+   query a vuoto, nessun miglioramento del punteggio puo' fare niente: BM25
+   applicato a un recupero congiuntivo riordinerebbe il nulla. La Fase 1 come
+   scritta misurerebbe zero.
+2. **E' il difetto piu' rilevante per il documentale**, che e' il banco di prova
+   della tesi. Li' le query arrivano da persone che scrivono a lingua naturale, e
+   sempre piu' spesso da un LLM che riformula: query lunghe, non da due parole.
+   E' esattamente il regime in cui il motore collassa.
+
+### Conseguenza operativa
+
+L'ordine delle fasi cambia: **il recupero disgiuntivo va prima di BM25.** E'
+anche una buona notizia per la tesi, perche' e' il capitolo con l'effetto
+misurabile piu' grande: si parte da 0,0246 e c'e' tutto lo spazio del mondo.
+
+Da riportare in `piano-autunno-2026.md`.
+
+### Una nota sull'impianto
+
+A parte la sorpresa, la Fase 0 ha fatto il suo lavoro. NFCorpus a 0,1659 contro
+un riferimento di 0,3218 e' un numero plausibile per un motore senza IDF: se
+l'impianto avesse avuto un bug grosso avremmo visto zero anche li'. E il
+contatore delle query a vuoto, che non era previsto, e' stato aggiunto al runner
+proprio perche' e' il numero che ha rivelato tutto: una media non distingue un
+motore che ordina male da uno che non trova, e i due vogliono fix opposti.
 
 ---
 

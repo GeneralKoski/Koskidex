@@ -78,6 +78,10 @@ func esegui(radice, collezione, nomeRun, uscita string) error {
 
 	fmt.Printf("\n  nDCG@10    %.4f\n  Recall@100 %.4f\n  MRR@10     %.4f\n",
 		res.MeanNDCG10, res.MeanRecall100, res.MeanMRR10)
+	if res.ZeroResults > 0 {
+		fmt.Printf("  QUERY A VUOTO %d su %d (%.0f%%)\n",
+			res.ZeroResults, res.Queries, 100*float64(res.ZeroResults)/float64(res.Queries))
+	}
 	fmt.Printf("  su %d query", res.Queries)
 	if res.SkippedNoRel > 0 {
 		fmt.Printf(", %d saltate perche' senza documenti rilevanti", res.SkippedNoRel)

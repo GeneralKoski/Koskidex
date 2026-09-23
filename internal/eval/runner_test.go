@@ -150,3 +150,21 @@ func TestWriteJSONRoundTrips(t *testing.T) {
 		t.Fatalf("attesa 1 query nel file, ottenute %d", len(riletto.PerQuery))
 	}
 }
+
+// A mean cannot tell a ranker that orders badly from one that retrieves
+// nothing, and the two call for opposite fixes. The count of empty queries is
+// what made that difference visible on SciFact, so every run reports it.
+func TestRunCountsQueriesThatCameBackEmpty(t *testing.T) {
+	queries := map[string]string{"q1": "trova", "q2": "non trova"}
+	qrels := Qrels{"q1": {"d1": 1}, "q2": {"d2": 1}}
+	s := &searcherFinto{perQuery: map[string][]string{"trova": {"d1"}}}
+
+	r := Run(s, "prova", "finta", queries, qrels)
+
+	if r.ZeroResults != 1 {
+		t.Fatalf("attesa 1 query a vuoto, ottenute %d", r.ZeroResults)
+	}
+	if r.Queries != 2 {
+		t.Fatalf("una query a vuoto va comunque valutata e conta nella media: %d", r.Queries)
+	}
+}

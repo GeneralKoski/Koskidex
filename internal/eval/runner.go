@@ -44,6 +44,7 @@ type Results struct {
 	GoVersion     string        `json:"go_version"`
 	Queries       int           `json:"queries"`
 	SkippedNoRel  int           `json:"skipped_no_relevant"`
+	ZeroResults   int           `json:"zero_results"`
 	MeanNDCG10    float64       `json:"mean_ndcg@10"`
 	MeanRecall100 float64       `json:"mean_recall@100"`
 	MeanMRR10     float64       `json:"mean_mrr@10"`
@@ -61,6 +62,10 @@ type Results struct {
 // Queries are processed in sorted ID order so that two runs of the same
 // configuration produce byte-identical files and a diff between two result
 // files shows only what actually changed.
+//
+// ZeroResults counts the queries that came back empty. It is reported on its
+// own because a mean cannot distinguish a ranker that orders badly from one
+// that retrieves nothing, and the two call for opposite fixes.
 func Run(s Searcher, nomeRun, collezione string, queries map[string]string, qrels Qrels) Results {
 	inizio := time.Now()
 
@@ -95,6 +100,9 @@ func Run(s Searcher, nomeRun, collezione string, queries map[string]string, qrel
 		}
 
 		ranked := s.Search(queries[qid], profondita)
+		if len(ranked) == 0 {
+			out.ZeroResults++
+		}
 
 		q := QueryResult{
 			QueryID:   qid,
