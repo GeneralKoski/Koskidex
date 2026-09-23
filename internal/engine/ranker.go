@@ -122,8 +122,9 @@ func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highl
 	return tokenDocBest
 }
 
-// Search fuzzy searches and returns ranked document IDs
-func (idx *InvertedIndex) Search(query string, settings Settings, fuzziness string, queryVector []float64) ([]string, map[string][]string) {
+// SearchScored fuzzy searches and returns the ranked matches, scores included.
+// This is the whole search: Search is only a thin wrapper over it.
+func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzziness string, queryVector []float64) ([]SearchMatch, map[string][]string) {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 
@@ -242,15 +243,22 @@ func (idx *InvertedIndex) Search(query string, settings Settings, fuzziness stri
 		return results[i].ExactMatches > results[j].ExactMatches
 	})
 
-	var docIDs []string
-	for _, r := range results {
-		docIDs = append(docIDs, r.DocID)
-	}
-
 	for docID, terms := range highlights {
 		highlights[docID] = removeDuplicateTerms(terms)
 	}
 
+	return results, highlights
+}
+
+// Search returns only the document IDs, in the order SearchScored decided.
+// Signature and behaviour are unchanged: this is the API the handlers call.
+func (idx *InvertedIndex) Search(query string, settings Settings, fuzziness string, queryVector []float64) ([]string, map[string][]string) {
+	results, highlights := idx.SearchScored(query, settings, fuzziness, queryVector)
+
+	var docIDs []string
+	for _, r := range results {
+		docIDs = append(docIDs, r.DocID)
+	}
 	return docIDs, highlights
 }
 
