@@ -50,3 +50,8 @@ tmp/
 .cursorrules
 .clauderules
 .github/copilot-instructions.md
+
+# Collezioni di valutazione: si riscaricano con eval/corpora/fetch.sh
+/eval/corpora/c1-public/*
+!/eval/corpora/c1-public/SOURCE.md
+/eval/corpora/c2-documentale/
