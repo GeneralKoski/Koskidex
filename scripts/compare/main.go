@@ -39,9 +39,10 @@ type documento struct {
 }
 
 type configurazione struct {
-	etichetta string
-	recupero  string
-	punteggio string
+	etichetta    string
+	recupero     string
+	punteggio    string
+	sottostringa bool
 }
 
 func main() {
@@ -55,6 +56,11 @@ func main() {
 	// sembra dire che Koskidex si comporta diversamente, mentre sta solo
 	// girando con una configurazione che nessuno usa.
 	refusi := flag.String("fuzziness", "auto", "tolleranza ai refusi: auto come Elasticsearch in produzione, 0 per spegnerla")
+	// La ricerca delle cartelle di Documentale unisce al match un wildcard
+	// *termine*. Accanto alla configurazione or + euristico se ne misura una
+	// uguale con la sottostringa accesa: stesse query, stesso corpus, cosi' la
+	// differenza di latenza e' il costo della scansione del vocabolario.
+	sottostringa := flag.Bool("sottostringa", false, "aggiunge la configurazione or + euristico con la ricerca per sottostringa")
 	flag.Parse()
 
 	if *corpus == "" || *queries == "" {
@@ -79,9 +85,12 @@ func main() {
 	}
 
 	configurazioni := []configurazione{
-		{"oggi (and + euristico)", engine.RetrievalAll, engine.ScoringLegacy},
-		{"or + euristico", engine.RetrievalAny, engine.ScoringLegacy},
-		{"or + BM25", engine.RetrievalAny, engine.ScoringBM25},
+		{"oggi (and + euristico)", engine.RetrievalAll, engine.ScoringLegacy, false},
+		{"or + euristico", engine.RetrievalAny, engine.ScoringLegacy, false},
+		{"or + BM25", engine.RetrievalAny, engine.ScoringBM25, false},
+	}
+	if *sottostringa {
+		configurazioni = append(configurazioni, configurazione{"or + euristico + sottostringa", engine.RetrievalAny, engine.ScoringLegacy, true})
 	}
 
 	fmt.Printf("%d documenti, %d query, tolleranza refusi %q\n", len(docs), len(domande), *refusi)
@@ -108,8 +117,8 @@ func main() {
 		t0 := time.Now()
 		indici[i], impostazioni[i] = indicizza(docs, c, *refusi)
 		ms := ms(time.Since(t0))
-		rap.Configurazioni = append(rap.Configurazioni, infoConfigurazione{c.etichetta, c.recupero, c.punteggio, ms})
-		fmt.Printf("indice %-24s %8.0f ms\n", c.etichetta, ms)
+		rap.Configurazioni = append(rap.Configurazioni, infoConfigurazione{c.etichetta, c.recupero, c.punteggio, c.sottostringa, indici[i].VocabularySize(), ms})
+		fmt.Printf("indice %-30s %8.0f ms  %d termini\n", c.etichetta, ms, indici[i].VocabularySize())
 	}
 
 	for _, q := range domande {
@@ -194,10 +203,12 @@ type rapporto struct {
 }
 
 type infoConfigurazione struct {
-	Etichetta string  `json:"etichetta"`
-	Recupero  string  `json:"recupero"`
-	Punteggio string  `json:"punteggio"`
-	IndexMs   float64 `json:"index_ms"`
+	Etichetta    string  `json:"etichetta"`
+	Recupero     string  `json:"recupero"`
+	Punteggio    string  `json:"punteggio"`
+	Sottostringa bool    `json:"sottostringa"`
+	Termini      int     `json:"termini"`
+	IndexMs      float64 `json:"index_ms"`
 }
 
 type esitoQuery struct {
@@ -230,6 +241,7 @@ func indicizza(docs []documento, c configurazione, refusi string) (*engine.Inver
 	s.TypoTolerance.Enabled = refusi != "0"
 	s.RetrievalMode = c.recupero
 	s.ScoringMode = c.punteggio
+	s.SubstringMatch = c.sottostringa
 
 	idx := engine.NewInvertedIndex()
 	for _, d := range docs {

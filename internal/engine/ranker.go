@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 type SearchMatch struct {
@@ -214,6 +215,10 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 		}
 	}
 
+	if settings.SubstringMatch {
+		idx.addSubstringMatchesLocked(query, settings, docMatches, highlights)
+	}
+
 	// Process exclude (NOT) terms: remove matching docs
 	if hasExclude {
 		for _, token := range pq.ExcludeTerms {
@@ -280,6 +285,53 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 	}
 
 	return results, highlights
+}
+
+// addSubstringMatchesLocked adds the documents with an indexed term that
+// contains the whole query, and adds to their score, as a bool should of the
+// normal match and Elasticsearch's wildcard *query* on a text field. The
+// wildcard compares the query with one indexed term at a time, and a term
+// holds only letters and digits: a query with a space or punctuation in it
+// can find nothing this way. The query is normalised as the terms are
+// (lowercase, no accents), but not stemmed. It is a scan of the whole
+// vocabulary, which the caller must hold idx.mu for.
+func (idx *InvertedIndex) addSubstringMatchesLocked(query string, settings Settings, docMatches map[string]*SearchMatch, highlights map[string][]string) {
+	needle := removeAccents(strings.ToLower(strings.TrimSpace(query)))
+	if needle == "" || strings.ContainsFunc(needle, func(r rune) bool { return !unicode.IsLetter(r) && !unicode.IsNumber(r) }) {
+		return
+	}
+
+	best := make(map[string]*TokenDocMatch)
+	for term, postings := range idx.index {
+		if !strings.Contains(term, needle) {
+			continue
+		}
+		for _, p := range postings {
+			weight := 1.0
+			if w, ok := settings.FieldWeights[p.Field]; ok {
+				weight = w
+			}
+			m, ok := best[p.DocID]
+			if !ok {
+				m = &TokenDocMatch{DocID: p.DocID, MaxWeight: weight, MatchedTerm: term}
+				best[p.DocID] = m
+			} else if weight > m.MaxWeight {
+				m.MaxWeight = weight
+			}
+			if m.MatchedTerm == term {
+				m.TF++
+			}
+			highlights[p.DocID] = append(highlights[p.DocID], term)
+		}
+	}
+
+	for docID, m := range best {
+		if _, ok := docMatches[docID]; !ok {
+			docMatches[docID] = &SearchMatch{DocID: docID}
+		}
+		docMatches[docID].WordsMatched++
+		docMatches[docID].Score += idx.tokenScoreLocked(m, settings)
+	}
 }
 
 // Search returns only the document IDs, in the order SearchScored decided.

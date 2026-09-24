@@ -24,6 +24,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and one sync for the whole list, and reports how many were actually there.
   Unknown ids are not an error; an unusable id rejects the whole request with
   `400` and deletes nothing.
+- `substring_match` index setting (off by default): a search also finds the
+  documents with an indexed term that contains the whole query, and adds to
+  their score, as Elasticsearch's `wildcard` `*query*` next to a `match` in a
+  `bool` `should`. It is what Documentale's folder search does. A query with a
+  space or punctuation finds nothing this way, as in Elasticsearch, where the
+  wildcard compares the query with one term at a time. It scans the whole
+  vocabulary rather than keeping an n-gram index: a folder index has a few
+  thousand paths. `InvertedIndex.VocabularySize` reports the vocabulary size,
+  and `scripts/compare -sottostringa` measures the cost on a corpus.
 - `ids_only` on search (query parameter or POST body field): hits carry only
   `id` and `score`, without building documents and highlights, as
   Elasticsearch's `_source: false`.

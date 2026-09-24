@@ -71,7 +71,8 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 | **WAL**              | Write-Ahead Log for crash recovery, avoiding data loss on unexpected shutdown                |         |
 | **Search operators** | `AND` (default), `OR`, `NOT` (prefix `-`)                                           |         |
 | **Field filters**    | `filter=genre=Sci-Fi,year>2000` with `=`, `!=`, `>`, `<`, `>=`, `<=`          |         |
-| **Pagination**       | `limit` and `offset` params, `total_hits` in response                                 |         |
+| **Pagination**       | `limit` (up to 10,000) and `offset` params, `total_hits` in response, `score` per hit, `ids_only` for id-and-score hits |         |
+| **Substring match**  | `substring_match` setting: also finds documents with a term containing the whole query, as a `*query*` wildcard |         |
 | **Multi-index**      | Create and manage independent indexes with their own settings                               |         |
 | **Schemaless**       | Index any JSON object, only a unique `id` field is required                                |         |
 | **Synonyms**         | Configure per-index synonym mappings                                                        |         |
@@ -98,6 +99,7 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 | `GET`    | `/indexes/{name}/documents`      | List documents (paginated: `limit`, `offset`) |
 | `GET`    | `/indexes/{name}/documents/{id}` | Get document by ID                            |
 | `DELETE` | `/indexes/{name}/documents/{id}` | Delete document                               |
+| `POST`   | `/indexes/{name}/documents/delete-batch` | Delete many documents (JSON array of ids) |
 | `GET`    | `/indexes/{name}/search?q=`      | Full-text search                              |
 | `POST`   | `/indexes/{name}/search`         | Full-text search (POST body)                  |
 | `GET`    | `/indexes/{name}/settings`       | Get index settings                            |
@@ -112,6 +114,9 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 
 # Pagination
 curl "http://localhost:7700/indexes/movies/search?q=matrix&limit=10&offset=0"
+
+# Only ids and scores, for large result sets
+curl "http://localhost:7700/indexes/movies/search?q=matrix&limit=10000&ids_only=true"
 
 # Field filters
 curl "http://localhost:7700/indexes/movies/search?q=matrix&filter=genre=Sci-Fi"

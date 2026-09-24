@@ -285,6 +285,10 @@ type Settings struct {
 	ScoringMode   string              `json:"scoring_mode"`
 	BM25K1        float64             `json:"bm25_k1"`
 	BM25B         float64             `json:"bm25_b"`
+	// SubstringMatch adds the documents with an indexed term that contains the
+	// whole query, as Elasticsearch's wildcard *query* on a text field. Off by
+	// default.
+	SubstringMatch bool `json:"substring_match"`
 }
 
 // How a term's contribution to a document's score is computed.
@@ -403,6 +407,14 @@ func (idx *InvertedIndex) DocFrequency(term string) int {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 	return idx.docFreq[term]
+}
+
+// VocabularySize returns how many distinct terms the index holds: the cost of
+// a scan of the vocabulary, as SubstringMatch does, grows with it.
+func (idx *InvertedIndex) VocabularySize() int {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+	return len(idx.index)
 }
 
 // DocLength returns a document's length in indexed tokens, occurrences
