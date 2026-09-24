@@ -24,6 +24,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and one sync for the whole list, and reports how many were actually there.
   Unknown ids are not an error; an unusable id rejects the whole request with
   `400` and deletes nothing.
+- Settings for matching closer to Elasticsearch's `multi_match` as Documentale
+  runs it, all off by default: `disable_prefix_search` (no match of a longer
+  term just because it starts with the query word), `prefix_length` (leading
+  characters of a typo match that must be exact, counted in characters), and
+  `all_terms_in_one_field` (with every term required, one field must hold them
+  all, as `best_fields` with `operator: and`). With these and the typo
+  thresholds at 3 and 6, `scripts/esmirror` reproduces from committed code the
+  divergence experiment of 23/09/2026, which needed a patch to the engine.
 - `substring_match` index setting (off by default): a search also finds the
   documents with an indexed term that contains the whole query, and adds to
   their score, as Elasticsearch's `wildcard` `*query*` next to a `match` in a

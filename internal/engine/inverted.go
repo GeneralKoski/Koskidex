@@ -289,6 +289,21 @@ type Settings struct {
 	// whole query, as Elasticsearch's wildcard *query* on a text field. Off by
 	// default.
 	SubstringMatch bool `json:"substring_match"`
+
+	// Matching closer to Elasticsearch's multi_match as Documentale runs it
+	// (best_fields, operator and, fuzziness AUTO, prefix_length 1). All off by
+	// default, so an index saved earlier keeps its behaviour. The typo
+	// thresholds of AUTO are TypoTolerance 3 and 6.
+	//
+	// DisablePrefixSearch drops the match of any term that starts with the
+	// query word, whatever the distance: only exact and typo matches remain.
+	DisablePrefixSearch bool `json:"disable_prefix_search"`
+	// PrefixLength is how many leading characters of a typo match must be
+	// exact, as Elasticsearch's prefix_length.
+	PrefixLength int `json:"prefix_length"`
+	// AllTermsInOneField requires, when every term is required, one field of
+	// the document that holds every term, as best_fields with operator and.
+	AllTermsInOneField bool `json:"all_terms_in_one_field"`
 }
 
 // How a term's contribution to a document's score is computed.

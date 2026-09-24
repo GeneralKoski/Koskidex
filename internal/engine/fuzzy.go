@@ -1,5 +1,7 @@
 package engine
 
+import "strings"
+
 // DamerauLevenshtein calculates the distance between two strings
 // allowing transposition of adjacent characters (e.g. teh -> the).
 func DamerauLevenshtein(a, b string) int {
@@ -64,12 +66,13 @@ func min3(a, b, c int) int {
 func (idx *InvertedIndex) FuzzySearchTerms(queryTerm string, maxDistance int, exactness bool) []string {
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
-	return idx.fuzzySearchTermsLocked(queryTerm, maxDistance, exactness)
+	return idx.fuzzySearchTermsLocked(queryTerm, maxDistance, exactness, false, 0)
 }
 
 // fuzzySearchTermsLocked is the lock-free body of FuzzySearchTerms. Caller must
-// hold idx.mu (read or write).
-func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance int, exactness bool) []string {
+// hold idx.mu (read or write). noPrefix and prefixLength are
+// Settings.DisablePrefixSearch and Settings.PrefixLength.
+func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance int, exactness bool, noPrefix bool, prefixLength int) []string {
 	var matchedTerms []string
 
 	// Direct match optimization
@@ -86,17 +89,28 @@ func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance i
 	// would miss matches whose typo lands in the first two characters.
 	candidates := idx.fuzzyCandidates(queryTerm)
 
+	// As in Elasticsearch, a prefix longer than the query word is the whole word.
+	queryRunes := []rune(queryTerm)
+	exact := queryRunes
+	if prefixLength < len(exact) {
+		exact = exact[:prefixLength]
+	}
+
 	for _, candidate := range candidates {
 		if candidate == queryTerm {
 			continue // Already handled
 		}
 
 		// Prefix matching: if candidate starts with queryTerm, it's a match regardless of distance
-		if len(queryTerm) >= 2 && len(candidate) > len(queryTerm) {
+		if !noPrefix && len(queryTerm) >= 2 && len(candidate) > len(queryTerm) {
 			if candidate[:len(queryTerm)] == queryTerm {
 				matchedTerms = append(matchedTerms, candidate)
 				continue
 			}
+		}
+
+		if len(exact) > 0 && !strings.HasPrefix(candidate, string(exact)) {
+			continue
 		}
 
 		dist := DamerauLevenshtein(queryTerm, candidate)

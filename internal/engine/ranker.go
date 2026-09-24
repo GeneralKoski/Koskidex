@@ -28,6 +28,9 @@ type TokenDocMatch struct {
 	// document.
 	MatchedTerm string
 	TF          int
+
+	// Fields where the token matched, kept only for Settings.AllTermsInOneField.
+	Fields map[string]bool
 }
 
 // ParsedQuery represents a parsed query with AND/OR/NOT semantics
@@ -80,7 +83,7 @@ func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highl
 	maxTypos := MaxTypos(token.Term, settings.TypoTolerance, fuzziness)
 	// Search already holds idx.mu (read); use the lock-free variant to avoid
 	// recursive read-locking, which can deadlock against a concurrent writer.
-	matchedTerms := idx.fuzzySearchTermsLocked(token.Term, maxTypos, false)
+	matchedTerms := idx.fuzzySearchTermsLocked(token.Term, maxTypos, false, settings.DisablePrefixSearch, settings.PrefixLength)
 
 	tokenDocBest := make(map[string]*TokenDocMatch)
 
@@ -122,6 +125,13 @@ func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highl
 				if weight > tokenDocBest[p.DocID].MaxWeight {
 					tokenDocBest[p.DocID].MaxWeight = weight
 				}
+			}
+
+			if settings.AllTermsInOneField {
+				if tokenDocBest[p.DocID].Fields == nil {
+					tokenDocBest[p.DocID].Fields = make(map[string]bool)
+				}
+				tokenDocBest[p.DocID].Fields[p.Field] = true
 			}
 
 			// One posting is one occurrence, but only of the term currently
@@ -166,13 +176,29 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 	docMatches := make(map[string]*SearchMatch)
 	highlights := make(map[string][]string)
 
+	// With AllTermsInOneField, the fields that hold every must term seen so
+	// far, per document: best_fields with operator and.
+	unCampo := settings.AllTermsInOneField && settings.RetrievalMode != RetrievalAny
+	campiComuni := make(map[string]map[string]bool)
+
 	// Process must (AND) terms
-	for _, token := range allTokens {
+	for n, token := range allTokens {
 		tokenDocBest := idx.findDocsForToken(token, settings, highlights, fuzziness)
 
 		for docID, match := range tokenDocBest {
 			if _, ok := docMatches[docID]; !ok {
 				docMatches[docID] = &SearchMatch{DocID: docID}
+			}
+			if unCampo {
+				if n == 0 {
+					campiComuni[docID] = match.Fields
+				} else {
+					for f := range campiComuni[docID] {
+						if !match.Fields[f] {
+							delete(campiComuni[docID], f)
+						}
+					}
+				}
 			}
 			docMatches[docID].WordsMatched++
 			docMatches[docID].Typos += match.Typos
@@ -192,7 +218,7 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 	}
 	if requiredMatches > 0 {
 		for docID, m := range docMatches {
-			if m.WordsMatched < requiredMatches {
+			if m.WordsMatched < requiredMatches || (unCampo && len(campiComuni[docID]) == 0) {
 				delete(docMatches, docID)
 			}
 		}
