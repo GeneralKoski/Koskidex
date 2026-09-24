@@ -85,3 +85,26 @@ func TestAnInvalidIDRejectsTheWholeRequest(t *testing.T) {
 		})
 	}
 }
+
+// Lo scenario provato dal vivo il 24/09/2026, con i campi come li manda
+// Documentale: "enel" sta solo in subjects, e dava zero risultati.
+func TestDocumentaleListFieldsAreSearchableOverHTTP(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	richiesta(t, srv, "POST", "/indexes", `{"name":"documents"}`)
+	richiesta(t, srv, "PUT", "/indexes/documents/settings",
+		`{"searchable_fields":["name","tags","summary","subjects","notes","additional_data"],
+		  "field_weights":{"name":5,"tags":4,"summary":3,"subjects":3,"notes":2,"additional_data":1}}`)
+	w := richiesta(t, srv, "POST", "/indexes/documents/documents", `[
+		{"id": 8, "name": "Contratto fornitura", "tags": ["contratto"], "summary": "Fornitura energia elettrica",
+		 "subjects": ["Enel Energia"], "notes": "", "additional_data": ["Ufficio Acquisti", 1223]}]`)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("atteso 202, ottenuto %d: %s", w.Code, w.Body.String())
+	}
+
+	for _, q := range []string{"enel", "acquisti", "1223", "contratto"} {
+		if res := searchV2(t, srv, "/indexes/documents/search?q="+q+"&fuzziness=0"); res["total_hits"].(float64) != 1 {
+			t.Errorf("%q va trovata: %v", q, res["total_hits"])
+		}
+	}
+}

@@ -31,6 +31,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optimized social share image (`og-image`) from ~5 MB to ~107 KB.
 
 ### Fixed
+- List fields (`["a", "b"]`) were stored but never indexed, silently: a word
+  found only in a list returned no hits. Lists are now indexed element by
+  element, strings and numbers, with a gap of 100 positions between elements so
+  that two elements never read as one phrase (as Elasticsearch's
+  `position_increment_gap`). Without declared searchable fields, list fields are
+  picked up automatically like string fields. A number on its own is indexed
+  only in a declared searchable field.
 - Integer ids were dropped with a `202` and `skipped: 1`. They are now accepted
   and stored as their canonical string (`7`, and `1000000` rather than `1e+06`).
 - Documents without a valid `id` were silently dropped while the API reported success.

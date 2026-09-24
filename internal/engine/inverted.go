@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"strconv"
 	"sync"
 )
 
@@ -69,6 +70,60 @@ func (idx *InvertedIndex) Reindex(settings Settings) {
 	}
 }
 
+// distanzaFraElementi separa le posizioni di due elementi consecutivi di un
+// campo lista, come position_increment_gap in Elasticsearch: gli elementi di
+// una lista non sono una frase, e l'ultima parola di uno non deve risultare
+// accanto alla prima del successivo.
+const distanzaFraElementi = 100
+
+// tokenizzaValore trasforma in token il valore di un campo. Una stringa si
+// tokenizza com'e'; una lista elemento per elemento, stringhe e numeri, con
+// distanzaFraElementi fra un elemento e l'altro; un numero da solo solo se il
+// campo e' stato dichiarato cercabile, perche' senza campi dichiarati prezzi e
+// anni di un catalogo non devono diventare cercabili. Il resto (booleani,
+// oggetti) non e' testo. Il secondo valore dice se il campo ha prodotto testo.
+func tokenizzaValore(v interface{}, field string, settings Settings, esplicito bool) ([]Token, bool) {
+	switch x := v.(type) {
+	case string:
+		return Tokenize(x, field, settings), true
+	case float64:
+		if !esplicito {
+			return nil, false
+		}
+		return Tokenize(strconv.FormatFloat(x, 'f', -1, 64), field, settings), true
+	case []string:
+		elementi := make([]interface{}, len(x))
+		for i, s := range x {
+			elementi[i] = s
+		}
+		return tokenizzaValore(elementi, field, settings, esplicito)
+	case []interface{}:
+		var out []Token
+		base := 0
+		for _, e := range x {
+			var testo string
+			switch y := e.(type) {
+			case string:
+				testo = y
+			case float64:
+				testo = strconv.FormatFloat(y, 'f', -1, 64)
+			default:
+				continue
+			}
+			tok := Tokenize(testo, field, settings)
+			for _, tk := range tok {
+				tk.Position += base
+				out = append(out, tk)
+			}
+			if len(tok) > 0 {
+				base = out[len(out)-1].Position + distanzaFraElementi
+			}
+		}
+		return out, true
+	}
+	return nil, false
+}
+
 // addDocumentLocked indexes a document. The caller must hold idx.mu.
 func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interface{}, settings Settings) {
 	// Purge any previous version of this document first, so re-adding the same
@@ -80,11 +135,13 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 
 	// Determine searchable fields
 	var fields []string
-	if len(settings.SearchableFields) > 0 {
+	esplicito := len(settings.SearchableFields) > 0
+	if esplicito {
 		fields = settings.SearchableFields
 	} else {
 		for k, v := range doc {
-			if _, ok := v.(string); ok {
+			switch v.(type) {
+			case string, []interface{}, []string:
 				fields = append(fields, k)
 			}
 		}
@@ -97,10 +154,8 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 	for _, field := range fields {
 		val, ok := doc[field]
 		if ok {
-			strVal, ok := val.(string)
+			tokens, ok := tokenizzaValore(val, field, settings, esplicito)
 			if ok {
-				// Tokenize searchable fields
-				tokens := Tokenize(strVal, field, settings)
 
 				// Token Expansion for Synonyms
 				expandedTokens := make([]Token, 0, len(tokens))
