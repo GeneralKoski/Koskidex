@@ -748,3 +748,69 @@ veri, l'ipotesi e' questa:
 4. `b` andra' rimisurato sul corpus di soli documenti lunghi: il valore 0,75 e'
    un default tarato su collezioni di articoli, e su un archivio dove tutti i
    documenti si somigliano in lunghezza dovrebbe contare meno.
+
+---
+
+## 23-24/09/2026 - Contro Elasticsearch sul corpus vero: il modello è lo stesso, il matching no
+
+I dati di questa voce stanno nell'archivio della tesi
+(`Universita-Martin/Magistrale/Tesi/risultati/`), non qui: `confronto/` per le
+esecuzioni, `esperimenti/2026-09-23_cause-divergenza/` e
+`esperimenti/2026-09-23_numero-atto/` per i due esperimenti, ciascuno con il
+codice per rifarlo.
+
+**Cosa credevo.** Stamattina del 23, su 14 documenti inventati, Koskidex e
+Elasticsearch restituivano lo stesso insieme su ogni query, e ne avevo concluso
+che Koskidex è un'implementazione fedele dello stesso modello di recupero.
+
+**Cosa ho trovato.** Su 10.018 atti e 24 query, gli insiemi coincidono in **8
+casi su 24**. Il modello è davvero lo stesso (congiuntivo, con refusi), ma il
+matching differisce in quattro punti, che ho misurato dando a Koskidex
+esattamente ciò che Elasticsearch ha indicizzato e correggendo una causa alla
+volta, dietro interruttori temporanei mai entrati nel codice:
+
+1. `best_fields` + `operator: and` vuole tutte le parole **nello stesso campo**;
+   Koskidex le accetta sparse. Pesa più di tutto: 326 dei 447 documenti in più.
+2. Soglie dei refusi: `AUTO` dà 1 refuso da 3 caratteri e 2 da 6, Koskidex 1 da
+   4 e 2 da 8.
+3. `fuzzySearchTermsLocked` accetta **qualunque termine che inizia con la parola
+   cercata**, a qualsiasi distanza (`fuzzy.go:94`). Eredità dell'e-commerce.
+4. `prefix_length: 1`: in Documentale la prima lettera è esatta.
+
+Con tutte e quattro, 15 query su 24. Il resto non è diagnosticato e lo scrivo
+così: probabilmente la tokenizzazione dei numeri e il tetto di 50 espansioni
+delle query fuzzy di Elasticsearch, nessuna delle due verificata.
+
+**La lezione è la stessa di BM25 su NFCorpus, al contrario.** Lì un controllo
+scattava su un campione piccolo per il motivo sbagliato; qui un campione piccolo
+non faceva scattare niente per il motivo sbagliato. Su 14 documenti le quattro
+differenze non avevano occasione di vedersi. Nessuna conclusione su "stesso
+comportamento" vale se non su dati veri, e con un numero di query che dia alle
+differenze il modo di comparire.
+
+**La scoperta che vale di più non riguarda Koskidex.** In produzione Documentale
+mette l'atto cercato per numero al 12° posto su 85 (`ordinanza 187`) e al 5° su 8
+(`determina 1223`). La causa è la tolleranza ai refusi sui numeri: `187` combacia
+con `18` e `17`. Spenti i refusi, l'atto è primo e unico. `pathinfo()` peggiora
+le cose, riducendo *"ORDINANZA N. 18.2026"* a *"ORDINANZA N. 18"*.
+
+**E una cosa da spiegare su Koskidex.** Nella stessa prova, `or + BM25` mette
+l'atto giusto al 3° e al 5° posto, dove l'euristico lo mette primo. BM25
+peggiora la ricerca per numero. Non ancora indagato; il sospetto naturale è
+l'IDF dei numeri corti, che in un archivio di atti numerati sono ovunque.
+
+**Conseguenza per la tesi.** L'argomento "i miglioramenti misurati su Koskidex
+valgono anche per Documentale" non regge più così com'era. Due strade, non si
+escludono: insegnare a Koskidex a riprodurre il matching di Elasticsearch, dietro
+flag, e mostrare insiemi identici; oppure misurare Elasticsearch direttamente,
+che ora gira in locale sullo stesso corpus e può entrare nello stesso pool.
+
+### Gli strumenti, da qui in poi
+
+Ogni esecuzione di `scripts/evaluate` e `scripts/compare` scrive un file nuovo
+nell'archivio della tesi, con il commit, se l'albero era pulito, l'impronta del
+corpus, ogni impostazione e i tempi in millisecondi. Sistemarlo ha trovato tre
+difetti, tutti miei: tempi arrotondati a zero sotto il microsecondo; i file di
+risultato che, stando nel repository, facevano dichiarare "non committato"
+ogni esecuzione dopo la prima; un contatore di collisione che finiva dopo il
+nome e faceva sfuggire il file ai glob.
