@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -22,6 +23,13 @@ func TestArchiviaNeverOverwrites(t *testing.T) {
 	}
 	if a == b {
 		t.Fatalf("due esecuzioni sono finite nello stesso file: %s", a)
+	}
+	// Il nome resta in coda anche nella collisione: e' quello che i grafici
+	// cercano con un glob.
+	for _, p := range []string{a, b} {
+		if !strings.HasSuffix(p, "_scifact-bm25.json") {
+			t.Fatalf("il nome dell'esecuzione deve restare in coda: %s", p)
+		}
 	}
 	primo, _ := os.ReadFile(a)
 	if string(primo) != `{"n":1}` {

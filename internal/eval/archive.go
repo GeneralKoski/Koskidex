@@ -33,8 +33,10 @@ func Archivia(sottocartella, nome string, dati []byte) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	base := time.Now().UTC().Format("2006-01-02T150405Z") + "_" + nome
-	path := filepath.Join(dir, base+".json")
+	// A collision gets its counter next to the time, not after the name, so
+	// that a glob on the name still finds every run.
+	ora := time.Now().UTC().Format("2006-01-02T150405Z")
+	path := filepath.Join(dir, ora+"_"+nome+".json")
 	for n := 2; ; n++ {
 		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 		if err == nil {
@@ -45,7 +47,7 @@ func Archivia(sottocartella, nome string, dati []byte) (string, error) {
 		if !os.IsExist(err) {
 			return "", err
 		}
-		path = filepath.Join(dir, fmt.Sprintf("%s-%d.json", base, n))
+		path = filepath.Join(dir, fmt.Sprintf("%s-%d_%s.json", ora, n, nome))
 	}
 }
 
