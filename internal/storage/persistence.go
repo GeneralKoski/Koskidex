@@ -31,6 +31,7 @@ type WALOperation struct {
 	Op       string                 `json:"op"`
 	Index    string                 `json:"index"`
 	DocID    string                 `json:"doc_id,omitempty"`
+	DocIDs   []string               `json:"doc_ids,omitempty"`
 	DocData  map[string]interface{} `json:"doc_data,omitempty"`
 	Settings *engine.Settings       `json:"settings,omitempty"`
 }

@@ -346,6 +346,47 @@ func (s *Server) handleDeleteDocument(w http.ResponseWriter, r *http.Request) {
 	sendJSON(w, http.StatusOK, map[string]string{"message": "Document deleted"})
 }
 
+// handleDeleteDocuments deletes the documents whose ids are in the body, a
+// JSON array of strings or integers, as Elasticsearch's delete by query on ids.
+func (s *Server) handleDeleteDocuments(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxJSONBody)
+	name := r.PathValue("name")
+
+	if s.blockProtected(w, r, name) {
+		return
+	}
+
+	var ids []interface{}
+	if err := json.NewDecoder(r.Body).Decode(&ids); err != nil {
+		sendError(w, http.StatusBadRequest, "Body must be a JSON array of ids")
+		return
+	}
+	if len(ids) == 0 {
+		sendError(w, http.StatusBadRequest, "No ids to delete")
+		return
+	}
+
+	deleted, err := s.mgr.DeleteDocuments(name, ids)
+	if err != nil {
+		if err == manager.ErrIndexNotFound {
+			sendError(w, http.StatusNotFound, "Index not found")
+			return
+		}
+		var idNonValidi *manager.IDNonValidiError
+		if errors.As(err, &idNonValidi) {
+			sendError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		sendInternalError(w, "delete documents", err)
+		return
+	}
+
+	sendJSON(w, http.StatusOK, map[string]interface{}{
+		"message": "Documents deleted",
+		"deleted": deleted,
+	})
+}
+
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	idx, err := s.mgr.GetIndex(name)

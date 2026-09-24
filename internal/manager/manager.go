@@ -101,6 +101,12 @@ func NewManager(opts storage.Options) (*Manager, error) {
 			if idx, ok := mgr.indexes[op.Index]; ok && op.DocID != "" {
 				idx.Engine.DeleteDocument(op.DocID)
 			}
+		case "DELETE_DOCS":
+			if idx, ok := mgr.indexes[op.Index]; ok {
+				for _, id := range op.DocIDs {
+					idx.Engine.DeleteDocument(id)
+				}
+			}
 		}
 	}
 
@@ -270,6 +276,54 @@ func (m *Manager) DeleteDocument(indexName, docID string) error {
 	idx.Engine.DeleteDocument(docID)
 	m.invalidateCache(indexName)
 	return m.triggerSaveLocked()
+}
+
+// DeleteDocuments removes many documents in one step: one WAL record and one
+// sync for the whole list, instead of one per id. Ids are strings or integers,
+// as in AddDocuments; if any of them is unusable nothing is deleted and an
+// *IDNonValidiError says which. Ids that are not in the index are not an
+// error. deleted counts the documents that were actually there.
+func (m *Manager) DeleteDocuments(indexName string, rawIDs []interface{}) (deleted int, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	idx, exists := m.indexes[indexName]
+	if !exists {
+		return 0, ErrIndexNotFound
+	}
+
+	var sbagliati []int
+	var presenti []string
+	visti := make(map[string]bool, len(rawIDs))
+	for i, v := range rawIDs {
+		id, valido := idCanonico(v)
+		if !valido {
+			sbagliati = append(sbagliati, i)
+			continue
+		}
+		if visti[id] {
+			continue
+		}
+		visti[id] = true
+		if _, ok := idx.Engine.GetDocument(id); ok {
+			presenti = append(presenti, id)
+		}
+	}
+	if len(sbagliati) > 0 {
+		return 0, &IDNonValidiError{Posizioni: sbagliati}
+	}
+	if len(presenti) == 0 {
+		return 0, nil
+	}
+
+	if err := m.persistence.AppendWAL(storage.WALOperation{Op: "DELETE_DOCS", Index: indexName, DocIDs: presenti}); err != nil {
+		return 0, fmt.Errorf("WAL write failed: %w", err)
+	}
+	for _, id := range presenti {
+		idx.Engine.DeleteDocument(id)
+	}
+	m.invalidateCache(indexName)
+	return len(presenti), m.triggerSaveLocked()
 }
 
 // UpdateSettings updates index configuration and re-indexes all documents.

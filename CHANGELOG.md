@@ -19,6 +19,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Frontend tests (Vitest + Testing Library).
 - `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`.
 - Every search hit carries its `score`. It was computed and then thrown away.
+- `POST /indexes/{name}/documents/delete-batch` — deletes the documents whose
+  ids are in the body (a JSON array of strings or integers) with one WAL record
+  and one sync for the whole list, and reports how many were actually there.
+  Unknown ids are not an error; an unusable id rejects the whole request with
+  `400` and deletes nothing.
 - `ids_only` on search (query parameter or POST body field): hits carry only
   `id` and `score`, without building documents and highlights, as
   Elasticsearch's `_source: false`.

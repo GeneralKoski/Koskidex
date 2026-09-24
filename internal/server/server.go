@@ -153,6 +153,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /indexes/{name}/documents", s.handleListDocuments)
 	s.mux.HandleFunc("GET /indexes/{name}/documents/{id}", s.handleGetDocument)
 	s.mux.HandleFunc("DELETE /indexes/{name}/documents/{id}", s.handleDeleteDocument)
+	s.mux.HandleFunc("POST /indexes/{name}/documents/delete-batch", s.handleDeleteDocuments)
 
 	// Settings
 	s.mux.HandleFunc("GET /indexes/{name}/settings", s.handleGetSettings)

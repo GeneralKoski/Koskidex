@@ -558,6 +558,7 @@ print(results['hits'])`}</CodeBlock>
                             ["POST", "/indexes/{name}/documents", "Add documents (single, array, or file upload)"],
                             ["GET", "/indexes/{name}/documents/{id}", "Get document by ID"],
                             ["DELETE", "/indexes/{name}/documents/{id}", "Delete document"],
+                          ["POST", "/indexes/{name}/documents/delete-batch", "Delete many documents (JSON array of ids)"],
                             ["GET", "/indexes/{name}/search?q=", "Full-text search (GET)"],
                             ["POST", "/indexes/{name}/search", "Full-text search (POST body)"],
                             ["GET", "/indexes/{name}/settings", "Get index settings"],
