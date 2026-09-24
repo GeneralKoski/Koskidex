@@ -18,12 +18,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Backend tests for cache, filters, sitemap escaping, robots, and document listing.
 - Frontend tests (Vitest + Testing Library).
 - `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`.
+- Every search hit carries its `score`. It was computed and then thrown away.
+- `ids_only` on search (query parameter or POST body field): hits carry only
+  `id` and `score`, without building documents and highlights, as
+  Elasticsearch's `_source: false`.
 
 ### Changed
 - `POST /indexes/{name}/documents` rejects the whole request with `400` when any
   document has a missing or unusable id, and says at which positions; nothing is
   added. `skipped` stays in the success response for compatibility and is
   always `0`.
+- Search `limit` goes up to 10,000 instead of 1,000: a caller that filters its
+  own database with the whole id set lost every result past the thousandth.
 - `POST /indexes/{name}/documents` now reports `{added, skipped}` instead of a raw count.
 - Document re-indexing on settings update happens in place (`Reindex`) instead of
   swapping the engine pointer.

@@ -3,8 +3,10 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -105,6 +107,117 @@ func TestDocumentaleListFieldsAreSearchableOverHTTP(t *testing.T) {
 	for _, q := range []string{"enel", "acquisti", "1223", "contratto"} {
 		if res := searchV2(t, srv, "/indexes/documents/search?q="+q+"&fuzziness=0"); res["total_hits"].(float64) != 1 {
 			t.Errorf("%q va trovata: %v", q, res["total_hits"])
+		}
+	}
+}
+
+func seminaFatture(t *testing.T, srv *server.Server, n int) {
+	t.Helper()
+	richiesta(t, srv, "POST", "/indexes", `{"name":"documents"}`)
+	var b strings.Builder
+	b.WriteString("[")
+	for i := 1; i <= n; i++ {
+		if i > 1 {
+			b.WriteString(",")
+		}
+		// Un titolo su due ha un refuso, così i punteggi non sono tutti uguali
+		// anche con il punteggio predefinito, che guarda i refusi e non la
+		// frequenza.
+		parola := "fattura"
+		if i%2 == 1 {
+			parola = "fatura"
+		}
+		b.WriteString(`{"id": ` + strconv.Itoa(i) + `, "title": "` + parola + ` numero ` + strconv.Itoa(i) + `"}`)
+	}
+	b.WriteString("]")
+	if w := richiesta(t, srv, "POST", "/indexes/documents/documents", b.String()); w.Code != http.StatusAccepted {
+		t.Fatalf("semina fallita: %d %s", w.Code, w.Body.String())
+	}
+}
+
+// Documentale chiede fino a 10.000 risultati e usa l'intero insieme di id per
+// filtrare con whereIn. Con il tetto a 1.000 i risultati oltre sparivano.
+func TestSearchReturnsMoreThanAThousandResults(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	seminaFatture(t, srv, 1200)
+
+	res := searchV2(t, srv, "/indexes/documents/search?q=fattura&limit=10000&ids_only=true")
+	if n := len(res["hits"].([]interface{})); n != 1200 {
+		t.Fatalf("attesi 1200 risultati, restituiti %d (total_hits %v)", n, res["total_hits"])
+	}
+	if res["limit"].(float64) != 10000 {
+		t.Fatalf("il limite richiesto va rispettato fino a 10000, è %v", res["limit"])
+	}
+	if res := searchV2(t, srv, "/indexes/documents/search?q=fattura&limit=50000&ids_only=true"); res["limit"].(float64) != 10000 {
+		t.Fatalf("oltre 10000 il limite va fermato a 10000, è %v", res["limit"])
+	}
+}
+
+// Con ids_only la risposta porta solo id e punteggio: costruire 10.000
+// documenti con le evidenziazioni per usarne solo gli id è lavoro buttato.
+func TestIDsOnlyReturnsJustIDsAndScores(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	seminaFatture(t, srv, 5)
+
+	for _, url := range []string{"/indexes/documents/search?q=fattura&ids_only=true", ""} {
+		var res map[string]interface{}
+		if url != "" {
+			res = searchV2(t, srv, url)
+		} else {
+			w := richiesta(t, srv, "POST", "/indexes/documents/search", `{"q": "fattura", "ids_only": true}`)
+			_ = json.NewDecoder(w.Body).Decode(&res)
+		}
+		for _, h := range res["hits"].([]interface{}) {
+			hit := h.(map[string]interface{})
+			if len(hit) != 2 || hit["id"] == nil || hit["score"] == nil {
+				t.Fatalf("con ids_only un risultato deve avere solo id e score: %v", hit)
+			}
+		}
+	}
+
+	// La cache non deve restituire la forma sbagliata: stessa query, senza ids_only.
+	res := searchV2(t, srv, "/indexes/documents/search?q=fattura")
+	if _, ok := res["hits"].([]interface{})[0].(map[string]interface{})["document"]; !ok {
+		t.Fatal("senza ids_only il risultato deve portare il documento")
+	}
+}
+
+// Il punteggio serve al confronto finale fra i motori, e c'era già: veniva
+// calcolato e buttato via nella risposta.
+func TestEveryHitCarriesItsScoreInRankingOrder(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	seminaFatture(t, srv, 30)
+
+	res := searchV2(t, srv, "/indexes/documents/search?q=fattura&limit=30")
+	precedente := math.Inf(1)
+	punteggi := map[string]float64{}
+	distinti := map[float64]bool{}
+	for _, h := range res["hits"].([]interface{}) {
+		hit := h.(map[string]interface{})
+		s, ok := hit["score"].(float64)
+		if !ok {
+			t.Fatalf("ogni risultato deve avere un punteggio numerico: %v", h)
+		}
+		if s > precedente {
+			t.Fatalf("senza sort i risultati devono essere in ordine di punteggio: %v dopo %v", s, precedente)
+		}
+		precedente = s
+		punteggi[hit["id"].(string)] = s
+		distinti[s] = true
+	}
+	if len(distinti) < 2 {
+		t.Fatalf("metà dei titoli ha un refuso, i punteggi non possono essere tutti uguali: %v", distinti)
+	}
+
+	soliID := searchV2(t, srv, "/indexes/documents/search?q=fattura&limit=30&ids_only=true")
+	for _, h := range soliID["hits"].([]interface{}) {
+		hit := h.(map[string]interface{})
+		if hit["score"].(float64) != punteggi[hit["id"].(string)] {
+			t.Fatalf("con ids_only il punteggio di %v deve essere lo stesso della risposta completa: %v invece di %v",
+				hit["id"], hit["score"], punteggi[hit["id"].(string)])
 		}
 	}
 }

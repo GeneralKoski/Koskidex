@@ -593,8 +593,11 @@ print(results['hits'])`}</CodeBlock>
 
                   <div>
                     <h3 className="text-white font-semibold text-sm mb-3">{t("docs.sections.api.search_params")}</h3>
-                    <CodeBlock>{`# Pagination (default: limit=20, max: 1000)
+                    <CodeBlock>{`# Pagination (default: limit=20, max: 10000)
 curl "http://localhost:7700/indexes/movies/search?q=matrix&limit=10&offset=0"
+
+# Only ids and scores, no documents or highlights (for large result sets)
+curl "http://localhost:7700/indexes/movies/search?q=matrix&limit=10000&ids_only=true"
 
 # Field filters (=, !=, >, <, >=, <=)
 curl "http://localhost:7700/indexes/movies/search?q=matrix&filter=genre=Sci-Fi"

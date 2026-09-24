@@ -394,7 +394,12 @@ type SearchRequest struct {
 	Fuzziness string    `json:"fuzziness"`
 	Sort      string    `json:"sort"`
 	Facets    string    `json:"facets"`
+	IDsOnly   bool      `json:"ids_only"`
 }
+
+// maxSearchLimit is as far as a search can page. Documentale asks for up to
+// 10,000 results and filters its database with the whole id set.
+const maxSearchLimit = 10000
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
@@ -405,6 +410,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	fuzziness := r.URL.Query().Get("fuzziness")
 	sortParam := r.URL.Query().Get("sort")
 	facetsParam := r.URL.Query().Get("facets")
+	idsOnly, _ := strconv.ParseBool(r.URL.Query().Get("ids_only"))
 	limit := 20
 	offset := 0
 	var vector []float64
@@ -437,6 +443,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			if req.Limit > 0 { limit = req.Limit }
 			if req.Offset >= 0 { offset = req.Offset }
 			if len(req.Vector) > 0 { vector = req.Vector }
+			if req.IDsOnly { idsOnly = true }
 		}
 	}
 
@@ -450,8 +457,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if limit > 1000 {
-		limit = 1000
+	if limit > maxSearchLimit {
+		limit = maxSearchLimit
 	}
 
 	idx, err := s.mgr.GetIndex(name)
@@ -478,7 +485,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if len(vector) > 0 {
 		vecKey = fmt.Sprintf("%v", vector)
 	}
-	cacheKey := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%s", name, query, filterRaw, fuzziness, sortParam, facetsParam, limit, offset, vecKey)
+	cacheKey := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%s|%t", name, query, filterRaw, fuzziness, sortParam, facetsParam, limit, offset, vecKey, idsOnly)
 	if cached, ok := s.cache.Get(cacheKey); ok {
 		if resp, ok := cached.(map[string]interface{}); ok {
 			// The LRU returns the stored map by reference. Copy it before
@@ -495,7 +502,13 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	docIDs, highlights := idx.Engine.Search(query, idx.Settings, fuzziness, vector)
+	matches, highlights := idx.Engine.SearchScored(query, idx.Settings, fuzziness, vector)
+	docIDs := make([]string, len(matches))
+	scores := make(map[string]float64, len(matches))
+	for i, m := range matches {
+		docIDs[i] = m.DocID
+		scores[m.DocID] = m.Score
+	}
 
 	// Apply filters before pagination
 	filters := engine.ParseFilters(filterRaw)
@@ -603,6 +616,10 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 
 	hits := []map[string]interface{}{}
 	for _, id := range docIDs {
+		if idsOnly {
+			hits = append(hits, map[string]interface{}{"id": id, "score": scores[id]})
+			continue
+		}
 		if doc, ok := idx.Engine.GetDocument(id); ok {
 			displayDoc := make(map[string]interface{})
 			if len(idx.Settings.DisplayedFields) > 0 {
@@ -631,6 +648,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 				"id":         id,
 				"document":   displayDoc,
 				"highlights": highlightsMap,
+				"score":      scores[id],
 			})
 		}
 	}
