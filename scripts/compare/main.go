@@ -48,6 +48,7 @@ func main() {
 	corpus := flag.String("corpus", "", "file JSONL esportato da Documentale")
 	queries := flag.String("queries", "", "file con una query per riga")
 	quante := flag.Int("top", 5, "quanti risultati mostrare per query")
+	conserva := flag.Int("conserva", 1000, "quanti risultati per query e configurazione salvare nel rapporto; il totale trovato si salva sempre")
 	uscita := flag.String("json", "", "se valorizzato, scrive il rapporto anche in questo file (l'archivio della tesi lo riceve comunque)")
 	// Il default e' "auto" perche' Documentale cerca con fuzziness AUTO: con la
 	// tolleranza spenta i due motori recuperano insiemi diversi e la tabella
@@ -99,6 +100,7 @@ func main() {
 	rap.Config["corpus"] = *corpus
 	rap.Config["documenti"] = fmt.Sprint(len(docs))
 	rap.Config["refusi"] = *refusi
+	rap.Config["risultati_conservati_per_query"] = fmt.Sprint(*conserva)
 	if impronta, err := eval.ImprontaFile(*corpus); err == nil {
 		rap.Config["corpus_sha256"] = impronta
 	}
@@ -123,8 +125,16 @@ func main() {
 
 			// Solo id e punteggi: i titoli degli atti possono contenere nomi di
 			// persone, e questi file finiscono nel repository della tesi.
-			e := esito{IDs: []string{}, Punteggi: []float64{}, Ms: durata}
-			for _, m := range trovati {
+			// Si conserva la testa del ranking, non tutto: con il recupero
+			// disgiuntivo sono migliaia di documenti per query, 12 MB a
+			// esecuzione, e nessuna metrica guarda oltre le prime 100
+			// posizioni. Il totale resta, perche' e' l'unico modo di dire se
+			// l'insieme recuperato e' cambiato.
+			e := esito{IDs: []string{}, Punteggi: []float64{}, Trovati: len(trovati), Ms: durata}
+			for n, m := range trovati {
+				if n >= *conserva {
+					break
+				}
 				e.IDs = append(e.IDs, m.DocID)
 				e.Punteggi = append(e.Punteggi, m.Score)
 			}
@@ -147,7 +157,9 @@ func main() {
 		fmt.Printf("  %-24s %d\n", c.etichetta, vuote[i])
 	}
 
-	dati, err := json.MarshalIndent(rap, "", "  ")
+	// Compatto: indentato, un rapporto con migliaia di id va a capo a ogni id
+	// e raddoppia di peso senza diventare piu' leggibile.
+	dati, err := json.Marshal(rap)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
@@ -196,6 +208,7 @@ type esitoQuery struct {
 type esito struct {
 	IDs      []string  `json:"ids"`
 	Punteggi []float64 `json:"punteggi"`
+	Trovati  int       `json:"trovati"`
 	Ms       float64   `json:"ms"`
 }
 
