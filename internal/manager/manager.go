@@ -3,7 +3,10 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/GeneralKoski/Koskidex/internal/engine"
@@ -169,8 +172,12 @@ func (m *Manager) DeleteIndex(name string) error {
 }
 
 // AddDocuments adds documents to an index and saves to disk.
-// It returns how many documents were indexed and how many were skipped
-// because they lacked a valid string "id" (or "_id") field.
+//
+// Every document needs an "id" (or "_id"): a non-empty string or an integer.
+// If any of them lacks one, nothing is added and an *IDNonValidiError says
+// which. skipped is therefore always 0; it stays in the signature because the
+// HTTP response has reported {added, skipped} since the CHANGELOG entry that
+// introduced it, and clients may read it.
 func (m *Manager) AddDocuments(indexName string, docs []map[string]interface{}) (added, skipped int, err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -180,16 +187,28 @@ func (m *Manager) AddDocuments(indexName string, docs []map[string]interface{}) 
 		return 0, 0, ErrIndexNotFound
 	}
 
-	for _, doc := range docs {
+	// Tutti gli id si controllano prima di toccare l'indice: con un id non
+	// valido non entra niente, invece di un blocco caricato a meta'.
+	ids := make([]string, len(docs))
+	var sbagliati []int
+	for i, doc := range docs {
 		idVal, ok := doc["id"]
 		if !ok {
 			idVal = doc["_id"] // fallback
 		}
-		idStr, ok := idVal.(string)
-		if !ok || idStr == "" {
-			skipped++
+		id, valido := idCanonico(idVal)
+		if !valido {
+			sbagliati = append(sbagliati, i)
 			continue
 		}
+		ids[i] = id
+	}
+	if len(sbagliati) > 0 {
+		return 0, 0, &IDNonValidiError{Posizioni: sbagliati}
+	}
+
+	for i, doc := range docs {
+		idStr := ids[i]
 		if err := m.persistence.AppendWAL(storage.WALOperation{Op: "ADD_DOC", Index: indexName, DocID: idStr, DocData: doc}); err != nil {
 			return added, skipped, fmt.Errorf("WAL write failed: %w", err)
 		}
@@ -275,6 +294,42 @@ func (m *Manager) UpdateSettings(indexName string, settings engine.Settings) err
 
 	m.invalidateCache(indexName)
 	return m.triggerSaveLocked()
+}
+
+// IDNonValidiError dice quali documenti di una richiesta non hanno un id
+// utilizzabile, per posizione nella richiesta a partire da 0.
+type IDNonValidiError struct {
+	Posizioni []int
+}
+
+func (e *IDNonValidiError) Error() string {
+	parti := make([]string, 0, len(e.Posizioni))
+	for i, p := range e.Posizioni {
+		if i == 10 {
+			parti = append(parti, fmt.Sprintf("e altri %d", len(e.Posizioni)-10))
+			break
+		}
+		parti = append(parti, fmt.Sprintf("posizione %d", p))
+	}
+	return "id mancante o non valido nei documenti in " + strings.Join(parti, ", ") +
+		": l'id deve essere una stringa non vuota o un numero intero"
+}
+
+// idCanonico accetta una stringa non vuota o un numero intero. JSON decodifica
+// ogni numero come float64, e fmt.Sprint scriverebbe 1000000 come "1e+06":
+// un id che cambia forma non si ritrova piu'. Un numero con la virgola non e'
+// un id, e oltre 2^53 un float64 non rappresenta piu' ogni intero.
+func idCanonico(v interface{}) (string, bool) {
+	switch x := v.(type) {
+	case string:
+		return x, x != ""
+	case float64:
+		if x != math.Trunc(x) || math.IsInf(x, 0) || math.Abs(x) > 1<<53 {
+			return "", false
+		}
+		return strconv.FormatInt(int64(x), 10), true
+	}
+	return "", false
 }
 
 // triggerSaveLocked saves all data to disk using the debounced save in the

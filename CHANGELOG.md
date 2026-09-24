@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`.
 
 ### Changed
+- `POST /indexes/{name}/documents` rejects the whole request with `400` when any
+  document has a missing or unusable id, and says at which positions; nothing is
+  added. `skipped` stays in the success response for compatibility and is
+  always `0`.
 - `POST /indexes/{name}/documents` now reports `{added, skipped}` instead of a raw count.
 - Document re-indexing on settings update happens in place (`Reindex`) instead of
   swapping the engine pointer.
@@ -27,6 +31,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optimized social share image (`og-image`) from ~5 MB to ~107 KB.
 
 ### Fixed
+- Integer ids were dropped with a `202` and `skipped: 1`. They are now accepted
+  and stored as their canonical string (`7`, and `1000000` rather than `1e+06`).
 - Documents without a valid `id` were silently dropped while the API reported success.
 - Data race / lost documents when updating settings concurrently with document writes.
 - Sitemap URLs are now XML-escaped (malformed XML / injection on `&`, `<`, `>`).

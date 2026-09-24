@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -256,6 +257,11 @@ func (s *Server) handleAddDocuments(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err == manager.ErrIndexNotFound {
 			sendError(w, http.StatusNotFound, "Index not found")
+			return
+		}
+		var idNonValidi *manager.IDNonValidiError
+		if errors.As(err, &idNonValidi) {
+			sendError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		sendInternalError(w, "add documents", err)
