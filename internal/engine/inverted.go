@@ -332,7 +332,24 @@ type Settings struct {
 	// to now: vectors come from the client or not at all. Documents added
 	// before an embedder is set keep having no vector.
 	Embedder EmbedderSettings `json:"embedder"`
+
+	// HybridMode decides who enters the candidates when the search carries a
+	// vector. Empty, as up to now: the vector only reorders the lexical
+	// matches. HybridUnion adds the VectorTopK documents closest to the query
+	// vector; HybridVector keeps only those. The fusion is the same in every
+	// mode: lexical score + sim * 20.
+	HybridMode string `json:"hybrid_mode"`
+	// VectorTopK is how many documents the vector brings in; zero is 100.
+	VectorTopK int `json:"vector_top_k"`
 }
+
+const (
+	HybridUnion  = "union"
+	HybridVector = "vector"
+	// vectorTopKDefault is the depth of Recall@100: past it no document can
+	// count in the metrics unless the lexical match finds it.
+	vectorTopKDefault = 100
+)
 
 // EmbedderSettings names the model that turns text into vectors. The
 // embedding itself is done by the server (internal/embedder): the engine only

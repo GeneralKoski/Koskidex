@@ -52,6 +52,8 @@ func main() {
 	elisione := flag.Bool("elisione", false, "toglie gli articoli elisi italiani, come l'analizzatore italian di Elasticsearch (Settings.ElisionArticles); vuole -tokenizer standard")
 	modello := flag.String("embedder", "", "modello Ollama per i vettori di documenti e query (per esempio bge-m3); vuoto = senza vettori")
 	ollama := flag.String("ollama", "", "URL di Ollama; vuoto = localhost:11434")
+	ibrido := flag.String("ibrido", "", "chi portano i vettori fra i candidati: vuoto (riordinano i lessicali), union o vector (Settings.HybridMode); vuole -embedder")
+	vettoriK := flag.Int("vettori-k", 0, "quanti documenti porta il vettore con -ibrido (Settings.VectorTopK); 0 = 100")
 	cacheVettori := flag.String("vettori-cache", "eval/cache/embeddings.jsonl", "cache dei vettori, per modello e testo: si calcolano una volta sola")
 	split := flag.String("split", "test", "giudizi da usare, qrels/<split>.tsv: test, oppure train per chi impara dalle query")
 	flag.Parse()
@@ -86,13 +88,24 @@ func main() {
 		fmt.Fprintln(os.Stderr, "-elisione vuole -tokenizer standard")
 		os.Exit(1)
 	}
+	if *ibrido != "" && *ibrido != engine.HybridUnion && *ibrido != engine.HybridVector {
+		fmt.Fprintf(os.Stderr, "ibrido %q sconosciuto, usa %q, %q o lascia vuoto\n", *ibrido, engine.HybridUnion, engine.HybridVector)
+		os.Exit(1)
+	}
+	// Senza vettori la modalita' ibrida non ha niente da portare: la run
+	// sarebbe quella lessicale, con un'etichetta che dice il contrario.
+	if (*ibrido != "" || *vettoriK != 0) && *modello == "" {
+		fmt.Fprintln(os.Stderr, "-ibrido e -vettori-k vogliono -embedder")
+		os.Exit(1)
+	}
 	if _, err := engine.RequiredTerms(*minimo, 1); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni,
 		minimo: *minimo, coordinazione: *coordinazione, split: *split, tokenizer: *tokenizer, elisione: *elisione,
-		embedder: engine.EmbedderSettings{Model: *modello, URL: *ollama}, cacheVettori: *cacheVettori}
+		embedder: engine.EmbedderSettings{Model: *modello, URL: *ollama}, cacheVettori: *cacheVettori,
+		ibrido: *ibrido, vettoriK: *vettoriK}
 	if *modello != "" {
 		opzioni.embedder.Source = embedder.SourceOllama
 	}
@@ -135,6 +148,8 @@ type opzioni struct {
 	elisione      bool
 	embedder      engine.EmbedderSettings
 	cacheVettori  string
+	ibrido        string
+	vettoriK      int
 }
 
 func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string, o opzioni) error {
@@ -191,6 +206,8 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 			st.MinimumShouldMatch = o.minimo
 			st.Coordination = o.coordinazione
 			st.Tokenizer = o.tokenizer
+			st.HybridMode = o.ibrido
+			st.VectorTopK = o.vettoriK
 			if o.elisione {
 				st.ElisionArticles = engine.ItalianElisionArticles()
 			}
@@ -230,6 +247,17 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		}
 		for k, v := range infoVettori {
 			res.Config[k] = v
+		}
+		if o.embedder.Source != "" {
+			res.Config["ibrido"] = "rerank"
+			if o.ibrido != "" {
+				res.Config["ibrido"] = o.ibrido
+				k := o.vettoriK
+				if k <= 0 {
+					k = 100
+				}
+				res.Config["vettori_k"] = fmt.Sprint(k)
+			}
 		}
 	}
 	if o.top > 0 {

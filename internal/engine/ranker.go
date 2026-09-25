@@ -286,6 +286,10 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 				}
 			}
 		} else {
+			if settings.HybridMode == HybridVector {
+				docMatches = make(map[string]*SearchMatch)
+				highlights = make(map[string][]string)
+			}
 			for docID, m := range docMatches {
 				if doc, ok := idx.docs[docID]; ok {
 					if vecVal, ok := doc["_vector"]; ok {
@@ -293,6 +297,20 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 							sim := cosineSimilarity(queryVector, docVec)
 							m.Score += sim * 20.0
 						}
+					}
+				}
+			}
+			// Hybrid retrieval: the closest documents enter the candidates
+			// too, scored as in the search by vector alone. The lexical ones
+			// keep their re-ranking score, so only who enters changes.
+			if settings.HybridMode == HybridUnion || settings.HybridMode == HybridVector {
+				k := settings.VectorTopK
+				if k <= 0 {
+					k = vectorTopKDefault
+				}
+				for _, v := range idx.viciniLocked(queryVector, k) {
+					if _, ok := docMatches[v.id]; !ok {
+						docMatches[v.id] = &SearchMatch{DocID: v.id, Score: v.sim * 20.0}
 					}
 				}
 			}
