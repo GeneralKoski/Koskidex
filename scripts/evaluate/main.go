@@ -37,6 +37,9 @@ func main() {
 	analisi := flag.String("analyzer", "none", "analisi lessicale: none, stopwords, stemmer, english (stopword + stemmer)")
 	rankings := flag.String("rankings", "", "rapporto di app:eval-run-queries da valutare al posto di Koskidex")
 	archivio := flag.String("archivio", "koskidex-beir", "sottocartella dell'archivio dei risultati")
+	k1 := flag.Float64("bm25-k1", engine.DefaultBM25K1, "k1 di BM25: saturazione della frequenza del termine")
+	b := flag.Float64("bm25-b", engine.DefaultBM25B, "b di BM25: peso della normalizzazione della lunghezza")
+	top := flag.Int("top", 0, "quanti id della testa di ogni ranking salvare nel file (0 = nessuno)")
 	flag.Parse()
 
 	if *modo != engine.RetrievalAll && *modo != engine.RetrievalAny {
@@ -54,7 +57,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi, *rankings, *archivio); err != nil {
+	opzioni := opzioni{k1: *k1, b: *b, top: *top}
+	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi, *rankings, *archivio, opzioni); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
 	}
@@ -73,7 +77,14 @@ var analisiLessicali = map[string]func(*engine.Settings){
 	},
 }
 
-func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string) error {
+// opzioni are the settings added after the first runs; their defaults leave a
+// run exactly as it was before them.
+type opzioni struct {
+	k1, b float64
+	top   int
+}
+
+func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string, o opzioni) error {
 	dir := filepath.Join(radice, collezione)
 	if _, err := os.Stat(dir); err != nil {
 		return fmt.Errorf("collezione %q non trovata in %s, lancia eval/corpora/fetch.sh", collezione, radice)
@@ -98,7 +109,7 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 
 	var res eval.Results
 	if rankings != "" {
-		res, err = valutaEsterno(rankings, docs, daValutare, qrels, nomeRun, collezione)
+		res, err = valutaEsterno(rankings, docs, daValutare, qrels, nomeRun, collezione, o.top)
 		if err != nil {
 			return err
 		}
@@ -111,13 +122,15 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		searcher := eval.NewKoskidexSearcher(docs, func(st *engine.Settings) {
 			st.RetrievalMode = modo
 			st.ScoringMode = punteggio
+			st.BM25K1 = o.k1
+			st.BM25B = o.b
 			analisiLessicali[analisi](st)
 		})
 		indicizzazione := time.Since(t0)
 		fmt.Println(indicizzazione.Round(time.Millisecond))
 
 		fmt.Print("valuto... ")
-		res = eval.Run(searcher, nomeRun, collezione, daValutare, qrels)
+		res = eval.RunTop(searcher, nomeRun, collezione, daValutare, qrels, o.top)
 		fmt.Println(res.Elapsed)
 
 		res.Timings.IndexMs = float64(indicizzazione.Nanoseconds()) / 1e6
@@ -126,6 +139,13 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		res.Config["punteggio"] = punteggio
 		res.Config["analisi"] = analisi
 		res.Config["refusi"] = "0"
+		if punteggio == engine.ScoringBM25 {
+			res.Config["bm25_k1"] = fmt.Sprint(o.k1)
+			res.Config["bm25_b"] = fmt.Sprint(o.b)
+		}
+	}
+	if o.top > 0 {
+		res.Config["top"] = fmt.Sprint(o.top)
 	}
 	res.Config["collezione"] = collezione
 	res.Config["documenti"] = fmt.Sprint(len(docs))
@@ -176,7 +196,7 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 
 // valutaEsterno scores a recorded run. The per-query times are the ones the
 // app measured: timing a lookup in a map would say nothing about the engine.
-func valutaEsterno(path string, docs []eval.Document, domande map[string]string, qrels eval.Qrels, nomeRun, collezione string) (eval.Results, error) {
+func valutaEsterno(path string, docs []eval.Document, domande map[string]string, qrels eval.Qrels, nomeRun, collezione string, top int) (eval.Results, error) {
 	run, err := eval.LoadExternalRun(path)
 	if err != nil {
 		return eval.Results{}, err
@@ -191,7 +211,7 @@ func valutaEsterno(path string, docs []eval.Document, domande map[string]string,
 
 	fmt.Printf("%s: %d documenti, %d query da valutare, ranking di %s da %s\n",
 		collezione, len(docs), len(domande), run.Name, filepath.Base(path))
-	res := eval.Run(run, nomeRun, collezione, domande, qrels)
+	res := eval.RunTop(run, nomeRun, collezione, domande, qrels, top)
 	for qid := range res.Timings.PerQueryMs {
 		res.Timings.PerQueryMs[qid] = run.Ms[strings.TrimSpace(domande[qid])]
 	}

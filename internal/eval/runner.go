@@ -41,6 +41,8 @@ type QueryResult struct {
 	// Candidates is how many documents matched in total, before the cutoff.
 	Candidates int `json:"candidates"`
 	Relevant   int `json:"relevant"`
+	// Top is the head of the ranking, kept only when asked for with RunTop.
+	Top []string `json:"top,omitempty"`
 }
 
 // Results is what gets written to a versioned file. Every number in the thesis
@@ -97,6 +99,12 @@ func millisecondi(d time.Duration) float64 {
 // own because a mean cannot distinguish a ranker that orders badly from one
 // that retrieves nothing, and the two call for opposite fixes.
 func Run(s Searcher, nomeRun, collezione string, queries map[string]string, qrels Qrels) Results {
+	return RunTop(s, nomeRun, collezione, queries, qrels, 0)
+}
+
+// RunTop is Run that also keeps the first top documents of every ranking, to
+// see which documents overtake the relevant one. With top 0 it is Run.
+func RunTop(s Searcher, nomeRun, collezione string, queries map[string]string, qrels Qrels, top int) Results {
 	inizio := time.Now()
 
 	ids := make([]string, 0, len(queries))
@@ -145,6 +153,9 @@ func Run(s Searcher, nomeRun, collezione string, queries map[string]string, qrel
 			Retrieved:  len(ranked),
 			Candidates: candidati,
 			Relevant:   rilevanti,
+		}
+		if top > 0 {
+			q.Top = append([]string{}, ranked[:min(top, len(ranked))]...)
 		}
 		out.PerQuery = append(out.PerQuery, q)
 

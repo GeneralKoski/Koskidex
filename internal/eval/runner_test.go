@@ -222,3 +222,41 @@ func TestTimingsDoNotLeakIntoThePerQueryMetrics(t *testing.T) {
 		t.Fatalf("per_query deve essere identico fra due esecuzioni:\n%s\n%s", a, b)
 	}
 }
+
+// Per capire chi passa davanti al documento giusto serve il ranking, non solo
+// le metriche: RunTop ne salva la testa.
+func TestRunTopKeepsTheHeadOfEachRanking(t *testing.T) {
+	queries := map[string]string{"q1": "prima", "q2": "seconda"}
+	qrels := Qrels{"q1": {"d1": 1}, "q2": {"d2": 1}}
+	s := &searcherFinto{perQuery: map[string][]string{
+		"prima":   {"x", "y", "d1"},
+		"seconda": {"d2"},
+	}}
+
+	r := RunTop(s, "prova", "finta", queries, qrels, 2)
+
+	if got := r.PerQuery[0].Top; len(got) != 2 || got[0] != "x" || got[1] != "y" {
+		t.Fatalf("attesi i primi 2 di q1, ottenuti %v", got)
+	}
+	if got := r.PerQuery[1].Top; len(got) != 1 || got[0] != "d2" {
+		t.Fatalf("un ranking piu' corto del taglio resta intero: %v", got)
+	}
+	if s.ultimoK < RecallCut {
+		t.Fatalf("salvare la testa non deve accorciare la profondita' delle metriche: k=%d", s.ultimoK)
+	}
+}
+
+// Senza richiesta, niente teste: i file di risultati gia' archiviati restano
+// confrontabili byte per byte con quelli nuovi.
+func TestRunKeepsNoRankingByDefault(t *testing.T) {
+	s := &searcherFinto{perQuery: map[string][]string{"prima": {"d1"}}}
+	r := Run(s, "prova", "finta", map[string]string{"q1": "prima"}, Qrels{"q1": {"d1": 1}})
+
+	var buf bytes.Buffer
+	if err := r.WriteJSON(&buf); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(buf.Bytes(), []byte(`"top"`)) {
+		t.Fatalf("senza RunTop il file non deve avere la chiave top: %s", buf.String())
+	}
+}
