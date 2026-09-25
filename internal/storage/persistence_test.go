@@ -3,6 +3,7 @@ package storage
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -121,5 +122,31 @@ func TestConcurrentSaves(t *testing.T) {
 	err := p2.LoadIndexes(func(name string, docs []DocRecord, settings engine.Settings) {})
 	if err != nil {
 		t.Fatal("failed to load after concurrent saves:", err)
+	}
+}
+
+// L'indice tiene i vettori come []float64, e lo snapshot li deve salvare: gob
+// codifica dentro un'interfaccia solo i tipi registrati, e []float64 è fra i
+// tipi base che registra da sé.
+func TestSnapshotKeepsAFloatVector(t *testing.T) {
+	dir := tempDir(t)
+	p := NewPersistence(Options{DataDir: dir})
+	defer p.Wait()
+	vettore := []float64{0.5, -0.25, 0.125}
+	data := map[string]IndexData{"atti": {Settings: engine.DefaultSettings(), Docs: []DocRecord{
+		{ID: "1", Data: map[string]interface{}{"title": "delibera", "_vector": vettore}},
+	}}}
+	if err := p.writeToDisk(data); err != nil {
+		t.Fatal("snapshot con un vettore []float64:", err)
+	}
+
+	var letto interface{}
+	if err := p.LoadIndexes(func(_ string, docs []DocRecord, _ engine.Settings) {
+		letto = docs[0].Data["_vector"]
+	}); err != nil {
+		t.Fatal("LoadIndexes:", err)
+	}
+	if !reflect.DeepEqual(letto, vettore) {
+		t.Fatalf("vettore ricaricato %#v, atteso %#v", letto, vettore)
 	}
 }

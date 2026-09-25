@@ -95,6 +95,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   took `_vector` too: every value of the embedding became an index term, and
   the document grew by as many tokens, which BM25 reads as length. `_vector` is
   never indexed as text.
+- A vector that arrived over HTTP or from the snapshot was a []interface{},
+  and every search copied it into a new []float64 for every document, twice
+  with `hybrid_mode: union`. It is now converted once when the document is
+  added. Scores are the same to the bit.
 - Integer ids were dropped with a `202` and `skipped: 1`. They are now accepted
   and stored as their canonical string (`7`, and `1000000` rather than `1e+06`).
 - Documents without a valid `id` were silently dropped while the API reported success.

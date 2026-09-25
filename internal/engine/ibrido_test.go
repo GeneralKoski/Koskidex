@@ -93,3 +93,39 @@ func TestVectorTopKDefaultAndWrongDimensions(t *testing.T) {
 		}
 	}
 }
+
+// Un vettore arrivato come []interface{}, come lo decodificano JSON e gob,
+// si converte una volta sola all'aggiunta: la ricerca non lo ricopia per ogni
+// documento.
+func TestAVectorIsStoredAsFloats(t *testing.T) {
+	s := impostazioniIbride("", 2)
+	idx := indiceIbrido(s)
+	doc, _ := idx.GetDocument("semantico")
+	if v, ok := doc["_vector"].([]float64); !ok || !reflect.DeepEqual(v, []float64{0.98, 0.2}) {
+		t.Fatalf("_vector salvato come %#v, atteso []float64{0.98, 0.2}", doc["_vector"])
+	}
+}
+
+// La conversione non cambia niente: stessi punteggi, al bit, con i vettori dati
+// come []interface{} o come []float64, in ogni modo di usare il vettore.
+func TestVectorScoresDoNotDependOnTheVectorType(t *testing.T) {
+	comeFloat := func(s Settings) *InvertedIndex {
+		idx := NewInvertedIndex()
+		idx.AddDocument("lessicale", map[string]interface{}{"text": "contratto di manutenzione", "_vector": []float64{1.0, 0.0}}, s)
+		idx.AddDocument("semantico", map[string]interface{}{"text": "accordo di assistenza tecnica", "_vector": []float64{0.98, 0.2}}, s)
+		idx.AddDocument("lontano", map[string]interface{}{"text": "delibera sul bilancio", "_vector": []float64{0.0, 1.0}}, s)
+		return idx
+	}
+	q := []float64{0.6, 0.8}
+	for _, s := range []Settings{impostazioniIbride("", 3), impostazioniIbride(HybridUnion, 3), impostazioniIbride(HybridVector, 3),
+		func() Settings { s := impostazioniIbride("", 3); s.FusionMode = FusionRRF; return s }(),
+		func() Settings { s := impostazioniIbride("", 3); s.FusionMode = FusionConvex; return s }()} {
+		for _, query := range []string{"contratto", ""} {
+			a, _ := indiceIbrido(s).SearchScored(query, s, "0", q)
+			b, _ := comeFloat(s).SearchScored(query, s, "0", q)
+			if !reflect.DeepEqual(a, b) {
+				t.Fatalf("modo %q fusione %q query %q: %v contro %v", s.HybridMode, s.FusionMode, query, a, b)
+			}
+		}
+	}
+}

@@ -323,19 +323,9 @@ func (s *Server) aggiungiVettori(ctx context.Context, name string, docs []map[st
 		return err
 	}
 	for j, i := range dove {
-		docs[i]["_vector"] = comeLista(vettori[j])
+		docs[i]["_vector"] = vettori[j]
 	}
 	return nil
-}
-
-// comeLista stores a vector as JSON would decode it: the snapshot's gob only
-// knows []interface{}, and the search reads both.
-func comeLista(v []float64) []interface{} {
-	out := make([]interface{}, len(v))
-	for i, x := range v {
-		out[i] = x
-	}
-	return out
 }
 
 func (s *Server) handleListDocuments(w http.ResponseWriter, r *http.Request) {

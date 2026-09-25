@@ -130,7 +130,14 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 	// id (update) doesn't leave stale postings behind or double-count terms.
 	idx.deleteDocumentLocked(docID)
 
-	// Store document
+	// Store document. A vector decoded from JSON or gob is a []interface{}:
+	// converted here once, the search reads it without copying it for every
+	// document. The caller's map gets the []float64 too.
+	if v, ok := doc["_vector"]; ok {
+		if dv, ok := toFloat64Array(v); ok {
+			doc["_vector"] = dv
+		}
+	}
 	idx.docs[docID] = doc
 
 	// Determine searchable fields
