@@ -24,6 +24,39 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-25 - Analisi italiana: elisioni, stopword, stemmer leggero
+
+**Flag:** `Settings.ElisionArticles` (`elision_articles`), vuoto = comportamento
+di oggi; `Settings.Stemmer = "italian_light"`; `ItalianStopWords()` per
+`Settings.StopWords`. Tutti spenti per default.
+
+**Perché.** Con `tokenizer: "standard"`, quello che l'innesto in Documentale usa
+per avere gli insiemi di Elasticsearch, *dell'infanzia* resta un termine solo e
+chi cerca "infanzia" non trova l'atto. In produzione succede in quattro atti su
+dieci (`risultati/esperimenti/2026-09-25_elisioni/` nel repository della tesi).
+
+### Cosa cambia
+
+I tre stadi dell'analizzatore `italian` di Elasticsearch, identici a Lucene:
+`ElisionFilter` con i `DEFAULT_ARTICLES` di `ItalianAnalyzer`, la lista di
+stopword di Snowball, `ItalianLightStemmer` (Savoy, CLEF 2001), controllato
+sulle 35.494 parole del vocabolario di prova di Lucene. L'elisione toglie la
+parte prima del primo apostrofo (`'` o `’`) se è un articolo, prima del
+controllo delle stopword, come Lucene.
+
+### Prima di misurare
+
+Si misura solo l'elisione, dall'app: stopword e stemmer italiani aspettano le
+known-item scritte da persone, perché quelle automatiche sono fatte di un
+numero e di un comune e non li mettono alla prova. Le previsioni sono nel
+README dell'esperimento (`risultati/esperimenti/2026-09-25_elisioni-koskidex/`),
+committato prima delle misure e dopo il codice, e lo dice. In breve: Koskidex
+senza elisione perde le stesse coppie di Elasticsearch; con l'elisione ne
+recupera almeno il 99%, come il filtro di Elasticsearch; sulle altre query non
+toglie documenti e sulle known-item l'MRR@10 cambia di meno di 0,01.
+
+---
+
 ## 2026-09-25 - Fra `all` e `any`: recupero intermedio e coordinazione
 
 **Flag:** `Settings.MinimumShouldMatch` (`minimum_should_match`), vuoto =
