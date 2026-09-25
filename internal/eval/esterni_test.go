@@ -118,3 +118,44 @@ func TestAlignRefusesIDsOutsideTheCorpus(t *testing.T) {
 		t.Fatalf("deve dire quale id non sta nel corpus: %v", err)
 	}
 }
+
+// Un rapporto registrato si valuta con lo stesso codice delle metriche di
+// Koskidex: due motori, un solo modo di contare.
+func TestExternalRunIsScoredByTheSameRunner(t *testing.T) {
+	run, err := LoadExternalRun(rapporto(t, rapportoElasticsearch))
+	if err != nil {
+		t.Fatal(err)
+	}
+	domande := map[string]string{"q-1": "determina 1223 crispiano", "q-2": "ordinanza 187"}
+	qrels := Qrels{"q-1": {"doc-0007": 2}, "q-2": {"doc-0001": 2}}
+
+	res := Run(run, "elasticsearch", "albo", domande, qrels)
+
+	// q-1 ha l'atto giusto al secondo posto, q-2 non trova niente.
+	if res.Queries != 2 || res.ZeroResults != 1 || res.MeanMRR10 != 0.25 {
+		t.Fatalf("attese 2 query, 1 a vuoto, MRR@10 0,25: %+v", res)
+	}
+}
+
+func TestExternalRunSearchCutsAtKAndCountsEverything(t *testing.T) {
+	run, err := LoadExternalRun(rapporto(t, rapportoElasticsearch))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids, trovati := run.Search(" determina 1223 crispiano", 1)
+	if len(ids) != 1 || ids[0] != "doc-0002" || trovati != 2 {
+		t.Fatalf("atteso il primo dei due, e 2 trovati in tutto: %v %d", ids, trovati)
+	}
+}
+
+// I tempi di un run esterno sono quelli misurati dall'app, non quelli di una
+// lettura da una mappa.
+func TestExternalRunKeepsTheRecordedTimes(t *testing.T) {
+	run, err := LoadExternalRun(rapporto(t, rapportoElasticsearch))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if run.Ms["determina 1223 crispiano"] != 12.5 || run.Ms["ordinanza 187"] != 8.1 {
+		t.Fatalf("tempi letti male: %v", run.Ms)
+	}
+}

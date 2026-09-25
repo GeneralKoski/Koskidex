@@ -5,6 +5,13 @@
 //	go run ./scripts/evaluate -collection scifact -run legacy
 //
 // The collections are not in git: fetch them with eval/corpora/fetch.sh.
+//
+// With -rankings it scores another engine instead of Koskidex: the report of
+// Documentale's app:eval-run-queries, run on the same queries, goes through
+// the same metric code, so the two engines are counted the same way.
+//
+//	go run ./scripts/evaluate -corpora eval/corpora/c3-albo -collection known-item-auto \
+//	    -run elasticsearch -rankings rapporto.json -archivio valutazioni-albo
 package main
 
 import (
@@ -13,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/GeneralKoski/Koskidex/internal/engine"
@@ -27,6 +35,8 @@ func main() {
 	modo := flag.String("mode", engine.RetrievalAll, "modalita' di recupero: all (congiuntivo) oppure any (disgiuntivo)")
 	punteggio := flag.String("scoring", engine.ScoringLegacy, "modalita' di punteggio: legacy oppure bm25")
 	analisi := flag.String("analyzer", "none", "analisi lessicale: none, stopwords, stemmer, english (stopword + stemmer)")
+	rankings := flag.String("rankings", "", "rapporto di app:eval-run-queries da valutare al posto di Koskidex")
+	archivio := flag.String("archivio", "koskidex-beir", "sottocartella dell'archivio dei risultati")
 	flag.Parse()
 
 	if *modo != engine.RetrievalAll && *modo != engine.RetrievalAny {
@@ -44,7 +54,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi); err != nil {
+	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi, *rankings, *archivio); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
 	}
@@ -63,7 +73,7 @@ var analisiLessicali = map[string]func(*engine.Settings){
 	},
 }
 
-func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi string) error {
+func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string) error {
 	dir := filepath.Join(radice, collezione)
 	if _, err := os.Stat(dir); err != nil {
 		return fmt.Errorf("collezione %q non trovata in %s, lancia eval/corpora/fetch.sh", collezione, radice)
@@ -86,31 +96,39 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi string
 		return err
 	}
 
-	fmt.Printf("%s: %d documenti, %d query da valutare (su %d nel file), recupero %q, punteggio %q, analisi %q\n",
-		collezione, len(docs), len(daValutare), len(queries), modo, punteggio, analisi)
+	var res eval.Results
+	if rankings != "" {
+		res, err = valutaEsterno(rankings, docs, daValutare, qrels, nomeRun, collezione)
+		if err != nil {
+			return err
+		}
+	} else {
+		fmt.Printf("%s: %d documenti, %d query da valutare (su %d nel file), recupero %q, punteggio %q, analisi %q\n",
+			collezione, len(docs), len(daValutare), len(queries), modo, punteggio, analisi)
 
-	fmt.Print("indicizzo... ")
-	t0 := time.Now()
-	searcher := eval.NewKoskidexSearcher(docs, func(st *engine.Settings) {
-		st.RetrievalMode = modo
-		st.ScoringMode = punteggio
-		analisiLessicali[analisi](st)
-	})
-	indicizzazione := time.Since(t0)
-	fmt.Println(indicizzazione.Round(time.Millisecond))
+		fmt.Print("indicizzo... ")
+		t0 := time.Now()
+		searcher := eval.NewKoskidexSearcher(docs, func(st *engine.Settings) {
+			st.RetrievalMode = modo
+			st.ScoringMode = punteggio
+			analisiLessicali[analisi](st)
+		})
+		indicizzazione := time.Since(t0)
+		fmt.Println(indicizzazione.Round(time.Millisecond))
 
-	fmt.Print("valuto... ")
-	res := eval.Run(searcher, nomeRun, collezione, daValutare, qrels)
-	fmt.Println(res.Elapsed)
+		fmt.Print("valuto... ")
+		res = eval.Run(searcher, nomeRun, collezione, daValutare, qrels)
+		fmt.Println(res.Elapsed)
 
-	res.Timings.IndexMs = float64(indicizzazione.Nanoseconds()) / 1e6
-	res.Config = eval.Provenienza(".")
+		res.Timings.IndexMs = float64(indicizzazione.Nanoseconds()) / 1e6
+		res.Config = eval.Provenienza(".")
+		res.Config["recupero"] = modo
+		res.Config["punteggio"] = punteggio
+		res.Config["analisi"] = analisi
+		res.Config["refusi"] = "0"
+	}
 	res.Config["collezione"] = collezione
 	res.Config["documenti"] = fmt.Sprint(len(docs))
-	res.Config["recupero"] = modo
-	res.Config["punteggio"] = punteggio
-	res.Config["analisi"] = analisi
-	res.Config["refusi"] = "0"
 	if impronta, err := eval.ImprontaFile(filepath.Join(dir, "corpus.jsonl")); err == nil {
 		res.Config["corpus_sha256"] = impronta
 	}
@@ -131,7 +149,7 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi string
 	if _, err := f.Write(buf.Bytes()); err != nil {
 		return err
 	}
-	archiviato, err := eval.Archivia("koskidex-beir", fmt.Sprintf("%s-%s", collezione, nomeRun), buf.Bytes())
+	archiviato, err := eval.Archivia(archivio, fmt.Sprintf("%s-%s", collezione, nomeRun), buf.Bytes())
 	if err != nil {
 		return fmt.Errorf("archiviazione fallita: %w", err)
 	}
@@ -154,4 +172,36 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi string
 		fmt.Println("!!! Il file qui sopra verra' sovrascritto alla prossima esecuzione.")
 	}
 	return nil
+}
+
+// valutaEsterno scores a recorded run. The per-query times are the ones the
+// app measured: timing a lookup in a map would say nothing about the engine.
+func valutaEsterno(path string, docs []eval.Document, domande map[string]string, qrels eval.Qrels, nomeRun, collezione string) (eval.Results, error) {
+	run, err := eval.LoadExternalRun(path)
+	if err != nil {
+		return eval.Results{}, err
+	}
+	nelCorpus := make(map[string]bool, len(docs))
+	for _, d := range docs {
+		nelCorpus[d.ID] = true
+	}
+	if _, err := run.Align(domande, nelCorpus); err != nil {
+		return eval.Results{}, err
+	}
+
+	fmt.Printf("%s: %d documenti, %d query da valutare, ranking di %s da %s\n",
+		collezione, len(docs), len(domande), run.Name, filepath.Base(path))
+	res := eval.Run(run, nomeRun, collezione, domande, qrels)
+	for qid := range res.Timings.PerQueryMs {
+		res.Timings.PerQueryMs[qid] = run.Ms[strings.TrimSpace(domande[qid])]
+	}
+
+	res.Config = eval.Provenienza(".")
+	res.Config["motore"] = run.Name
+	res.Config["rapporto"] = filepath.Base(path)
+	if impronta, err := eval.ImprontaFile(path); err == nil {
+		res.Config["rapporto_sha256"] = impronta
+	}
+
+	return res, nil
 }

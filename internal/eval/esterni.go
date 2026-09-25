@@ -19,6 +19,8 @@ import (
 type ExternalRun struct {
 	Name    string
 	ByQuery map[string][]string
+	// Ms is the time the app measured for each query, in milliseconds.
+	Ms map[string]float64
 }
 
 // LoadExternalRun reads a report of app:eval-run-queries.
@@ -34,6 +36,7 @@ func LoadExternalRun(path string) (ExternalRun, error) {
 		Query []struct {
 			Query string    `json:"query"`
 			IDs   *[]string `json:"ids"`
+			Ms    float64   `json:"ms"`
 		} `json:"query"`
 	}
 	if err := json.Unmarshal(dati, &r); err != nil {
@@ -43,7 +46,8 @@ func LoadExternalRun(path string) (ExternalRun, error) {
 		return ExternalRun{}, fmt.Errorf("%s: nessuna query, non sembra un rapporto di app:eval-run-queries", path)
 	}
 
-	run := ExternalRun{Name: r.Config.Motore, ByQuery: make(map[string][]string, len(r.Query))}
+	run := ExternalRun{Name: r.Config.Motore, ByQuery: make(map[string][]string, len(r.Query)),
+		Ms: make(map[string]float64, len(r.Query))}
 	for _, q := range r.Query {
 		testo := strings.TrimSpace(q.Query)
 		// Un ranking vuoto e un ranking assente non sono la stessa cosa: il
@@ -55,6 +59,7 @@ func LoadExternalRun(path string) (ExternalRun, error) {
 			return ExternalRun{}, fmt.Errorf("%s: la query %q compare due volte con due ranking diversi", path, testo)
 		}
 		run.ByQuery[testo] = *q.IDs
+		run.Ms[testo] = q.Ms
 	}
 
 	return run, nil
@@ -92,4 +97,16 @@ func (r ExternalRun) Align(queries map[string]string, corpus map[string]bool) (m
 	}
 
 	return out, nil
+}
+
+// Search makes a recorded run a Searcher, so Run scores it with the same code
+// as Koskidex. A query the run did not execute comes back empty: Align is the
+// place that refuses it.
+func (r ExternalRun) Search(query string, k int) ([]string, int) {
+	ids := r.ByQuery[strings.TrimSpace(query)]
+	if len(ids) > k {
+		return ids[:k], len(ids)
+	}
+
+	return ids, len(ids)
 }
