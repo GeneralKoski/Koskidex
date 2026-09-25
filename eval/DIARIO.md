@@ -61,6 +61,29 @@ vincolo del campo unico non cambia quasi niente.
 Le collezioni pubbliche non si misurano: `KoskidexSearcher` spegne i refusi, e
 lì l'impostazione non agisce per costruzione.
 
+### Dopo
+
+Commit `ae1c4b9`, albero pulito, dall'app con Documentale `ab52f4f`. Esito
+`risultati/esperimenti/2026-09-25_refusi-numeri/2026-09-25T093350Z_esito.json`.
+
+| known-item, dall'app | MRR@10 | atto primo | entro 10 | a vuoto |
+|---|---|---|---|---|
+| campo unico, refusi sui numeri (oggi) | 0,018 | 5 | 6 | 211 |
+| campo unico, numeri esatti | 0,020 | 6 | 6 | 285 |
+| parole libere, refusi sui numeri | 0,548 | 115 | 280 | 0 |
+| **parole libere, numeri esatti** | **0,950** | **275** | **299** | **0** |
+
+Le quattro previsioni tengono. Nei 25 casi rimasti vince un atto con lo stesso
+numero esatto in un campo più pesante (21), o comunque esatto (3), o il codice
+misto `a647` battuto da `a649` (1). Sulle 24 query del confronto cambiano solo
+`ordinanza 187` e `determina 1223`, e si riducono all'atto giusto, primo. Da
+sbagliare c'era una cosa: con il campo unico le query a vuoto non restano al
+70%, salgono al 95%, perché quel vincolo lasciava rispondere soprattutto i
+numeri a un refuso.
+
+Resta spenta per default, come tutte: la scelta dei default si fa alla fine,
+tutte insieme.
+
 ---
 
 ## 2026-09-25 - BM25: le espansioni pesate con la frequenza mescolata
