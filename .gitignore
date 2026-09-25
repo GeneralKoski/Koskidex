@@ -59,3 +59,6 @@ tmp/
 # Corpus di dominio: si riscarica con eval/corpora/fetch-albo.py
 /eval/corpora/c3-albo/*
 !/eval/corpora/c3-albo/SOURCE.md
+
+# Evaluation outputs (the thesis archive keeps the runs that count)
+/eval/results/

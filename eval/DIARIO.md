@@ -9,13 +9,18 @@ parametro è stato scelto così, ed è la risposta alla domanda che in discussio
 arriva: le metriche sono state scelte dopo aver visto i risultati? Un'ipotesi
 scritta prima e smentita dai numeri vale più di un risultato pulito senza storia.
 
-Regole, da `piano-autunno-2026.md`:
+Regole, oggi in `Magistrale/Tesi/piano.md` del repository `Universita-Martin`:
 
 1. Ogni modifica che cambia l'ordine sta **dietro un campo di `Settings`**, con
    il comportamento attuale come default.
 2. `TestBaselineRankingIsFrozen` deve continuare a passare a default, **senza
    modifiche al test**.
 3. Ogni modifica ha la sua voce qui.
+
+I file `eval/results/<nome>.json` citati nelle voci del 23/09/2026 non sono più
+nel repository dal 25/09/2026. L'ultima versione di ciascuno è identica, byte
+per byte, a `risultati/koskidex-beir/2026-09-23T155*_<nome>.json` nell'archivio
+della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 

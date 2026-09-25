@@ -10,7 +10,8 @@ confronto con Elasticsearch e' gia' stato fatto. Cambia solo cosa ci sta dentro.
 I dati non stanno in git. Si riscaricano con `../fetch-albo.py`.
 
 Task E2 di `piano-autunno-2026.md` (repository `Universita-Martin`,
-`Magistrale/Tesi/`). Cercate, provate e scelte il **23 settembre 2026**.
+`Magistrale/Tesi/`; rimosso il 25/09/2026, l'ultima versione è nel commit
+`5f9b080`). Cercate, provate e scelte il **23 settembre 2026**.
 
 ## Perche' l'albo pretorio
 

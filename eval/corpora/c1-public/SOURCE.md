@@ -7,7 +7,8 @@ I dati non stanno in git. Si riscaricano con `../fetch.sh`, che verifica l'MD5
 degli zip contro i valori fissati qui sotto.
 
 Task B1 di `piano-autunno-2026.md` (repository `Universita-Martin`,
-`Magistrale/Tesi/`). Scelte e scaricate il **23 settembre 2026**.
+`Magistrale/Tesi/`; rimosso il 25/09/2026, l'ultima versione è nel commit
+`5f9b080`). Scelte e scaricate il **23 settembre 2026**.
 
 ## Provenienza
 

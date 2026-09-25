@@ -4,7 +4,8 @@ Stato del repository nel momento in cui inizia il lavoro di tesi. Serve a sapere
 fra sei mesi, con quale toolchain e da quale codice sono nati i primi numeri.
 
 Task A0 di `piano-autunno-2026.md` (repository `Universita-Martin`,
-`Magistrale/Tesi/`).
+`Magistrale/Tesi/`; rimosso il 25/09/2026, l'ultima versione è nel commit
+`5f9b080`).
 
 ## 23 settembre 2026
 
