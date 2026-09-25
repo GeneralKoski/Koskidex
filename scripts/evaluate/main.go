@@ -44,6 +44,7 @@ func main() {
 	senzaPrefisso := flag.Bool("senza-prefisso", false, "spegne la ricerca per prefisso (Settings.DisablePrefixSearch)")
 	minimo := flag.String("minimum-should-match", "", "termini richiesti in recupero any, sintassi di Elasticsearch (Settings.MinimumShouldMatch)")
 	coordinazione := flag.Bool("coordinazione", false, "punteggio per quota di termini trovati, coord di Lucene (Settings.Coordination)")
+	split := flag.String("split", "test", "giudizi da usare, qrels/<split>.tsv: test, oppure train per chi impara dalle query")
 	flag.Parse()
 
 	if *modo != engine.RetrievalAll && *modo != engine.RetrievalAny {
@@ -70,7 +71,7 @@ func main() {
 		os.Exit(1)
 	}
 	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni,
-		minimo: *minimo, coordinazione: *coordinazione}
+		minimo: *minimo, coordinazione: *coordinazione, split: *split}
 	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi, *rankings, *archivio, opzioni); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
@@ -99,6 +100,7 @@ type opzioni struct {
 	espansioni    string
 	minimo        string
 	coordinazione bool
+	split         string
 }
 
 func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string, o opzioni) error {
@@ -115,7 +117,7 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 	if err != nil {
 		return err
 	}
-	qrels, err := eval.LoadQrels(filepath.Join(dir, "qrels", "test.tsv"))
+	qrels, err := eval.LoadQrels(filepath.Join(dir, "qrels", o.split+".tsv"))
 	if err != nil {
 		return err
 	}
@@ -181,6 +183,9 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		res.Config["ricerca_per_prefisso"] = "spenta"
 	}
 	res.Config["collezione"] = collezione
+	if o.split != "test" {
+		res.Config["split"] = o.split
+	}
 	res.Config["documenti"] = fmt.Sprint(len(docs))
 	if impronta, err := eval.ImprontaFile(filepath.Join(dir, "corpus.jsonl")); err == nil {
 		res.Config["corpus_sha256"] = impronta
