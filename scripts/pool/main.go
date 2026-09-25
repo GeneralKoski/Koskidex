@@ -4,7 +4,7 @@
 // Two steps, because between them there is a person.
 //
 //	go run ./scripts/pool -corpus c.jsonl -queries q.jsonl -out giudizi.tsv \
-//	    [-run rapporto-elasticsearch.json ...]
+//	    [-embedder bge-m3] [-composizione pool.json] [-run rapporto-elasticsearch.json ...]
 //	# si apre giudizi.tsv, si riempie la colonna "grado"
 //	go run ./scripts/pool -sheet giudizi.tsv -qrels qrels/test.tsv
 //
@@ -21,9 +21,15 @@
 // -run adds the rankings of another engine, as Documentale's
 // app:eval-run-queries records them, one flag per report. Without them the pool
 // is Koskidex's alone, and a document only Elasticsearch finds is never judged.
+//
+// -embedder adds the configurations with vectors, which bring documents with
+// none of the query's words. -composizione writes, ids only, which
+// configuration brought which document: the sheet does not say it, on purpose,
+// and the thesis needs it.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -31,24 +37,59 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/GeneralKoski/Koskidex/internal/embedder"
 	"github.com/GeneralKoski/Koskidex/internal/engine"
 	"github.com/GeneralKoski/Koskidex/internal/eval"
 )
 
-const campo = "text"
-
 type configurazione struct {
-	recupero  string
-	punteggio string
+	nome     string
+	vettori  bool
+	modifica func(*engine.Settings)
 }
 
-// Le tre configurazioni in gioco: quella di oggi e le due corrette. Il pool le
-// unisce tutte, cosi' nessuna delle tre viene giudicata su documenti scelti da
-// un'altra.
+func bm25(s *engine.Settings) {
+	s.ScoringMode = engine.ScoringBM25
+	s.BM25Expansion = engine.BM25ExpansionBlended
+}
+
+// Le configurazioni in gioco: quella di oggi, le correzioni del lessicale e,
+// con -embedder, le due ibride calibrate (2026-09-25_scelta-ibrida) e il solo
+// vettore. Il pool le unisce tutte, cosi' nessuna viene giudicata su documenti
+// scelti da un'altra.
 var configurazioni = []configurazione{
-	{engine.RetrievalAll, engine.ScoringLegacy},
-	{engine.RetrievalAny, engine.ScoringLegacy},
-	{engine.RetrievalAny, engine.ScoringBM25},
+	{"all-euristico", false, func(s *engine.Settings) { s.RetrievalMode = engine.RetrievalAll; s.ScoringMode = engine.ScoringLegacy }},
+	{"any-euristico", false, func(s *engine.Settings) { s.RetrievalMode = engine.RetrievalAny; s.ScoringMode = engine.ScoringLegacy }},
+	{"any-bm25", false, func(s *engine.Settings) { s.RetrievalMode = engine.RetrievalAny; s.ScoringMode = engine.ScoringBM25 }},
+	{"any-bm25-mescolata", false, func(s *engine.Settings) { s.RetrievalMode = engine.RetrievalAny; bm25(s) }},
+	{"all-bm25-mescolata", false, func(s *engine.Settings) { s.RetrievalMode = engine.RetrievalAll; bm25(s) }},
+	{"any-bm25-mescolata-italiano", false, func(s *engine.Settings) {
+		s.RetrievalMode = engine.RetrievalAny
+		bm25(s)
+		s.Tokenizer = engine.TokenizerStandard
+		s.ElisionArticles = engine.ItalianElisionArticles()
+		s.StopWords = engine.ItalianStopWords()
+		s.Stemmer = engine.StemmerItalianLight
+	}},
+	{"ibrida-A-any-160", true, func(s *engine.Settings) {
+		s.RetrievalMode = engine.RetrievalAny
+		bm25(s)
+		s.HybridMode = engine.HybridUnion
+		peso := 160.0
+		s.VectorWeight = &peso
+	}},
+	{"ibrida-B-all-10", true, func(s *engine.Settings) {
+		s.RetrievalMode = engine.RetrievalAll
+		bm25(s)
+		s.HybridMode = engine.HybridUnion
+		peso := 10.0
+		s.VectorWeight = &peso
+	}},
+	{"solo-vettore", true, func(s *engine.Settings) {
+		s.RetrievalMode = engine.RetrievalAny
+		bm25(s)
+		s.HybridMode = engine.HybridVector
+	}},
 }
 
 // rapporti collects -run, which can be given more than once.
@@ -69,16 +110,24 @@ func main() {
 	uscita := flag.String("out", "", "foglio di annotazione da scrivere")
 	foglio := flag.String("sheet", "", "foglio compilato da riconvertire")
 	qrels := flag.String("qrels", "", "file di giudizi da scrivere dal foglio")
+	modello := flag.String("embedder", "", "modello Ollama (per esempio bge-m3): aggiunge le configurazioni con i vettori")
+	ollama := flag.String("ollama", "", "URL di Ollama; vuoto = localhost:11434")
+	cacheVettori := flag.String("vettori-cache", "eval/cache/embeddings.jsonl", "cache dei vettori, la stessa di scripts/evaluate")
+	composizione := flag.String("composizione", "", "dove scrivere quale configurazione ha portato quale documento (solo id)")
 	var esterni rapporti
 	flag.Var(&esterni, "run", "rapporto di app:eval-run-queries da aggiungere al pool (ripetibile)")
 	flag.Parse()
+	var vettori *engine.EmbedderSettings
+	if *modello != "" {
+		vettori = &engine.EmbedderSettings{Source: embedder.SourceOllama, Model: *modello, URL: *ollama}
+	}
 
 	var err error
 	switch {
 	case *foglio != "":
 		err = converti(*foglio, *qrels)
 	case *corpus != "" && *queries != "":
-		err = prepara(*corpus, *queries, *uscita, *profondita, esterni)
+		err = prepara(*corpus, *queries, *uscita, *profondita, esterni, vettori, *cacheVettori, *composizione)
 	default:
 		flag.Usage()
 		os.Exit(1)
@@ -90,7 +139,8 @@ func main() {
 	}
 }
 
-func prepara(pathCorpus, pathQueries, out string, profondita int, esterni []string) error {
+func prepara(pathCorpus, pathQueries, out string, profondita int, esterni []string,
+	impostazioniVettori *engine.EmbedderSettings, cacheVettori, pathComposizione string) error {
 	if out == "" {
 		return fmt.Errorf("serve -out: dove scrivere il foglio")
 	}
@@ -121,14 +171,41 @@ func prepara(pathCorpus, pathQueries, out string, profondita int, esterni []stri
 		if rankingEsterni[i], err = run.Align(domande, nelCorpus); err != nil {
 			return err
 		}
-		nomiEsterni[i] = run.Name
+		// Il nome del motore non basta: dall'app Koskidex si interroga in piu'
+		// configurazioni. Si usa il nome del file senza l'ora.
+		nome := strings.TrimSuffix(filepath.Base(path), ".json")
+		if _, dopo, ok := strings.Cut(nome, "_"); ok {
+			nome = dopo
+		}
+		nomiEsterni[i] = nome
 	}
 
-	indici := make([]*engine.InvertedIndex, len(configurazioni))
-	impostazioni := make([]engine.Settings, len(configurazioni))
-	for i, c := range configurazioni {
-		indici[i], impostazioni[i] = indicizza(docs, c)
+	var vettori eval.Vettori
+	info := map[string]string{}
+	if impostazioniVettori != nil {
+		if vettori, info, err = eval.CalcolaVettori(*impostazioniVettori, cacheVettori, docs, domande); err != nil {
+			return err
+		}
 	}
+	var usate []configurazione
+	var cercatori []*eval.KoskidexSearcher
+	for _, c := range configurazioni {
+		if c.vettori && impostazioniVettori == nil {
+			continue
+		}
+		v := eval.Vettori{}
+		if c.vettori {
+			v = vettori
+		}
+		usate = append(usate, c)
+		cercatori = append(cercatori, eval.NewKoskidexSearcherConVettori(docs, c.modifica, v))
+	}
+	nomi := make([]string, 0, len(usate)+len(esterni))
+	for _, c := range usate {
+		nomi = append(nomi, c.nome)
+	}
+	nomi = append(nomi, nomiEsterni...)
+	portati := map[string]map[string][]string{}
 
 	ids := make([]string, 0, len(domande))
 	for id := range domande {
@@ -141,9 +218,9 @@ func prepara(pathCorpus, pathQueries, out string, profondita int, esterni []stri
 	for _, qid := range ids {
 		testo := domande[qid]
 
-		rankings := make([][]string, len(configurazioni))
-		for i := range configurazioni {
-			rankings[i], _ = indici[i].Search(testo, impostazioni[i], "0", nil)
+		rankings := make([][]string, len(cercatori))
+		for i, c := range cercatori {
+			rankings[i], _ = c.Search(testo, profondita)
 		}
 
 		// Quanti documenti porta solo chi sta fuori da Koskidex: se aggiungere
@@ -155,6 +232,10 @@ func prepara(pathCorpus, pathQueries, out string, profondita int, esterni []stri
 		}
 		pool := eval.PoolForQuery(rankings, profondita)
 		soloEsterni += len(pool) - soloKoskidex
+		portati[qid] = map[string][]string{}
+		for i, r := range rankings {
+			portati[qid][nomi[i]] = r[:min(profondita, len(r))]
+		}
 		if len(pool) == 0 {
 			senzaCandidati++
 
@@ -184,7 +265,19 @@ func prepara(pathCorpus, pathQueries, out string, profondita int, esterni []stri
 		return err
 	}
 
-	fmt.Printf("%d documenti, %d query, profondita' %d\n", len(docs), len(domande), profondita)
+	if pathComposizione != "" {
+		dati, err := json.MarshalIndent(map[string]interface{}{
+			"profondita": profondita, "configurazioni": nomi, "vettori": info, "query": portati,
+		}, "", "  ")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(pathComposizione, append(dati, '\n'), 0o644); err != nil {
+			return err
+		}
+	}
+
+	fmt.Printf("%d documenti, %d query, profondita' %d, configurazioni: %s\n", len(docs), len(domande), profondita, strings.Join(nomi, ", "))
 	fmt.Printf("scritto %s: %d giudizi da dare\n", out, len(righe))
 	if len(domande) > 0 {
 		fmt.Printf("  in media %.1f documenti per query\n", float64(len(righe))/float64(len(domande)-senzaCandidati))
@@ -257,23 +350,6 @@ func converti(pathFoglio, pathQrels string) error {
 	}
 
 	return nil
-}
-
-func indicizza(docs []eval.Document, c configurazione) (*engine.InvertedIndex, engine.Settings) {
-	s := engine.DefaultSettings()
-	s.SearchableFields = []string{campo}
-	s.FieldWeights = map[string]float64{campo: 1.0}
-	s.TypoTolerance.Enabled = false
-	s.RetrievalMode = c.recupero
-	s.ScoringMode = c.punteggio
-
-	idx := engine.NewInvertedIndex()
-	for _, d := range docs {
-		testo := strings.TrimSpace(d.Title + " " + d.Text)
-		idx.AddDocument(d.ID, map[string]interface{}{campo: testo}, s)
-	}
-
-	return idx, s
 }
 
 func estratto(s string, n int) string {

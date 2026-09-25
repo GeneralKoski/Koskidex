@@ -16,13 +16,10 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -230,7 +227,7 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		var vettori eval.Vettori
 		infoVettori := map[string]string{}
 		if o.embedder.Source != "" {
-			vettori, infoVettori, err = calcolaVettori(o, docs, daValutare)
+			vettori, infoVettori, err = eval.CalcolaVettori(o.embedder, o.cacheVettori, docs, daValutare)
 			if err != nil {
 				return err
 			}
@@ -379,66 +376,6 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 // the cache, so that a second run with the same model calls nothing. What it
 // records says which model, which weights, and how many vectors were computed
 // now rather than read from the cache.
-func calcolaVettori(o opzioni, docs []eval.Document, domande map[string]string) (eval.Vettori, map[string]string, error) {
-	ctx := context.Background()
-	client := &http.Client{Timeout: 10 * time.Minute}
-	e, err := embedder.New(o.embedder, client)
-	if err != nil {
-		return eval.Vettori{}, nil, err
-	}
-	digest, err := embedder.Digest(ctx, o.embedder, client)
-	if err != nil {
-		return eval.Vettori{}, nil, err
-	}
-	if err := os.MkdirAll(filepath.Dir(o.cacheVettori), 0o755); err != nil {
-		return eval.Vettori{}, nil, err
-	}
-	cache, err := embedder.OpenCache(o.cacheVettori)
-	if err != nil {
-		return eval.Vettori{}, nil, err
-	}
-	defer func() { _ = cache.Close() }()
-	prima := cache.Len()
-
-	t0 := time.Now()
-	testi := make([]string, len(docs))
-	for i, d := range docs {
-		testi[i] = eval.TestoDocumento(d)
-	}
-	const blocco = 256
-	v := eval.Vettori{Documenti: make(map[string][]float64, len(docs)), Query: make(map[string][]float64, len(domande))}
-	for i := 0; i < len(testi); i += blocco {
-		fine := min(i+blocco, len(testi))
-		out, err := cache.Embed(ctx, e, testi[i:fine])
-		if err != nil {
-			return eval.Vettori{}, nil, err
-		}
-		for j, vettore := range out {
-			v.Documenti[docs[i+j].ID] = vettore
-		}
-		fmt.Printf("\rvettori dei documenti: %d/%d", fine, len(testi))
-	}
-	fmt.Println()
-	var qtesti []string
-	for _, q := range domande {
-		qtesti = append(qtesti, q)
-	}
-	sort.Strings(qtesti)
-	out, err := cache.Embed(ctx, e, qtesti)
-	if err != nil {
-		return eval.Vettori{}, nil, err
-	}
-	for i, q := range qtesti {
-		v.Query[q] = out[i]
-	}
-
-	return v, map[string]string{
-		"embedder":        e.Nome(),
-		"embedder_digest": digest,
-		"vettori_ms":      fmt.Sprintf("%.0f", float64(time.Since(t0).Nanoseconds())/1e6),
-		"vettori_nuovi":   fmt.Sprint(cache.Len() - prima),
-	}, nil
-}
 
 // valutaEsterno scores a recorded run. The per-query times are the ones the
 // app measured: timing a lookup in a map would say nothing about the engine.
