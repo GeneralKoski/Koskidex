@@ -24,6 +24,58 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-25 - BM25: le espansioni pesate con la frequenza mescolata
+
+**Flag:** `Settings.BM25Expansion`, vuoto = comportamento di oggi; `"blended"`
+= la correzione. Conta solo con `ScoringMode = "bm25"`.
+
+**Perché.** Sulle 300 known-item `<numero> <comune>` BM25 fa MRR@10 0,709
+contro 0,975 dell'euristico. In 61 dei 115 fallimenti il primo classificato
+non contiene nessun termine della query: combacia solo per prefisso, `190` con
+`1900129` (`risultati/esperimenti/2026-09-25_bm25-numeri/` nel repository
+della tesi). `findDocsForToken` attribuisce il match al termine trovato, e
+`bm25Locked` usa la frequenza documentale di quel termine: un'espansione rara
+ha un IDF altissimo e batte il termine esatto, che è più comune. L'euristico non
+ci cade perché dà `+2` ai match esatti.
+
+### Cosa cambia
+
+Con `"blended"`, tutte le espansioni di un termine della query (prefisso e
+refusi, termine esatto compreso) usano la **frequenza documentale più alta** fra
+i termini che quel termine della query ha trovato nell'indice. È quello che fa
+Lucene per le ricerche fuzzy (`TopTermsBlendedFreqScoringRewrite`): un
+termine espanso non può pesare più del più comune dei suoi fratelli, quindi un
+codice raro che comincia con `190` pesa quanto `190`, non di più. Il TF resta
+quello del termine trovato nell'atto, come oggi.
+
+Non si tocca l'euristico, non si tocca il recupero: cambiano solo i punteggi,
+quindi gli insiemi restano identici.
+
+### Prima di misurare
+
+Numeri di partenza: known-item MRR@10 0,709 (BM25 di serie), 0,854 con la
+ricerca per prefisso spenta, 0,975 l'euristico. SciFact 0,6197 e NFCorpus
+0,2810 di nDCG@10 con BM25 senza analisi, 0,6641 e 0,3182 con le stopword.
+
+1. **Known-item: MRR@10 sopra 0,85**, almeno quanto spegnere il prefisso. Con
+   la frequenza mescolata l'espansione rara pesa quanto il numero esatto, e
+   l'atto giusto, che ha anche le parole del comune, torna davanti. Può fare
+   meglio di spegnere il prefisso, perché il prefisso resta e continua a
+   trovare le parole scritte a metà.
+2. **Known-item: resta sotto l'euristico.** Il divario che il prefisso non
+   spiega (da 0,854 a 0,975) non è toccato da questa modifica.
+3. **SciFact e NFCorpus cambiano meno di 0,01 di nDCG@10**, in un verso o
+   nell'altro. Lì i refusi sono spenti ma il prefisso no, quindi la modifica
+   agisce anche lì; ma sulle query in inglese in linguaggio naturale le
+   espansioni per prefisso sono rare e pesano poco sul totale.
+4. **Gli insiemi non cambiano**: stessi `candidates` per query in ogni file.
+
+Da non fare: scegliere fra questa e altre varianti guardando le 300 query. Se
+la 1 è smentita, la variante successiva si scrive qui con la sua ipotesi, prima
+di misurarla.
+
+---
+
 ## 2026-09-23 - Analisi lessicale: stopword e stemmer (Task E1)
 
 **Flag:** `Settings.Analyzer`, vuoto = comportamento di oggi. Terzo campo con
