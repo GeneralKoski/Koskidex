@@ -41,6 +41,9 @@ func Valida(s engine.EmbedderSettings) error {
 		if strings.TrimSpace(s.Model) == "" {
 			return errors.New("embedder: model is required")
 		}
+		if s.Context < 0 {
+			return errors.New("embedder: context must not be negative")
+		}
 		return nil
 	}
 	return fmt.Errorf("embedder: unknown source %q, use %q", s.Source, SourceOllama)
@@ -58,15 +61,23 @@ func New(s engine.EmbedderSettings, client *http.Client) (Embedder, error) {
 	if url == "" {
 		url = defaultOllamaURL
 	}
-	return &ollama{url: url, model: s.Model, client: client}, nil
+	return &ollama{url: url, model: s.Model, contesto: s.Context, client: client}, nil
 }
 
 type ollama struct {
 	url, model string
+	contesto   int
 	client     *http.Client
 }
 
-func (o *ollama) Nome() string { return SourceOllama + "/" + o.model }
+// Nome carries the context when one is set: the same text read up to a
+// different length is a different vector.
+func (o *ollama) Nome() string {
+	if o.contesto > 0 {
+		return fmt.Sprintf("%s/%s@%d", SourceOllama, o.model, o.contesto)
+	}
+	return SourceOllama + "/" + o.model
+}
 
 // Embed calls /api/embed, a block of texts at a time. Ollama returns the
 // vectors already normalised.
@@ -74,7 +85,11 @@ func (o *ollama) Embed(ctx context.Context, testi []string) ([][]float64, error)
 	out := make([][]float64, 0, len(testi))
 	for i := 0; i < len(testi); i += bloccoOllama {
 		blocco := testi[i:min(i+bloccoOllama, len(testi))]
-		corpo, err := json.Marshal(map[string]interface{}{"model": o.model, "input": blocco})
+		richiesta := map[string]interface{}{"model": o.model, "input": blocco}
+		if o.contesto > 0 {
+			richiesta["options"] = map[string]int{"num_ctx": o.contesto}
+		}
+		corpo, err := json.Marshal(richiesta)
 		if err != nil {
 			return nil, err
 		}

@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `embedder.context` setting: the number of tokens Ollama reads of each text,
+  sent as `num_ctx`. Zero keeps Ollama's default, which with bge-m3 is 2,048
+  tokens, so longer texts were embedded from their first 2,048 tokens only.
+  When set, the model name used by the vector cache and recorded in results
+  becomes `ollama/<model>@<context>`. `scripts/evaluate -contesto`.
 - `bm25_expansion` setting. With `"blended"`, BM25 weights every prefix or typo
   expansion of a query term with the highest document frequency among the
   index terms that query term matched, as Lucene does for fuzzy queries: a rare

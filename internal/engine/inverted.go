@@ -399,6 +399,11 @@ type EmbedderSettings struct {
 	// Fields whose values make up a document's text, in this order; empty is
 	// SearchableFields.
 	Fields []string `json:"fields"`
+	// Context is the number of tokens the model server reads of a text, sent
+	// to Ollama as num_ctx. Zero is the server's default, as up to now: with
+	// Ollama and bge-m3 that is 2,048 tokens, and the rest of a longer text
+	// does not reach the vector.
+	Context int `json:"context,omitempty"`
 }
 
 // TokenizerStandard is Elasticsearch's standard tokenizer (Unicode UAX#29) for

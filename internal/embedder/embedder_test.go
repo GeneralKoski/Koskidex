@@ -203,3 +203,75 @@ func TestDigestIsTheModelsVersion(t *testing.T) {
 		t.Fatal("un modello che Ollama non ha è un errore")
 	}
 }
+
+// richiestaCatturata answers /api/embed with one vector per text and keeps the
+// last request body, as raw JSON.
+func richiestaCatturata(t *testing.T, corpo *map[string]json.RawMessage) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		*corpo = req
+		var input []string
+		_ = json.Unmarshal(req["input"], &input)
+		out := make([][]float64, len(input))
+		for i := range out {
+			out[i] = []float64{1}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"embeddings": out})
+	}))
+}
+
+func TestTheDefaultContextSendsNoOptions(t *testing.T) {
+	var corpo map[string]json.RawMessage
+	srv := richiestaCatturata(t, &corpo)
+	defer srv.Close()
+	e, err := New(impostazioni(srv.URL), srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.Embed(context.Background(), []string{"x"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ci := corpo["options"]; ci || len(corpo) != 2 {
+		t.Fatalf("senza contesto la richiesta deve restare model e input, ottenuto %v", corpo)
+	}
+	if e.Nome() != "ollama/bge-m3" {
+		t.Fatalf("senza contesto il nome resta quello di sempre, ottenuto %q", e.Nome())
+	}
+}
+
+func TestAContextIsSentAsNumCtx(t *testing.T) {
+	var corpo map[string]json.RawMessage
+	srv := richiestaCatturata(t, &corpo)
+	defer srv.Close()
+	s := impostazioni(srv.URL)
+	s.Context = 8192
+	e, err := New(s, srv.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.Embed(context.Background(), []string{"x"}); err != nil {
+		t.Fatal(err)
+	}
+	var opzioni struct {
+		NumCtx int `json:"num_ctx"`
+	}
+	if err := json.Unmarshal(corpo["options"], &opzioni); err != nil || opzioni.NumCtx != 8192 {
+		t.Fatalf("atteso options.num_ctx 8192, ottenuto %s", corpo["options"])
+	}
+	if e.Nome() != "ollama/bge-m3@8192" {
+		t.Fatalf("il contesto deve entrare nel nome, per la cache: ottenuto %q", e.Nome())
+	}
+}
+
+func TestANegativeContextIsRejected(t *testing.T) {
+	s := impostazioni("")
+	s.Context = -1
+	if err := Valida(s); err == nil {
+		t.Fatal("un contesto negativo deve essere rifiutato")
+	}
+}

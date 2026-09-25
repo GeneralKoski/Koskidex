@@ -50,6 +50,7 @@ func main() {
 	elisione := flag.Bool("elisione", false, "toglie gli articoli elisi italiani, come l'analizzatore italian di Elasticsearch (Settings.ElisionArticles); vuole -tokenizer standard")
 	modello := flag.String("embedder", "", "modello Ollama per i vettori di documenti e query (per esempio bge-m3); vuoto = senza vettori")
 	ollama := flag.String("ollama", "", "URL di Ollama; vuoto = localhost:11434")
+	contesto := flag.Int("contesto", 0, "token che Ollama legge di ogni testo (EmbedderSettings.Context, num_ctx); 0 = il predefinito di Ollama, 2.048 con bge-m3")
 	ibrido := flag.String("ibrido", "", "chi portano i vettori fra i candidati: vuoto (riordinano i lessicali), union o vector (Settings.HybridMode); vuole -embedder")
 	vettoriK := flag.Int("vettori-k", 0, "quanti documenti porta il vettore con -ibrido (Settings.VectorTopK); 0 = 100")
 	fusione := flag.String("fusione", "", "come si fondono lessicale e vettore: vuoto (somma, lessicale + sim * peso), rrf o convex (Settings.FusionMode); vuole -embedder")
@@ -127,7 +128,7 @@ func main() {
 	}
 	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni,
 		minimo: *minimo, coordinazione: *coordinazione, split: *split, tokenizer: *tokenizer, elisione: *elisione,
-		embedder: engine.EmbedderSettings{Model: *modello, URL: *ollama}, cacheVettori: *cacheVettori,
+		embedder: engine.EmbedderSettings{Model: *modello, URL: *ollama, Context: *contesto}, cacheVettori: *cacheVettori,
 		ibrido: *ibrido, vettoriK: *vettoriK, fusione: *fusione, pesoVettore: peso, alfa: pesoLessicale}
 	if *modello != "" {
 		opzioni.embedder.Source = embedder.SourceOllama
