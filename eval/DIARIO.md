@@ -85,6 +85,13 @@ Previsioni per la correzione:
 5. Con `Context` a zero la richiesta resta `model` e `input`, byte per byte: i
    vettori in cache e le valutazioni archiviate restano validi.
 
+Esito: **4 confermata.** Dall'embedder di Koskidex, sul testo più lungo, il
+vettore con `Context` 8.192 è quello che Ollama dà leggendo 8.192 token
+(stesse prime componenti, -0,0326 0,0134 -0,0324), e con zero è quello dei
+2.048 token (-0,0155 -0,0232 -0,0435). **5 confermata**:
+`TestTheDefaultContextSendsNoOptions` passa senza modifiche, e con lui
+`TestBaselineRankingIsFrozen`.
+
 ---
 
 ## 2026-09-25 - Difetto 3: fondere scale incomparabili

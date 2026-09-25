@@ -400,9 +400,10 @@ type EmbedderSettings struct {
 	// SearchableFields.
 	Fields []string `json:"fields"`
 	// Context is the number of tokens the model server reads of a text, sent
-	// to Ollama as num_ctx. Zero is the server's default, as up to now: with
-	// Ollama and bge-m3 that is 2,048 tokens, and the rest of a longer text
-	// does not reach the vector.
+	// to Ollama as both num_ctx and num_batch: Ollama cuts an input at the
+	// smaller of the two. Zero is the server's default, as up to now: with
+	// Ollama that is 2,048 tokens, and the rest of a longer text does not
+	// reach the vector.
 	Context int `json:"context,omitempty"`
 }
 

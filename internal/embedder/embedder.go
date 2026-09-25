@@ -87,7 +87,7 @@ func (o *ollama) Embed(ctx context.Context, testi []string) ([][]float64, error)
 		blocco := testi[i:min(i+bloccoOllama, len(testi))]
 		richiesta := map[string]interface{}{"model": o.model, "input": blocco}
 		if o.contesto > 0 {
-			richiesta["options"] = map[string]int{"num_ctx": o.contesto}
+			richiesta["options"] = map[string]int{"num_ctx": o.contesto, "num_batch": o.contesto}
 		}
 		corpo, err := json.Marshal(richiesta)
 		if err != nil {

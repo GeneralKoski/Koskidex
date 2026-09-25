@@ -258,10 +258,11 @@ func TestAContextIsSentAsNumCtx(t *testing.T) {
 		t.Fatal(err)
 	}
 	var opzioni struct {
-		NumCtx int `json:"num_ctx"`
+		NumCtx   int `json:"num_ctx"`
+		NumBatch int `json:"num_batch"`
 	}
-	if err := json.Unmarshal(corpo["options"], &opzioni); err != nil || opzioni.NumCtx != 8192 {
-		t.Fatalf("atteso options.num_ctx 8192, ottenuto %s", corpo["options"])
+	if err := json.Unmarshal(corpo["options"], &opzioni); err != nil || opzioni.NumCtx != 8192 || opzioni.NumBatch != 8192 {
+		t.Fatalf("attesi options.num_ctx e num_batch 8192, ottenuto %s", corpo["options"])
 	}
 	if e.Nome() != "ollama/bge-m3@8192" {
 		t.Fatalf("il contesto deve entrare nel nome, per la cache: ottenuto %q", e.Nome())
