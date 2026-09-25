@@ -185,3 +185,21 @@ func TestDocumentText(t *testing.T) {
 		t.Fatalf("numeri: %q", got)
 	}
 }
+
+func TestDigestIsTheModelsVersion(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/tags" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"models":[{"name":"altro:latest","digest":"aaa"},{"name":"bge-m3:latest","digest":"790764642607"}]}`))
+	}))
+	defer srv.Close()
+	d, err := Digest(context.Background(), impostazioni(srv.URL), srv.Client())
+	if err != nil || d != "790764642607" {
+		t.Fatalf("digest %q, errore %v", d, err)
+	}
+	if _, err := Digest(context.Background(), engine.EmbedderSettings{Source: SourceOllama, Model: "manca", URL: srv.URL}, srv.Client()); err == nil {
+		t.Fatal("un modello che Ollama non ha è un errore")
+	}
+}

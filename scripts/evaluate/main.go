@@ -16,13 +16,17 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/GeneralKoski/Koskidex/internal/embedder"
 	"github.com/GeneralKoski/Koskidex/internal/engine"
 	"github.com/GeneralKoski/Koskidex/internal/eval"
 )
@@ -46,6 +50,9 @@ func main() {
 	coordinazione := flag.Bool("coordinazione", false, "punteggio per quota di termini trovati, coord di Lucene (Settings.Coordination)")
 	tokenizer := flag.String("tokenizer", "", "tokenizer: vuoto (spezza su tutto cio' che non e' lettera o cifra) o standard (Settings.Tokenizer)")
 	elisione := flag.Bool("elisione", false, "toglie gli articoli elisi italiani, come l'analizzatore italian di Elasticsearch (Settings.ElisionArticles); vuole -tokenizer standard")
+	modello := flag.String("embedder", "", "modello Ollama per i vettori di documenti e query (per esempio bge-m3); vuoto = senza vettori")
+	ollama := flag.String("ollama", "", "URL di Ollama; vuoto = localhost:11434")
+	cacheVettori := flag.String("vettori-cache", "eval/cache/embeddings.jsonl", "cache dei vettori, per modello e testo: si calcolano una volta sola")
 	split := flag.String("split", "test", "giudizi da usare, qrels/<split>.tsv: test, oppure train per chi impara dalle query")
 	flag.Parse()
 
@@ -84,7 +91,11 @@ func main() {
 		os.Exit(1)
 	}
 	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni,
-		minimo: *minimo, coordinazione: *coordinazione, split: *split, tokenizer: *tokenizer, elisione: *elisione}
+		minimo: *minimo, coordinazione: *coordinazione, split: *split, tokenizer: *tokenizer, elisione: *elisione,
+		embedder: engine.EmbedderSettings{Model: *modello, URL: *ollama}, cacheVettori: *cacheVettori}
+	if *modello != "" {
+		opzioni.embedder.Source = embedder.SourceOllama
+	}
 	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi, *rankings, *archivio, opzioni); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
@@ -122,6 +133,8 @@ type opzioni struct {
 	split         string
 	tokenizer     string
 	elisione      bool
+	embedder      engine.EmbedderSettings
+	cacheVettori  string
 }
 
 func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string, o opzioni) error {
@@ -157,9 +170,18 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		fmt.Printf("%s: %d documenti, %d query da valutare (su %d nel file), recupero %q, punteggio %q, analisi %q\n",
 			collezione, len(docs), len(daValutare), len(queries), modo, punteggio, analisi)
 
+		var vettori eval.Vettori
+		infoVettori := map[string]string{}
+		if o.embedder.Source != "" {
+			vettori, infoVettori, err = calcolaVettori(o, docs, daValutare)
+			if err != nil {
+				return err
+			}
+		}
+
 		fmt.Print("indicizzo... ")
 		t0 := time.Now()
-		searcher := eval.NewKoskidexSearcher(docs, func(st *engine.Settings) {
+		searcher := eval.NewKoskidexSearcherConVettori(docs, func(st *engine.Settings) {
 			st.RetrievalMode = modo
 			st.ScoringMode = punteggio
 			st.BM25K1 = o.k1
@@ -173,7 +195,7 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 				st.ElisionArticles = engine.ItalianElisionArticles()
 			}
 			analisiLessicali[analisi](st)
-		})
+		}, vettori)
 		indicizzazione := time.Since(t0)
 		fmt.Println(indicizzazione.Round(time.Millisecond))
 
@@ -205,6 +227,9 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		}
 		if o.elisione {
 			res.Config["elisione"] = "articoli italiani"
+		}
+		for k, v := range infoVettori {
+			res.Config[k] = v
 		}
 	}
 	if o.top > 0 {
@@ -261,6 +286,71 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		fmt.Println("!!! Il file qui sopra verra' sovrascritto alla prossima esecuzione.")
 	}
 	return nil
+}
+
+// calcolaVettori embeds every document and every query to evaluate through
+// the cache, so that a second run with the same model calls nothing. What it
+// records says which model, which weights, and how many vectors were computed
+// now rather than read from the cache.
+func calcolaVettori(o opzioni, docs []eval.Document, domande map[string]string) (eval.Vettori, map[string]string, error) {
+	ctx := context.Background()
+	client := &http.Client{Timeout: 10 * time.Minute}
+	e, err := embedder.New(o.embedder, client)
+	if err != nil {
+		return eval.Vettori{}, nil, err
+	}
+	digest, err := embedder.Digest(ctx, o.embedder, client)
+	if err != nil {
+		return eval.Vettori{}, nil, err
+	}
+	if err := os.MkdirAll(filepath.Dir(o.cacheVettori), 0o755); err != nil {
+		return eval.Vettori{}, nil, err
+	}
+	cache, err := embedder.OpenCache(o.cacheVettori)
+	if err != nil {
+		return eval.Vettori{}, nil, err
+	}
+	defer func() { _ = cache.Close() }()
+	prima := cache.Len()
+
+	t0 := time.Now()
+	testi := make([]string, len(docs))
+	for i, d := range docs {
+		testi[i] = eval.TestoDocumento(d)
+	}
+	const blocco = 256
+	v := eval.Vettori{Documenti: make(map[string][]float64, len(docs)), Query: make(map[string][]float64, len(domande))}
+	for i := 0; i < len(testi); i += blocco {
+		fine := min(i+blocco, len(testi))
+		out, err := cache.Embed(ctx, e, testi[i:fine])
+		if err != nil {
+			return eval.Vettori{}, nil, err
+		}
+		for j, vettore := range out {
+			v.Documenti[docs[i+j].ID] = vettore
+		}
+		fmt.Printf("\rvettori dei documenti: %d/%d", fine, len(testi))
+	}
+	fmt.Println()
+	var qtesti []string
+	for _, q := range domande {
+		qtesti = append(qtesti, q)
+	}
+	sort.Strings(qtesti)
+	out, err := cache.Embed(ctx, e, qtesti)
+	if err != nil {
+		return eval.Vettori{}, nil, err
+	}
+	for i, q := range qtesti {
+		v.Query[q] = out[i]
+	}
+
+	return v, map[string]string{
+		"embedder":        e.Nome(),
+		"embedder_digest": digest,
+		"vettori_ms":      fmt.Sprintf("%.0f", float64(time.Since(t0).Nanoseconds())/1e6),
+		"vettori_nuovi":   fmt.Sprint(cache.Len() - prima),
+	}, nil
 }
 
 // valutaEsterno scores a recorded run. The per-query times are the ones the

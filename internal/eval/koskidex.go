@@ -22,12 +22,34 @@ const campoUnico = "text"
 type KoskidexSearcher struct {
 	idx      *engine.InvertedIndex
 	settings engine.Settings
+	vettori  Vettori
+}
+
+// Vettori are the embeddings of a run with vectors: one per document, given
+// to the engine as _vector, and one per query text, passed with the search as
+// a client passes it over HTTP. Computing them is the caller's job, so the
+// engine sees exactly what it would see from Documentale.
+type Vettori struct {
+	Documenti map[string][]float64
+	Query     map[string][]float64
+}
+
+// TestoDocumento is the text a document is indexed with, and embedded from:
+// title and text in one field.
+func TestoDocumento(d Document) string {
+	return strings.TrimSpace(d.Title + " " + d.Text)
 }
 
 // NewKoskidexSearcher indexes the corpus and returns a searcher over it.
 // Applying extra settings, such as switching a ranking flag on, is done
 // through modifica, which runs before the documents are indexed.
 func NewKoskidexSearcher(docs []Document, modifica func(*engine.Settings)) *KoskidexSearcher {
+	return NewKoskidexSearcherConVettori(docs, modifica, Vettori{})
+}
+
+// NewKoskidexSearcherConVettori is NewKoskidexSearcher with vectors: a
+// document or a query without one is searched as without vectors.
+func NewKoskidexSearcherConVettori(docs []Document, modifica func(*engine.Settings), vettori Vettori) *KoskidexSearcher {
 	s := engine.DefaultSettings()
 	s.SearchableFields = []string{campoUnico}
 	s.FieldWeights = map[string]float64{campoUnico: 1.0}
@@ -39,11 +61,14 @@ func NewKoskidexSearcher(docs []Document, modifica func(*engine.Settings)) *Kosk
 
 	idx := engine.NewInvertedIndex()
 	for _, d := range docs {
-		testo := strings.TrimSpace(d.Title + " " + d.Text)
-		idx.AddDocument(d.ID, map[string]interface{}{campoUnico: testo}, s)
+		doc := map[string]interface{}{campoUnico: TestoDocumento(d)}
+		if v, ok := vettori.Documenti[d.ID]; ok {
+			doc["_vector"] = v
+		}
+		idx.AddDocument(d.ID, doc, s)
 	}
 
-	return &KoskidexSearcher{idx: idx, settings: s}
+	return &KoskidexSearcher{idx: idx, settings: s, vettori: vettori}
 }
 
 // Search returns at most k document IDs, best first, and how many documents
@@ -53,7 +78,7 @@ func NewKoskidexSearcher(docs []Document, modifica func(*engine.Settings)) *Kosk
 // regardless of the settings. Relying on TypoTolerance.Enabled alone would not
 // be enough: an explicit fuzziness overrides it, so the two are set together.
 func (k *KoskidexSearcher) Search(query string, limite int) ([]string, int) {
-	ids, _ := k.idx.Search(query, k.settings, "0", nil)
+	ids, _ := k.idx.Search(query, k.settings, "0", k.vettori.Query[query])
 	trovati := len(ids)
 	if trovati > limite {
 		return ids[:limite], trovati

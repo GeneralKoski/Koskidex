@@ -109,6 +109,40 @@ func (o *ollama) Embed(ctx context.Context, testi []string) ([][]float64, error)
 	return out, nil
 }
 
+// Digest is the digest Ollama reports for the model, the version a result
+// records: a name like bge-m3 can point to other weights tomorrow.
+func Digest(ctx context.Context, s engine.EmbedderSettings, client *http.Client) (string, error) {
+	e, err := New(s, client)
+	if err != nil {
+		return "", err
+	}
+	o := e.(*ollama)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, o.url+"/api/tags", nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("embedder: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var r struct {
+		Models []struct {
+			Name   string `json:"name"`
+			Digest string `json:"digest"`
+		} `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return "", fmt.Errorf("embedder: unreadable ollama answer: %w", err)
+	}
+	for _, m := range r.Models {
+		if m.Name == o.model || m.Name == o.model+":latest" {
+			return m.Digest, nil
+		}
+	}
+	return "", fmt.Errorf("embedder: model %q not found in ollama", o.model)
+}
+
 func estratto(b []byte) string {
 	s := strings.TrimSpace(string(b))
 	if len(s) > 200 {

@@ -111,3 +111,29 @@ func TestKoskidexSearcherReportsMatchesBeyondTheLimit(t *testing.T) {
 		t.Fatalf("i documenti trovati sono 2, il searcher ne dichiara %d", trovati)
 	}
 }
+
+// With vectors the searcher passes the query's vector as a client would, and
+// the engine reorders by it; without the query's vector nothing changes.
+func TestKoskidexSearcherPassesTheVectors(t *testing.T) {
+	docs := documentiDiProva()
+	senza := NewKoskidexSearcher(docs, nil)
+	base, _ := senza.Search("manutenzione", 10)
+
+	v := Vettori{
+		Documenti: map[string][]float64{"d1": {0, 1}, "d2": {1, 0}, "d3": {1, 0}},
+		Query:     map[string][]float64{"manutenzione": {0, 1}},
+	}
+	con := NewKoskidexSearcherConVettori(docs, nil, v)
+	vicino, _ := con.Search("manutenzione", 10)
+	if len(vicino) != 2 || vicino[0] != "d1" {
+		t.Fatalf("il vettore della query doveva mettere d1 davanti: %v (senza vettori %v)", vicino, base)
+	}
+	v.Query = map[string][]float64{"manutenzione": {1, 0}}
+	con = NewKoskidexSearcherConVettori(docs, nil, v)
+	if lontano, _ := con.Search("manutenzione", 10); lontano[0] != "d3" {
+		t.Fatalf("col vettore opposto doveva andare davanti d3: %v", lontano)
+	}
+	if altra, _ := con.Search("assistenza", 10); len(altra) != 2 {
+		t.Fatalf("una query senza vettore si cerca come sempre: %v", altra)
+	}
+}

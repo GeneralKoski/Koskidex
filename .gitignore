@@ -62,3 +62,6 @@ tmp/
 
 # Evaluation outputs (the thesis archive keeps the runs that count)
 /eval/results/
+
+# Vector cache of scripts/evaluate: derived from the corpora, which are not in git
+/eval/cache/
