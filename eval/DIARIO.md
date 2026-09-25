@@ -24,6 +24,45 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-25 - Niente refusi sui termini numerici
+
+**Flag:** `Settings.TypoTolerance.DisableOnNumbers`
+(`typo_tolerance.disable_on_numbers`), `false` = comportamento di oggi. Stesso
+nome e stessa definizione di `typoTolerance.disableOnNumbers` di Meilisearch
+(v1.15), spento per default anche lì.
+
+**Perché.** Innestato in Documentale con le parole libere di stare in campi
+diversi, Koskidex trova l'atto giusto entro i primi dieci nel 93% delle 300
+known-item `<numero> <comune>`, ma primo solo nel 38%: in 154 dei 185 casi in
+cui non è primo vince un atto con il numero a un refuso, `1109` per `1209`
+(`risultati/esperimenti/2026-09-25_koskidex-campi-liberi/` nel repository
+della tesi). Un numero di protocollo con una cifra sbagliata è un altro atto.
+
+### Cosa cambia
+
+Con l'impostazione accesa, `MaxTypos` restituisce zero per un termine della
+query fatto di sole cifre, quando la fuzziness viene dalle impostazioni (vuota
+o `AUTO`). Una fuzziness esplicita nella richiesta vince, come vince oggi su
+`Enabled`. I codici misti (`a651`) restano con i refusi. Il prefisso non si
+tocca.
+
+Cambiano gli insiemi, non solo l'ordine: un documento trovato solo per un
+refuso su un numero esce dai risultati.
+
+### Prima di misurare
+
+Le previsioni sono nel README dell'esperimento
+(`risultati/esperimenti/2026-09-25_refusi-numeri/`), committato prima del
+codice. In breve: con le parole in campi diversi l'atto primo passa dal 38,3%
+a più dell'80% ma non oltre il 92%, entro 10 non scende sotto il 93,3%; delle 24
+query del confronto cambiano solo le tre con un numero, e si restringono; con il
+vincolo del campo unico non cambia quasi niente.
+
+Le collezioni pubbliche non si misurano: `KoskidexSearcher` spegne i refusi, e
+lì l'impostazione non agisce per costruzione.
+
+---
+
 ## 2026-09-25 - BM25: le espansioni pesate con la frequenza mescolata
 
 **Flag:** `Settings.BM25Expansion`, vuoto = comportamento di oggi; `"blended"`
