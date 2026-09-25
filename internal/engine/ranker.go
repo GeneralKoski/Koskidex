@@ -28,6 +28,9 @@ type TokenDocMatch struct {
 	// document.
 	MatchedTerm string
 	TF          int
+	// BlendedDF is the highest document frequency among all the index terms
+	// the query token matched, for Settings.BM25Expansion.
+	BlendedDF int
 
 	// Fields where the token matched, kept only for Settings.AllTermsInOneField.
 	Fields map[string]bool
@@ -87,6 +90,11 @@ func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highl
 
 	tokenDocBest := make(map[string]*TokenDocMatch)
 
+	mescolata := 0
+	for _, mTerm := range matchedTerms {
+		mescolata = max(mescolata, idx.docFreq[mTerm])
+	}
+
 	for _, mTerm := range matchedTerms {
 		dist := DamerauLevenshtein(token.Term, mTerm)
 
@@ -113,7 +121,7 @@ func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highl
 			if _, ok := tokenDocBest[p.DocID]; !ok {
 				tokenDocBest[p.DocID] = &TokenDocMatch{
 					DocID: p.DocID, Typos: matchDist, MaxWeight: weight,
-					MatchedTerm: mTerm,
+					MatchedTerm: mTerm, BlendedDF: mescolata,
 				}
 			} else {
 				if matchDist < tokenDocBest[p.DocID].Typos {
@@ -400,6 +408,9 @@ func (idx *InvertedIndex) bm25Locked(match *TokenDocMatch, settings Settings) fl
 	}
 
 	df := float64(idx.docFreq[match.MatchedTerm])
+	if settings.BM25Expansion == BM25ExpansionBlended && float64(match.BlendedDF) > df {
+		df = float64(match.BlendedDF)
+	}
 	idf := math.Log(1 + (n-df+0.5)/(df+0.5))
 
 	tf := float64(match.TF)

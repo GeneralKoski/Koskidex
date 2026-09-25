@@ -285,6 +285,10 @@ type Settings struct {
 	ScoringMode   string              `json:"scoring_mode"`
 	BM25K1        float64             `json:"bm25_k1"`
 	BM25B         float64             `json:"bm25_b"`
+	// BM25Expansion is the document frequency a prefix or typo expansion is
+	// weighted with. Empty is the term found, as up to now; BM25ExpansionBlended
+	// is the highest among the terms the query term matched.
+	BM25Expansion string `json:"bm25_expansion"`
 	// SubstringMatch adds the documents with an indexed term that contains the
 	// whole query, as Elasticsearch's wildcard *query* on a text field. Off by
 	// default.
@@ -333,6 +337,13 @@ const (
 	// own phase, and a number tuned before it is measured is not a result.
 	DefaultBM25K1 = 1.2
 	DefaultBM25B  = 0.75
+
+	// BM25ExpansionBlended gives every expansion of a query term the highest
+	// document frequency among the index terms that query term matched, as
+	// Lucene's TopTermsBlendedFreqScoringRewrite does for fuzzy queries. A rare
+	// term found by prefix, such as a code starting with the searched number,
+	// then weighs no more than the most common of its siblings.
+	BM25ExpansionBlended = "blended"
 )
 
 // How many of the query terms a document has to carry to be retrieved.

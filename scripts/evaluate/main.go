@@ -40,6 +40,7 @@ func main() {
 	k1 := flag.Float64("bm25-k1", engine.DefaultBM25K1, "k1 di BM25: saturazione della frequenza del termine")
 	b := flag.Float64("bm25-b", engine.DefaultBM25B, "b di BM25: peso della normalizzazione della lunghezza")
 	top := flag.Int("top", 0, "quanti id della testa di ogni ranking salvare nel file (0 = nessuno)")
+	espansioni := flag.String("bm25-espansioni", "", "frequenza con cui BM25 pesa le espansioni: vuoto (il termine trovato) o blended")
 	senzaPrefisso := flag.Bool("senza-prefisso", false, "spegne la ricerca per prefisso (Settings.DisablePrefixSearch)")
 	flag.Parse()
 
@@ -58,7 +59,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso}
+	if *espansioni != "" && *espansioni != engine.BM25ExpansionBlended {
+		fmt.Fprintf(os.Stderr, "espansioni %q sconosciute, usa %q o lascia vuoto\n", *espansioni, engine.BM25ExpansionBlended)
+		os.Exit(1)
+	}
+	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni}
 	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi, *rankings, *archivio, opzioni); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
@@ -84,6 +89,7 @@ type opzioni struct {
 	k1, b         float64
 	top           int
 	senzaPrefisso bool
+	espansioni    string
 }
 
 func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string, o opzioni) error {
@@ -127,6 +133,7 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 			st.BM25K1 = o.k1
 			st.BM25B = o.b
 			st.DisablePrefixSearch = o.senzaPrefisso
+			st.BM25Expansion = o.espansioni
 			analisiLessicali[analisi](st)
 		})
 		indicizzazione := time.Since(t0)
@@ -145,6 +152,9 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		if punteggio == engine.ScoringBM25 {
 			res.Config["bm25_k1"] = fmt.Sprint(o.k1)
 			res.Config["bm25_b"] = fmt.Sprint(o.b)
+			if o.espansioni != "" {
+				res.Config["bm25_espansioni"] = o.espansioni
+			}
 		}
 	}
 	if o.top > 0 {

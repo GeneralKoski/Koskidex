@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `bm25_expansion` setting. With `"blended"`, BM25 weights every prefix or typo
+  expansion of a query term with the highest document frequency among the
+  index terms that query term matched, as Lucene does for fuzzy queries: a rare
+  term found by prefix (a code starting with the searched number) no longer
+  outscores the exact term. Off by default.
 - `GET /indexes/{name}/documents` — paginated document listing (`limit`, `offset`).
 - Configurable CORS origin via `--cors-origin` / `KOSKIDEX_CORS_ORIGIN`.
 - Environment-variable configuration for all flags (flags take precedence).
