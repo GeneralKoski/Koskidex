@@ -24,6 +24,40 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-25 - Fra `all` e `any`: recupero intermedio e coordinazione
+
+**Flag:** `Settings.MinimumShouldMatch` (`minimum_should_match`), vuoto =
+comportamento di oggi, con la sintassi di Elasticsearch; `Settings.Coordination`
+(`coordination`), `false` = comportamento di oggi. Il primo conta solo con
+`RetrievalMode = "any"`.
+
+**Perché.** Sulle known-item il divario fra BM25 e l'euristico è il recupero
+disgiuntivo: con `all` BM25 fa 0,976 contro 0,975
+(`risultati/esperimenti/2026-09-25_known-item-divario/` nel repository della
+tesi). Ma `all` è il difetto 0 su SciFact.
+
+### Cosa cambia
+
+- `MinimumShouldMatch`: in `any`, un documento deve contenere almeno tanti
+  termini della query quanti ne dice la specifica, calcolati come Elasticsearch
+  (intero, intero negativo, percentuale arrotondata per difetto, percentuale
+  negativa, condizioni `n<spec`; mai meno di 1 né più dei termini). Una
+  specifica non valida è rifiutata dall'API delle impostazioni.
+- `Coordination`: dopo i termini obbligatori, il punteggio di ogni documento è
+  moltiplicato per termini trovati / termini della query, come `coord` della
+  `ClassicSimilarity` di Lucene prima della versione 7.
+
+### Prima di misurare
+
+Le previsioni sono nel README dell'esperimento
+(`risultati/esperimenti/2026-09-25_recupero-intermedio/`), committato prima
+del codice, con i valori fissati: `2<-25% 9<-3`, l'esempio della documentazione
+di Elasticsearch. In breve: `minimum_should_match` porta le known-item ad
+almeno 0,93 ma costa più di 0,02 su SciFact; la coordinazione porta le
+known-item ad almeno 0,93 e resta entro 0,01 su SciFact e NFCorpus.
+
+---
+
 ## 2026-09-25 - Niente refusi sui termini numerici
 
 **Flag:** `Settings.TypoTolerance.DisableOnNumbers`
