@@ -21,6 +21,7 @@ type InvertedIndex struct {
 	docs       map[string]map[string]interface{} // docID -> original document
 	docToTerms map[string][]string               // docID -> list of terms in it (for fast deletion)
 	prefixMap  map[string][]string               // first 2 chars -> list of terms for fuzzy search
+	norme      map[string]float64                // docID -> norm of its _vector
 
 	// Collection statistics BM25 needs. Maintained while indexing rather than
 	// derived at query time: df would cost O(postings) for a common term, and
@@ -37,6 +38,7 @@ func NewInvertedIndex() *InvertedIndex {
 		docs:       make(map[string]map[string]interface{}),
 		docToTerms: make(map[string][]string),
 		prefixMap:  make(map[string][]string),
+		norme:      make(map[string]float64),
 		docFreq:    make(map[string]int),
 		docLengths: make(map[string]int),
 	}
@@ -61,6 +63,7 @@ func (idx *InvertedIndex) Reindex(settings Settings) {
 	idx.docs = make(map[string]map[string]interface{})
 	idx.docToTerms = make(map[string][]string)
 	idx.prefixMap = make(map[string][]string)
+	idx.norme = make(map[string]float64)
 	idx.docFreq = make(map[string]int)
 	idx.docLengths = make(map[string]int)
 	idx.totalLen = 0
@@ -136,6 +139,7 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 	if v, ok := doc["_vector"]; ok {
 		if dv, ok := toFloat64Array(v); ok {
 			doc["_vector"] = dv
+			idx.norme[docID] = norma(dv)
 		}
 	}
 	idx.docs[docID] = doc
@@ -522,6 +526,7 @@ func (idx *InvertedIndex) deleteDocumentLocked(docID string) {
 	idx.totalLen -= idx.docLengths[docID]
 	delete(idx.docLengths, docID)
 	delete(idx.docs, docID)
+	delete(idx.norme, docID)
 	delete(idx.docToTerms, docID)
 }
 

@@ -277,11 +277,12 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 
 	if len(queryVector) > 0 {
 		peso := settings.pesoVettore()
+		nq := norma(queryVector)
 		if len(allTokens) == 0 && len(pq.OrTerms) == 0 {
 			for docID, doc := range idx.docs {
 				if vecVal, ok := doc["_vector"]; ok {
 					if docVec, valid := toFloat64Array(vecVal); valid && len(docVec) == len(queryVector) {
-						sim := cosineSimilarity(queryVector, docVec)
+						sim := similarita(queryVector, nq, docVec, idx.norme[docID])
 						docMatches[docID] = &SearchMatch{DocID: docID, Score: sim * peso}
 					}
 				}
@@ -297,7 +298,7 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 				if doc, ok := idx.docs[docID]; ok {
 					if vecVal, ok := doc["_vector"]; ok {
 						if docVec, valid := toFloat64Array(vecVal); valid && len(docVec) == len(queryVector) {
-							sim := cosineSimilarity(queryVector, docVec)
+							sim := similarita(queryVector, nq, docVec, idx.norme[docID])
 							m.Score += sim * peso
 						}
 					}
@@ -527,16 +528,30 @@ func Highlight(text string, matchedTerms []string) string {
 }
 
 func cosineSimilarity(a, b []float64) float64 {
-	var dotProduct, normA, normB float64
-	for i := range a {
-		dotProduct += a[i] * b[i]
-		normA += a[i] * a[i]
-		normB += b[i] * b[i]
+	return similarita(a, norma(a), b, norma(b))
+}
+
+// norma is the Euclidean norm of v. Computed once per document and once per
+// query, it leaves only the dot product in the per-document loop; the sum runs
+// in the same order as before, so the similarity keeps the same bits.
+func norma(v []float64) float64 {
+	var n float64
+	for _, x := range v {
+		n += x * x
 	}
-	if normA == 0 || normB == 0 {
+	return math.Sqrt(n)
+}
+
+// similarita is the cosine similarity of q and d given their norms.
+func similarita(q []float64, nq float64, d []float64, nd float64) float64 {
+	if nq == 0 || nd == 0 {
 		return 0
 	}
-	return dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
+	var dot float64
+	for i := range q {
+		dot += q[i] * d[i]
+	}
+	return dot / (nq * nd)
 }
 
 func toFloat64Array(v interface{}) ([]float64, bool) {

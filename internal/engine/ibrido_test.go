@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"math"
+	"math/rand"
 	"reflect"
 	"testing"
 )
@@ -128,4 +130,47 @@ func TestVectorScoresDoNotDependOnTheVectorType(t *testing.T) {
 			}
 		}
 	}
+}
+
+// La similarità con le norme calcolate prima dà gli stessi bit della formula
+// che le ricalcolava a ogni documento, qui copiata com'era.
+func TestPrecomputedNormsGiveTheSameBits(t *testing.T) {
+	vecchia := func(a, b []float64) float64 {
+		var dotProduct, normA, normB float64
+		for i := range a {
+			dotProduct += a[i] * b[i]
+			normA += a[i] * a[i]
+			normB += b[i] * b[i]
+		}
+		if normA == 0 || normB == 0 {
+			return 0
+		}
+		return dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
+	}
+	r := rand.New(rand.NewSource(7))
+	for n := 0; n < 1000; n++ {
+		a, b := make([]float64, 1024), make([]float64, 1024)
+		for i := range a {
+			a[i], b[i] = r.NormFloat64(), r.NormFloat64()*3
+		}
+		if n == 0 {
+			b = make([]float64, 1024)
+		}
+		if got, want := similarita(a, norma(a), b, norma(b)), vecchia(a, b); got != want {
+			t.Fatalf("vettori %d: %v invece di %v", n, got, want)
+		}
+	}
+}
+
+// Un documento aggiunto di nuovo con un altro vettore prende la norma nuova.
+func TestAnUpdatedVectorGetsItsNorm(t *testing.T) {
+	s := impostazioniIbride("", 1)
+	idx := NewInvertedIndex()
+	idx.AddDocument("x", map[string]interface{}{"text": "atto", "_vector": []interface{}{1.0, 0.0}}, s)
+	idx.AddDocument("x", map[string]interface{}{"text": "atto", "_vector": []interface{}{3.0, 4.0}}, s)
+	ms, _ := idx.SearchScored("", s, "0", []float64{0.0, 1.0})
+	if len(ms) != 1 {
+		t.Fatalf("atteso un documento, ottenuti %v", ms)
+	}
+	circa(t, ms[0].Score, 0.8*20, "similarità col vettore nuovo, per il peso 20")
 }

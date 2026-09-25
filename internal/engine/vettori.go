@@ -13,6 +13,7 @@ type vicino struct {
 // no vector, or with one of another dimension, is skipped, as in the
 // re-ranking. The caller holds idx.mu.
 func (idx *InvertedIndex) viciniLocked(q []float64, k int) []vicino {
+	nq := norma(q)
 	tutti := make([]vicino, 0, len(idx.docs))
 	for id, doc := range idx.docs {
 		v, ok := doc["_vector"]
@@ -23,7 +24,7 @@ func (idx *InvertedIndex) viciniLocked(q []float64, k int) []vicino {
 		if !ok || len(dv) != len(q) {
 			continue
 		}
-		tutti = append(tutti, vicino{id: id, sim: cosineSimilarity(q, dv)})
+		tutti = append(tutti, vicino{id: id, sim: similarita(q, nq, dv, idx.norme[id])})
 	}
 	ordina(tutti)
 	if len(tutti) > k {
