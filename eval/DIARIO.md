@@ -24,6 +24,35 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-25 - Il contesto che Ollama usa per i vettori
+
+**Flag:** `EmbedderSettings.Context` (`embedder.context`), zero = il contesto
+predefinito di Ollama, cioè il comportamento di oggi; un numero di token lo
+passa a Ollama come `num_ctx`. Il nome del modello registrato e usato dalla
+cache diventa `ollama/<modello>@<contesto>`, così i vettori calcolati con due
+contesti non si mescolano. `scripts/evaluate -contesto`.
+
+**Perché.** Koskidex chiede i vettori a Ollama senza dire quanto contesto
+usare, e Ollama con `bge-m3` legge al più 2.048 token, non gli 8.192 del
+modello: il resto del testo non entra nel vettore. Sulle schede e sugli
+abstract non cambia niente; sul testo intero degli atti di Crispiano sì, ed è
+la misura della scheda contro il testo intero.
+
+### Prima di misurare
+
+Le previsioni sono nel README dell'esperimento
+(`risultati/esperimenti/2026-09-25_contesto-ollama/` nel repository della
+tesi), committato prima della misura e prima di questo codice. Per il codice:
+
+1. Con `Context` a zero la richiesta a Ollama è identica a oggi, byte per
+   byte, e il nome del modello resta `ollama/bge-m3`: i vettori in cache e le
+   valutazioni archiviate restano validi.
+2. Con `Context` 8.192 la richiesta porta `options.num_ctx` 8.192, e un testo
+   più lungo di 2.048 token ha un vettore diverso da quello di oggi.
+3. `TestBaselineRankingIsFrozen` passa a default, senza modifiche al test.
+
+---
+
 ## 2026-09-25 - Difetto 3: fondere scale incomparabili
 
 **Flag:** `Settings.FusionMode` (`fusion_mode`), vuoto = somma di oggi,
