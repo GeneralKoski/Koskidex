@@ -369,6 +369,9 @@ type TypoSettings struct {
 	Enabled               bool `json:"enabled"`
 	MinWordLengthOneTypo  int  `json:"min_word_length_one_typo"`
 	MinWordLengthTwoTypos int  `json:"min_word_length_two_typos"`
+	// DisableOnNumbers denies typos to a query term made only of digits, as
+	// Meilisearch's typoTolerance.disableOnNumbers: 1209 must not match 1109.
+	DisableOnNumbers bool `json:"disable_on_numbers"`
 }
 
 // DefaultSettings returns sane defaults

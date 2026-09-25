@@ -2,6 +2,7 @@ package engine
 
 import (
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -187,6 +188,9 @@ func MaxTypos(term string, settings TypoSettings, fuzziness string) int {
 	if !settings.Enabled {
 		return 0
 	}
+	if settings.DisableOnNumbers && soloCifre(term) {
+		return 0
+	}
 	l := len([]rune(term))
 	if l < settings.MinWordLengthOneTypo {
 		return 0
@@ -195,4 +199,13 @@ func MaxTypos(term string, settings TypoSettings, fuzziness string) int {
 		return 1
 	}
 	return 2
+}
+
+func soloCifre(term string) bool {
+	for _, r := range term {
+		if !unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return term != ""
 }
