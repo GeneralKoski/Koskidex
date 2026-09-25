@@ -24,6 +24,28 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-25 - Difetto 3: fondere scale incomparabili
+
+**Flag:** `Settings.FusionMode` (`fusion_mode`), vuoto = somma di oggi,
+lessicale + `sim * VectorWeight` (`vector_weight`, vuoto = 20); `rrf`
+(costante 60); `convex` (min-max per lista, `fusion_alpha`, vuoto = 0,5). Le due
+fusioni nuove lavorano sull'unione dei candidati.
+
+**Perché.** BM25 cresce con la lunghezza della query, la similarità no, e il 20
+è messo a occhio: su una query lunga il vettore pesa poco, su una corta molto.
+
+### Prima di misurare
+
+Le previsioni sono nel README dell'esperimento
+(`risultati/esperimenti/2026-09-25_fusione/`), committato prima del codice.
+Calibrazione solo su split separati (SciFact train, NFCorpus dev, known-item
+train). In breve: la costante migliore cambia di almeno quattro volte fra
+SciFact e NFCorpus, l'α migliore di non più di 0,2; RRF guadagna sulle
+collezioni pubbliche e perde sulle known-item; la convessa calibrata guadagna
+sulle pubbliche senza perdere sulle known-item.
+
+---
+
 ## 2026-09-25 - Difetto 2: dal re-ranking al recupero ibrido
 
 **Flag:** `Settings.HybridMode` (`hybrid_mode`), vuoto = re-ranking di oggi;
