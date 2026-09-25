@@ -50,6 +50,30 @@ known-item; l'unione porta richiamo ma quasi niente in nDCG@10, perché i
 documenti del solo vettore hanno al più 20 punti; il modello da solo fa fra
 0,55 e 0,72 su SciFact; l'unione costa meno di 10 ms per query.
 
+### Dopo
+
+Commit `f5ce77f`, albero pulito, `bge-m3` digest `790764642607`. Esito
+`risultati/esperimenti/2026-09-25_ibrido-unione/2026-09-25T124914Z_esito.json`.
+
+| BM25 `any`, frequenza mescolata | SciFact | NFCorpus | known-item |
+|---|---|---|---|
+| lessicale | 0,6694 | 0,3049 | 0,8331 |
+| re-ranking (oggi) | 0,6913 | 0,3284 | 0,8464 |
+| unione | 0,6913 | 0,3340 | 0,8464 |
+| solo vettori | 0,6436 | 0,3149 | 0,1837 |
+
+Quattro previsioni su sei, più metà della terza. Il re-ranking vale più di due
+punti sulle collezioni pubbliche e, contro quello che avevo scritto, migliora
+anche le known-item (+0,013). L'unione non cambia niente su SciFact: con `any`
+e senza stopword il lessicale trova in mediana 5.182 documenti su 5.183, e i
+cento più vicini sono già candidati. Su NFCorpus, query corte, porta 44
+candidati in mediana, +0,031 di Recall@100 e toglie tutte le 24 query a vuoto.
+Il peso del difetto 2 dipende dal recupero lessicale: sulla ricerca
+congiuntiva di Documentale va misurato a parte. L'unione costa da 5 a 15 ms
+per query, lineare nei documenti.
+
+HybridMode resta vuoto per default.
+
 ---
 
 ## 2026-09-25 - Analisi italiana: elisioni, stopword, stemmer leggero
