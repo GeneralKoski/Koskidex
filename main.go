@@ -92,6 +92,7 @@ func main() {
 	defer mgr.Close()
 
 	// Initialize HTTP server
+	server.Version = version
 	srv := server.NewServer(mgr, *apiKey, *rateLimit, *corsOrigin)
 	if *protectedIndexes != "" {
 		srv.SetProtectedIndexes(strings.Split(*protectedIndexes, ","))

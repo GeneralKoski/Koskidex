@@ -48,6 +48,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   vocabulary rather than keeping an n-gram index: a folder index has a few
   thousand paths. `InvertedIndex.VocabularySize` reports the vocabulary size,
   and `scripts/compare -sottostringa` measures the cost on a corpus.
+- `/health` reports `version`, the build set with `-ldflags -X main.version`,
+  so a measurement taken over HTTP can record which engine produced it.
 - `ids_only` on search (query parameter or POST body field): hits carry only
   `id` and `score`, without building documents and highlights, as
   Elasticsearch's `_source: false`.

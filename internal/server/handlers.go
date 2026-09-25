@@ -15,6 +15,10 @@ import (
 	"github.com/GeneralKoski/Koskidex/internal/manager"
 )
 
+// Version is the build the server reports on /health, set by main from the
+// -ldflags version. A measurement taken over HTTP records it next to its numbers.
+var Version = "dev"
+
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	uptime := time.Since(s.startTime).Round(time.Second).String()
@@ -32,6 +36,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"uptime":    uptime,
 		"indexes":   len(indexes),
 		"documents": totalDocs,
+		"version":   Version,
 	})
 }
 
