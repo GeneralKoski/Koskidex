@@ -44,6 +44,29 @@ SciFact e NFCorpus, l'α migliore di non più di 0,2; RRF guadagna sulle
 collezioni pubbliche e perde sulle known-item; la convessa calibrata guadagna
 sulle pubbliche senza perdere sulle known-item.
 
+### Dopo
+
+Commit `d3ffe17`, albero pulito. Calibrazione
+`risultati/esperimenti/2026-09-25_fusione/2026-09-25T131533Z_calibrazione.json`,
+test `2026-09-25T131731Z_esito.json`.
+
+| test | U (somma, 20) | somma calibrata | RRF | convessa calibrata |
+|---|---|---|---|---|
+| SciFact | 0,6913 | **0,7067** (160) | 0,6866 | 0,7025 (0,5) |
+| NFCorpus | 0,3340 | 0,3441 (160) | **0,3447** | 0,3416 (0,5) |
+| known-item | 0,8464 | **0,8499** (10) | 0,4623 | 0,8466 (0,9) |
+
+Il 20 era otto volte troppo basso per le query in lingua naturale e giusto per
+quelle identificative. Sbagliata la mia idea di partenza: la costante migliore
+non cambia fra query lunghe e corte (160 su SciFact e su NFCorpus), cambia fra
+tipi di query (10 sulle known-item, dove 160 dimezza l'MRR). Nessuna fusione
+con un parametro unico regge i due tipi: RRF dimezza le known-item, la
+convessa normalizzata vuole 0,5 da una parte e 0,9 dall'altra. Il peso del
+vettore diventa un secondo parametro da scegliere per tipo di query. Le fusioni
+nuove costano meno della somma, perché scandiscono i vettori una volta sola.
+
+Tutto resta spento per default.
+
 ---
 
 ## 2026-09-25 - Difetto 2: dal re-ranking al recupero ibrido
