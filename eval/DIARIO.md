@@ -55,6 +55,30 @@ senza elisione perde le stesse coppie di Elasticsearch; con l'elisione ne
 recupera almeno il 99%, come il filtro di Elasticsearch; sulle altre query non
 toglie documenti e sulle known-item l'MRR@10 cambia di meno di 0,01.
 
+### Dopo
+
+Koskidex `69035bb` (il codice di `76162dc`), dall'app con Documentale
+`9998939`. Esito
+`risultati/esperimenti/2026-09-25_elisioni-koskidex/2026-09-25T105111Z_esito.json`.
+
+| 5.913 coppie a rischio | perse |
+|---|---|
+| Elasticsearch di produzione | 5.775 |
+| Koskidex, elisione spenta | 5.775, le stesse |
+| Elasticsearch col filtro `elision` | 36 |
+| **Koskidex, `ElisionArticles` italiani** | **36, le stesse** |
+
+Sei previsioni su sette. Le 24 query del confronto non perdono nessun atto e
+otto ne guadagnano (*illuminazione pubblica* da 62 a 73); le 300 known-item
+hanno gli stessi primi dieci. Cade la prima, la più sicura: la parità con
+Elasticsearch su 486 parole su 507, non 500. In 20 Koskidex trova solo di più,
+perché toglie gli accenti ed Elasticsearch no (*identita* trova *identità*);
+in una, *comunale*, entrambi trovano tutti gli atti e il tetto dei 10.000 ne
+taglia 18 diversi. La parità misurata finora vale per il matching, non per gli
+accenti, e va scritto così.
+
+Resta spenta per default.
+
 ---
 
 ## 2026-09-25 - Fra `all` e `any`: recupero intermedio e coordinazione
