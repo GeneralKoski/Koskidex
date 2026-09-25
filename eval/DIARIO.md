@@ -56,6 +56,25 @@ di Elasticsearch. In breve: `minimum_should_match` porta le known-item ad
 almeno 0,93 ma costa più di 0,02 su SciFact; la coordinazione porta le
 known-item ad almeno 0,93 e resta entro 0,01 su SciFact e NFCorpus.
 
+### Dopo
+
+Commit `2fd4721`, albero pulito. Esito
+`risultati/esperimenti/2026-09-25_recupero-intermedio/2026-09-25T094842Z_esito.json`.
+
+| BM25 `any`, frequenza mescolata | known-item MRR@10 | SciFact | NFCorpus |
+|---|---|---|---|
+| base | 0,833 | 0,6694 | 0,3049 |
+| `2<-25% 9<-3` | 0,889 | 0,2556 | 0,2268 |
+| coordinazione | 0,944 | 0,6422 | 0,2935 |
+
+Due previsioni su cinque tengono. `minimum_should_match` col valore della
+documentazione rovina le collezioni pubbliche (169 query a vuoto su SciFact) e
+sulle known-item lascia cadere il numero nelle query di tre o più termini. La
+coordinazione chiude quasi tutto il divario sulle known-item, ma costa 0,027 su
+SciFact e 0,011 su NFCorpus. Nessuna impostazione unica va bene per le query
+identificative e per quelle in lingua naturale: restano entrambe spente, e il
+problema passa alla scelta per tipo di query.
+
 ---
 
 ## 2026-09-25 - Niente refusi sui termini numerici
