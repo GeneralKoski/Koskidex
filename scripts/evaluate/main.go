@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -54,6 +55,9 @@ func main() {
 	ollama := flag.String("ollama", "", "URL di Ollama; vuoto = localhost:11434")
 	ibrido := flag.String("ibrido", "", "chi portano i vettori fra i candidati: vuoto (riordinano i lessicali), union o vector (Settings.HybridMode); vuole -embedder")
 	vettoriK := flag.Int("vettori-k", 0, "quanti documenti porta il vettore con -ibrido (Settings.VectorTopK); 0 = 100")
+	fusione := flag.String("fusione", "", "come si fondono lessicale e vettore: vuoto (somma, lessicale + sim * peso), rrf o convex (Settings.FusionMode); vuole -embedder")
+	pesoVettore := flag.String("peso-vettore", "", "la costante della somma (Settings.VectorWeight); vuoto = 20")
+	alfa := flag.String("alfa", "", "il peso del lessicale nella fusione convex (Settings.FusionAlpha); vuoto = 0,5")
 	cacheVettori := flag.String("vettori-cache", "eval/cache/embeddings.jsonl", "cache dei vettori, per modello e testo: si calcolano una volta sola")
 	split := flag.String("split", "test", "giudizi da usare, qrels/<split>.tsv: test, oppure train per chi impara dalle query")
 	flag.Parse()
@@ -94,8 +98,30 @@ func main() {
 	}
 	// Senza vettori la modalita' ibrida non ha niente da portare: la run
 	// sarebbe quella lessicale, con un'etichetta che dice il contrario.
-	if (*ibrido != "" || *vettoriK != 0) && *modello == "" {
-		fmt.Fprintln(os.Stderr, "-ibrido e -vettori-k vogliono -embedder")
+	if (*ibrido != "" || *vettoriK != 0 || *fusione != "" || *pesoVettore != "" || *alfa != "") && *modello == "" {
+		fmt.Fprintln(os.Stderr, "-ibrido, -vettori-k, -fusione, -peso-vettore e -alfa vogliono -embedder")
+		os.Exit(1)
+	}
+	if *fusione != "" && *fusione != engine.FusionRRF && *fusione != engine.FusionConvex {
+		fmt.Fprintf(os.Stderr, "fusione %q sconosciuta, usa %q, %q o lascia vuoto\n", *fusione, engine.FusionRRF, engine.FusionConvex)
+		os.Exit(1)
+	}
+	peso, err := numeroFacoltativo("-peso-vettore", *pesoVettore)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	pesoLessicale, err := numeroFacoltativo("-alfa", *alfa)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if pesoLessicale != nil && (*fusione != engine.FusionConvex || *pesoLessicale < 0 || *pesoLessicale > 1) {
+		fmt.Fprintln(os.Stderr, "-alfa vale fra 0 e 1, e solo con -fusione convex")
+		os.Exit(1)
+	}
+	if peso != nil && *fusione != "" {
+		fmt.Fprintln(os.Stderr, "-peso-vettore vale solo per la somma, senza -fusione")
 		os.Exit(1)
 	}
 	if _, err := engine.RequiredTerms(*minimo, 1); err != nil {
@@ -105,7 +131,7 @@ func main() {
 	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni,
 		minimo: *minimo, coordinazione: *coordinazione, split: *split, tokenizer: *tokenizer, elisione: *elisione,
 		embedder: engine.EmbedderSettings{Model: *modello, URL: *ollama}, cacheVettori: *cacheVettori,
-		ibrido: *ibrido, vettoriK: *vettoriK}
+		ibrido: *ibrido, vettoriK: *vettoriK, fusione: *fusione, pesoVettore: peso, alfa: pesoLessicale}
 	if *modello != "" {
 		opzioni.embedder.Source = embedder.SourceOllama
 	}
@@ -150,6 +176,22 @@ type opzioni struct {
 	cacheVettori  string
 	ibrido        string
 	vettoriK      int
+	fusione       string
+	pesoVettore   *float64
+	alfa          *float64
+}
+
+// numeroFacoltativo reads a number that can be left empty: empty is nil, the
+// engine's default, which zero could not stand for.
+func numeroFacoltativo(nome, v string) (*float64, error) {
+	if v == "" {
+		return nil, nil
+	}
+	x, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %q non e' un numero", nome, v)
+	}
+	return &x, nil
 }
 
 func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string, o opzioni) error {
@@ -208,6 +250,9 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 			st.Tokenizer = o.tokenizer
 			st.HybridMode = o.ibrido
 			st.VectorTopK = o.vettoriK
+			st.FusionMode = o.fusione
+			st.VectorWeight = o.pesoVettore
+			st.FusionAlpha = o.alfa
 			if o.elisione {
 				st.ElisionArticles = engine.ItalianElisionArticles()
 			}
@@ -257,6 +302,20 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 					k = 100
 				}
 				res.Config["vettori_k"] = fmt.Sprint(k)
+			}
+			res.Config["fusione"] = "somma"
+			if o.fusione != "" {
+				res.Config["fusione"] = o.fusione
+			}
+			switch {
+			case o.fusione == "" && o.pesoVettore != nil:
+				res.Config["peso_vettore"] = strconv.FormatFloat(*o.pesoVettore, 'f', -1, 64)
+			case o.fusione == "":
+				res.Config["peso_vettore"] = "20"
+			case o.fusione == engine.FusionConvex && o.alfa != nil:
+				res.Config["alfa"] = strconv.FormatFloat(*o.alfa, 'f', -1, 64)
+			case o.fusione == engine.FusionConvex:
+				res.Config["alfa"] = "0.5"
 			}
 		}
 	}

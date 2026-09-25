@@ -276,15 +276,18 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 	}
 
 	if len(queryVector) > 0 {
+		peso := settings.pesoVettore()
 		if len(allTokens) == 0 && len(pq.OrTerms) == 0 {
 			for docID, doc := range idx.docs {
 				if vecVal, ok := doc["_vector"]; ok {
 					if docVec, valid := toFloat64Array(vecVal); valid && len(docVec) == len(queryVector) {
 						sim := cosineSimilarity(queryVector, docVec)
-						docMatches[docID] = &SearchMatch{DocID: docID, Score: sim * 20.0}
+						docMatches[docID] = &SearchMatch{DocID: docID, Score: sim * peso}
 					}
 				}
 			}
+		} else if settings.FusionMode == FusionRRF || settings.FusionMode == FusionConvex {
+			idx.fondiLocked(docMatches, queryVector, settings)
 		} else {
 			if settings.HybridMode == HybridVector {
 				docMatches = make(map[string]*SearchMatch)
@@ -295,7 +298,7 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 					if vecVal, ok := doc["_vector"]; ok {
 						if docVec, valid := toFloat64Array(vecVal); valid && len(docVec) == len(queryVector) {
 							sim := cosineSimilarity(queryVector, docVec)
-							m.Score += sim * 20.0
+							m.Score += sim * peso
 						}
 					}
 				}
@@ -304,13 +307,9 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 			// too, scored as in the search by vector alone. The lexical ones
 			// keep their re-ranking score, so only who enters changes.
 			if settings.HybridMode == HybridUnion || settings.HybridMode == HybridVector {
-				k := settings.VectorTopK
-				if k <= 0 {
-					k = vectorTopKDefault
-				}
-				for _, v := range idx.viciniLocked(queryVector, k) {
+				for _, v := range idx.viciniLocked(queryVector, settings.vettoriK()) {
 					if _, ok := docMatches[v.id]; !ok {
-						docMatches[v.id] = &SearchMatch{DocID: v.id, Score: v.sim * 20.0}
+						docMatches[v.id] = &SearchMatch{DocID: v.id, Score: v.sim * peso}
 					}
 				}
 			}

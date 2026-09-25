@@ -341,6 +341,18 @@ type Settings struct {
 	HybridMode string `json:"hybrid_mode"`
 	// VectorTopK is how many documents the vector brings in; zero is 100.
 	VectorTopK int `json:"vector_top_k"`
+
+	// FusionMode decides how lexical score and vector similarity become one
+	// score. Empty, as up to now: lexical + sim * VectorWeight. FusionRRF and
+	// FusionConvex work on the union of the candidates, whatever HybridMode
+	// says, and a document missing from one list gets nothing from it.
+	FusionMode string `json:"fusion_mode"`
+	// VectorWeight multiplies the similarity in the sum; nil is 20, the
+	// constant of the code up to now.
+	VectorWeight *float64 `json:"vector_weight,omitempty"`
+	// FusionAlpha is the lexical weight of FusionConvex, the vector's being
+	// 1 - FusionAlpha; nil is 0.5.
+	FusionAlpha *float64 `json:"fusion_alpha,omitempty"`
 }
 
 const (
@@ -349,6 +361,16 @@ const (
 	// vectorTopKDefault is the depth of Recall@100: past it no document can
 	// count in the metrics unless the lexical match finds it.
 	vectorTopKDefault = 100
+
+	// FusionRRF is Reciprocal Rank Fusion (Cormack, Clarke and Büttcher,
+	// 2009): 1/(rrfK + rank) from each list.
+	FusionRRF = "rrf"
+	// FusionConvex normalises each list min-max over its own candidates and
+	// weighs them FusionAlpha and 1 - FusionAlpha, as Weaviate's
+	// relativeScoreFusion.
+	FusionConvex = "convex"
+	// rrfK is the constant of the RRF paper, Elasticsearch's default.
+	rrfK = 60
 )
 
 // EmbedderSettings names the model that turns text into vectors. The
