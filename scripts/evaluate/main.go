@@ -42,6 +42,8 @@ func main() {
 	top := flag.Int("top", 0, "quanti id della testa di ogni ranking salvare nel file (0 = nessuno)")
 	espansioni := flag.String("bm25-espansioni", "", "frequenza con cui BM25 pesa le espansioni: vuoto (il termine trovato) o blended")
 	senzaPrefisso := flag.Bool("senza-prefisso", false, "spegne la ricerca per prefisso (Settings.DisablePrefixSearch)")
+	minimo := flag.String("minimum-should-match", "", "termini richiesti in recupero any, sintassi di Elasticsearch (Settings.MinimumShouldMatch)")
+	coordinazione := flag.Bool("coordinazione", false, "punteggio per quota di termini trovati, coord di Lucene (Settings.Coordination)")
 	flag.Parse()
 
 	if *modo != engine.RetrievalAll && *modo != engine.RetrievalAny {
@@ -63,7 +65,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "espansioni %q sconosciute, usa %q o lascia vuoto\n", *espansioni, engine.BM25ExpansionBlended)
 		os.Exit(1)
 	}
-	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni}
+	if _, err := engine.RequiredTerms(*minimo, 1); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni,
+		minimo: *minimo, coordinazione: *coordinazione}
 	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi, *rankings, *archivio, opzioni); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
@@ -90,6 +97,8 @@ type opzioni struct {
 	top           int
 	senzaPrefisso bool
 	espansioni    string
+	minimo        string
+	coordinazione bool
 }
 
 func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string, o opzioni) error {
@@ -134,6 +143,8 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 			st.BM25B = o.b
 			st.DisablePrefixSearch = o.senzaPrefisso
 			st.BM25Expansion = o.espansioni
+			st.MinimumShouldMatch = o.minimo
+			st.Coordination = o.coordinazione
 			analisiLessicali[analisi](st)
 		})
 		indicizzazione := time.Since(t0)
@@ -155,6 +166,12 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 			if o.espansioni != "" {
 				res.Config["bm25_espansioni"] = o.espansioni
 			}
+		}
+		if o.minimo != "" {
+			res.Config["minimum_should_match"] = o.minimo
+		}
+		if o.coordinazione {
+			res.Config["coordinazione"] = "accesa"
 		}
 	}
 	if o.top > 0 {

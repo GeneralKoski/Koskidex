@@ -418,6 +418,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusBadRequest, "Invalid JSON settings")
 		return
 	}
+	if _, err := engine.RequiredTerms(settings.MinimumShouldMatch, 1); err != nil {
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	if err := s.mgr.UpdateSettings(name, settings); err != nil {
 		if err == manager.ErrIndexNotFound {

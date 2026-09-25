@@ -42,3 +42,23 @@ func TestHealthReportsTheVersion(t *testing.T) {
 		t.Fatalf("/health deve riportare la versione: %v", h)
 	}
 }
+
+// Una specifica di minimum_should_match sbagliata si rifiuta quando arriva, e
+// l'indice tiene le impostazioni che aveva: altrimenti la ricerca dovrebbe
+// scegliere da sola cosa farne.
+func TestAMalformedMinimumShouldMatchIsRefused(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	richiesta(t, srv, "POST", "/indexes", `{"name":"documents"}`)
+	if w := richiesta(t, srv, "PUT", "/indexes/documents/settings", `{"minimum_should_match": "2<-25% 9<-3"}`); w.Code != 200 {
+		t.Fatalf("una specifica valida va accettata: %d %s", w.Code, w.Body.String())
+	}
+	if w := richiesta(t, srv, "PUT", "/indexes/documents/settings", `{"minimum_should_match": "tre quarti"}`); w.Code != 400 {
+		t.Fatalf("una specifica sbagliata va rifiutata con 400: %d %s", w.Code, w.Body.String())
+	}
+	var s map[string]interface{}
+	_ = json.NewDecoder(richiesta(t, srv, "GET", "/indexes/documents/settings", "").Body).Decode(&s)
+	if s["minimum_should_match"] != "2<-25% 9<-3" {
+		t.Fatalf("dopo il rifiuto restano le impostazioni di prima: %v", s["minimum_should_match"])
+	}
+}

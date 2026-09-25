@@ -223,12 +223,23 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 	requiredMatches := len(allTokens)
 	if settings.RetrievalMode == RetrievalAny {
 		requiredMatches = 1
+		// The settings API refuses a malformed spec, so an error here cannot
+		// come from a request.
+		if n, err := RequiredTerms(settings.MinimumShouldMatch, len(allTokens)); err == nil {
+			requiredMatches = n
+		}
 	}
 	if requiredMatches > 0 {
 		for docID, m := range docMatches {
 			if m.WordsMatched < requiredMatches || (unCampo && len(campiComuni[docID]) == 0) {
 				delete(docMatches, docID)
 			}
+		}
+	}
+
+	if settings.Coordination && len(allTokens) > 0 {
+		for _, m := range docMatches {
+			m.Score *= float64(m.WordsMatched) / float64(len(allTokens))
 		}
 	}
 

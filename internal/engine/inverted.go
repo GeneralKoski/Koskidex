@@ -289,6 +289,14 @@ type Settings struct {
 	// weighted with. Empty is the term found, as up to now; BM25ExpansionBlended
 	// is the highest among the terms the query term matched.
 	BM25Expansion string `json:"bm25_expansion"`
+	// MinimumShouldMatch is how many query terms a document must hold in
+	// RetrievalAny, with Elasticsearch's minimum_should_match syntax. Empty is
+	// one, as up to now. See RequiredTerms.
+	MinimumShouldMatch string `json:"minimum_should_match"`
+	// Coordination multiplies a document's score by the share of query terms
+	// it holds, as Lucene ClassicSimilarity's coord before Lucene 7. Off by
+	// default.
+	Coordination bool `json:"coordination"`
 	// SubstringMatch adds the documents with an indexed term that contains the
 	// whole query, as Elasticsearch's wildcard *query* on a text field. Off by
 	// default.
