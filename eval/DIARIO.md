@@ -193,6 +193,15 @@ esatti anche in BM25, e il prefisso solo oltre una lunghezza minima del
 termine cercato. Il default resta vuoto: cambiarlo cambierebbe il baseline, e
 va deciso a parte.
 
+**Aggiornamento del 25/09/2026**: le due cose da provare non si provano. Prima
+di scriverle è stato guardato chi passa davanti all'atto giusto
+(`risultati/esperimenti/2026-09-25_known-item-divario/` nel repository della
+tesi): in 36 dei 69 fallimenti con la frequenza mescolata vince un atto senza
+il numero, che ripete il nome del comune, e solo in 11 un numero trovato per
+prefisso. Il divario è il recupero disgiuntivo: con `RetrievalMode = "all"`
+BM25 fa 0,960 con la frequenza mescolata e 0,976 col prefisso spento, contro
+0,975 dell'euristico.
+
 ---
 
 ## 2026-09-23 - Analisi lessicale: stopword e stemmer (Task E1)
