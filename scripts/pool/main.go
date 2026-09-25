@@ -3,7 +3,8 @@
 //
 // Two steps, because between them there is a person.
 //
-//	go run ./scripts/pool -corpus c.jsonl -queries q.jsonl -out giudizi.tsv
+//	go run ./scripts/pool -corpus c.jsonl -queries q.jsonl -out giudizi.tsv \
+//	    [-run rapporto-elasticsearch.json ...]
 //	# si apre giudizi.tsv, si riempie la colonna "grado"
 //	go run ./scripts/pool -sheet giudizi.tsv -qrels qrels/test.tsv
 //
@@ -16,6 +17,10 @@
 // judged and count as not relevant, so recall measured this way is an upper
 // bound. It is the standard compromise, and it is the reason the pool is built
 // from several configurations rather than from the one being promoted.
+//
+// -run adds the rankings of another engine, as Documentale's
+// app:eval-run-queries records them, one flag per report. Without them the pool
+// is Koskidex's alone, and a document only Elasticsearch finds is never judged.
 package main
 
 import (
@@ -46,6 +51,17 @@ var configurazioni = []configurazione{
 	{engine.RetrievalAny, engine.ScoringBM25},
 }
 
+// rapporti collects -run, which can be given more than once.
+type rapporti []string
+
+func (r *rapporti) String() string { return strings.Join(*r, ",") }
+
+func (r *rapporti) Set(v string) error {
+	*r = append(*r, v)
+
+	return nil
+}
+
 func main() {
 	corpus := flag.String("corpus", "", "corpus.jsonl in formato BEIR")
 	queries := flag.String("queries", "", "queries.jsonl in formato BEIR")
@@ -53,6 +69,8 @@ func main() {
 	uscita := flag.String("out", "", "foglio di annotazione da scrivere")
 	foglio := flag.String("sheet", "", "foglio compilato da riconvertire")
 	qrels := flag.String("qrels", "", "file di giudizi da scrivere dal foglio")
+	var esterni rapporti
+	flag.Var(&esterni, "run", "rapporto di app:eval-run-queries da aggiungere al pool (ripetibile)")
 	flag.Parse()
 
 	var err error
@@ -60,7 +78,7 @@ func main() {
 	case *foglio != "":
 		err = converti(*foglio, *qrels)
 	case *corpus != "" && *queries != "":
-		err = prepara(*corpus, *queries, *uscita, *profondita)
+		err = prepara(*corpus, *queries, *uscita, *profondita, esterni)
 	default:
 		flag.Usage()
 		os.Exit(1)
@@ -72,7 +90,7 @@ func main() {
 	}
 }
 
-func prepara(pathCorpus, pathQueries, out string, profondita int) error {
+func prepara(pathCorpus, pathQueries, out string, profondita int, esterni []string) error {
 	if out == "" {
 		return fmt.Errorf("serve -out: dove scrivere il foglio")
 	}
@@ -87,8 +105,23 @@ func prepara(pathCorpus, pathQueries, out string, profondita int) error {
 	}
 
 	perID := map[string]eval.Document{}
+	nelCorpus := map[string]bool{}
 	for _, d := range docs {
 		perID[d.ID] = d
+		nelCorpus[d.ID] = true
+	}
+
+	nomiEsterni := make([]string, len(esterni))
+	rankingEsterni := make([]map[string][]string, len(esterni))
+	for i, path := range esterni {
+		run, err := eval.LoadExternalRun(path)
+		if err != nil {
+			return err
+		}
+		if rankingEsterni[i], err = run.Align(domande, nelCorpus); err != nil {
+			return err
+		}
+		nomiEsterni[i] = run.Name
 	}
 
 	indici := make([]*engine.InvertedIndex, len(configurazioni))
@@ -104,7 +137,7 @@ func prepara(pathCorpus, pathQueries, out string, profondita int) error {
 	sort.Strings(ids)
 
 	var righe []eval.SheetRow
-	senzaCandidati := 0
+	senzaCandidati, soloEsterni := 0, 0
 	for _, qid := range ids {
 		testo := domande[qid]
 
@@ -113,7 +146,15 @@ func prepara(pathCorpus, pathQueries, out string, profondita int) error {
 			rankings[i], _ = indici[i].Search(testo, impostazioni[i], "0", nil)
 		}
 
+		// Quanti documenti porta solo chi sta fuori da Koskidex: se aggiungere
+		// Elasticsearch non aggiunge mai niente, o va bene davvero o qualcosa
+		// non funziona, e le due cose vanno distinte guardando.
+		soloKoskidex := len(eval.PoolForQuery(rankings, profondita))
+		for _, r := range rankingEsterni {
+			rankings = append(rankings, r[qid])
+		}
 		pool := eval.PoolForQuery(rankings, profondita)
+		soloEsterni += len(pool) - soloKoskidex
 		if len(pool) == 0 {
 			senzaCandidati++
 
@@ -147,6 +188,9 @@ func prepara(pathCorpus, pathQueries, out string, profondita int) error {
 	fmt.Printf("scritto %s: %d giudizi da dare\n", out, len(righe))
 	if len(domande) > 0 {
 		fmt.Printf("  in media %.1f documenti per query\n", float64(len(righe))/float64(len(domande)-senzaCandidati))
+	}
+	if len(esterni) > 0 {
+		fmt.Printf("  %d documenti nel pool vengono solo da %s\n", soloEsterni, strings.Join(nomiEsterni, ", "))
 	}
 	if senzaCandidati > 0 {
 		fmt.Printf("  %d query non pescano niente in nessuna configurazione e non sono nel foglio\n", senzaCandidati)
