@@ -40,6 +40,7 @@ func main() {
 	k1 := flag.Float64("bm25-k1", engine.DefaultBM25K1, "k1 di BM25: saturazione della frequenza del termine")
 	b := flag.Float64("bm25-b", engine.DefaultBM25B, "b di BM25: peso della normalizzazione della lunghezza")
 	top := flag.Int("top", 0, "quanti id della testa di ogni ranking salvare nel file (0 = nessuno)")
+	senzaPrefisso := flag.Bool("senza-prefisso", false, "spegne la ricerca per prefisso (Settings.DisablePrefixSearch)")
 	flag.Parse()
 
 	if *modo != engine.RetrievalAll && *modo != engine.RetrievalAny {
@@ -57,7 +58,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	opzioni := opzioni{k1: *k1, b: *b, top: *top}
+	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso}
 	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi, *rankings, *archivio, opzioni); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
@@ -80,8 +81,9 @@ var analisiLessicali = map[string]func(*engine.Settings){
 // opzioni are the settings added after the first runs; their defaults leave a
 // run exactly as it was before them.
 type opzioni struct {
-	k1, b float64
-	top   int
+	k1, b         float64
+	top           int
+	senzaPrefisso bool
 }
 
 func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string, o opzioni) error {
@@ -124,6 +126,7 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 			st.ScoringMode = punteggio
 			st.BM25K1 = o.k1
 			st.BM25B = o.b
+			st.DisablePrefixSearch = o.senzaPrefisso
 			analisiLessicali[analisi](st)
 		})
 		indicizzazione := time.Since(t0)
@@ -146,6 +149,9 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 	}
 	if o.top > 0 {
 		res.Config["top"] = fmt.Sprint(o.top)
+	}
+	if o.senzaPrefisso {
+		res.Config["ricerca_per_prefisso"] = "spenta"
 	}
 	res.Config["collezione"] = collezione
 	res.Config["documenti"] = fmt.Sprint(len(docs))
