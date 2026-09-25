@@ -49,6 +49,9 @@ func Tokenize(text string, field string, settings Settings) []Token {
 	addToken := func() {
 		if currentTerm.Len() > 0 {
 			term := currentTerm.String()
+			if len(settings.ElisionArticles) > 0 {
+				term = togliElisione(term, settings.ElisionArticles)
+			}
 			if stopwords == nil || !stopwords[term] {
 				if norm != nil {
 					term = norm.Normalize(term)

@@ -276,15 +276,21 @@ type Settings struct {
 	StopWords        map[string]bool `json:"stop_words"`
 	// Stemmer sceglie l'analizzatore dei termini. Vuoto = nessuno, cioe' il
 	// comportamento di sempre.
-	Stemmer       string              `json:"stemmer"`
-	Synonyms      map[string][]string `json:"synonyms"`
-	TypoTolerance TypoSettings        `json:"typo_tolerance"`
-	FieldWeights  map[string]float64  `json:"field_weights"`
-	Sitemap       SitemapSettings     `json:"sitemap"`
-	RetrievalMode string              `json:"retrieval_mode"`
-	ScoringMode   string              `json:"scoring_mode"`
-	BM25K1        float64             `json:"bm25_k1"`
-	BM25B         float64             `json:"bm25_b"`
+	Stemmer string `json:"stemmer"`
+	// ElisionArticles are stripped with their apostrophe from the front of a
+	// term, as Lucene's ElisionFilter: with ItalianElisionArticles,
+	// "dell'illuminazione" is indexed as "illuminazione". Empty, as up to now,
+	// strips nothing. It only matters with TokenizerStandard, the one that
+	// keeps an apostrophe inside a term.
+	ElisionArticles []string            `json:"elision_articles"`
+	Synonyms        map[string][]string `json:"synonyms"`
+	TypoTolerance   TypoSettings        `json:"typo_tolerance"`
+	FieldWeights    map[string]float64  `json:"field_weights"`
+	Sitemap         SitemapSettings     `json:"sitemap"`
+	RetrievalMode   string              `json:"retrieval_mode"`
+	ScoringMode     string              `json:"scoring_mode"`
+	BM25K1          float64             `json:"bm25_k1"`
+	BM25B           float64             `json:"bm25_b"`
 	// BM25Expansion is the document frequency a prefix or typo expansion is
 	// weighted with. Empty is the term found, as up to now; BM25ExpansionBlended
 	// is the highest among the terms the query term matched.

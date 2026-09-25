@@ -35,8 +35,11 @@ func (porterAnalyzer) Normalize(term string) string { return stemPorter(term) }
 // does not have must still open. It will rank differently, and that is
 // visible; refusing to start would not be.
 func analizzatore(nome string) Analyzer {
-	if nome == StemmerPorter {
+	switch nome {
+	case StemmerPorter:
 		return porterAnalyzer{}
+	case StemmerItalianLight:
+		return italianLightAnalyzer{}
 	}
 
 	return nil
