@@ -74,6 +74,56 @@ Da non fare: scegliere fra questa e altre varianti guardando le 300 query. Se
 la 1 è smentita, la variante successiva si scrive qui con la sua ipotesi, prima
 di misurarla.
 
+### Dopo
+
+Commit `f449b02`, albero pulito. Ogni coppia viene dallo stesso commit, con e
+senza `-bm25-espansioni blended`. File nell'archivio della tesi:
+`valutazioni-albo/2026-09-25T0910{07,10}Z_*` e
+`koskidex-beir/2026-09-25T0910{20..51}Z_*`.
+
+**Una correzione alla sezione Prima:** NFCorpus con le stopword non è 0,3182
+ma 0,2900, il valore già scritto nella voce E1 qui sotto. 0,3182 non viene da
+nessun file: è un errore di trascrizione. La previsione 3 non ne dipende.
+
+| | di serie | `blended` | differenza |
+|---|---|---|---|
+| known-item, MRR@10 | 0,7094 | 0,8331 | +0,124 |
+| SciFact, nDCG@10 | 0,6197 | **0,6694** | +0,050 |
+| SciFact con stopword | 0,6641 | **0,6757** | +0,012 |
+| NFCorpus, nDCG@10 | 0,2810 | **0,3049** | +0,024 |
+| NFCorpus con stopword | 0,2900 | **0,3062** | +0,016 |
+
+Recall@100 sale di poco ovunque (SciFact da 0,8746 a 0,8859), le query a vuoto
+non cambiano. Rispetto ai riferimenti BEIR, SciFact con le stopword passa dal
+97,8% al 99,5% di 0,6789, NFCorpus dal 90% al 95% di 0,3218.
+
+1. Known-item sopra 0,85: **smentita di poco**, 0,833. Meglio di BM25 di serie,
+   ma sotto lo spegnimento del prefisso (0,854).
+2. Known-item sotto l'euristico: **confermata**, 0,833 contro 0,975.
+3. SciFact e NFCorpus entro 0,01: **smentita, e nel verso buono.** Senza
+   analisi SciFact guadagna 0,050, cinque volte il limite previsto. Le
+   espansioni per prefisso non sono rare sulle query in inglese: sono
+   dappertutto, e costavano cinque punti di nDCG@10.
+4. Insiemi invariati: **confermata**, `candidates` identici query per query in
+   tutte e cinque le coppie.
+
+**La sorpresa della 3 riscrive un pezzo della voce E1.** Le stopword avevano
+portato SciFact da 0,6197 a 0,6641, e la spiegazione era stata "le parole
+funzionali pesano troppo". Ma una stopword corta è anche un prefisso
+larghissimo: `a` combacia con ogni termine che comincia per a, `the` con
+`theory`, e fra quelle espansioni ce ne sono di rarissime, che BM25 pesava con
+il loro IDF. La frequenza mescolata da sola porta SciFact a 0,6694, più delle
+sole stopword. È probabile che una parte del guadagno attribuito alle stopword
+venisse da questo difetto. Non è misurato: sarebbe da contare quanti punteggi
+delle query di SciFact vengono da espansioni di stopword.
+
+**Cosa resta.** Sulle known-item il divario con l'euristico è ancora 0,14, e
+spegnere il prefisso fa meglio di mescolare le frequenze. Due cose da provare,
+ciascuna con la sua voce qui prima di misurarla: una penalità per i match non
+esatti anche in BM25, e il prefisso solo oltre una lunghezza minima del
+termine cercato. Il default resta vuoto: cambiarlo cambierebbe il baseline, e
+va deciso a parte.
+
 ---
 
 ## 2026-09-23 - Analisi lessicale: stopword e stemmer (Task E1)
