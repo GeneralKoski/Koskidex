@@ -9,7 +9,7 @@ parametro è stato scelto così, ed è la risposta alla domanda che in discussio
 arriva: le metriche sono state scelte dopo aver visto i risultati? Un'ipotesi
 scritta prima e smentita dai numeri vale più di un risultato pulito senza storia.
 
-Regole, oggi in `Magistrale/Tesi/piano.md` del repository `Universita-Martin`:
+Regole, oggi in `Magistrale/Tesi/TODO.md` del repository `Universita-Martin`:
 
 1. Ogni modifica che cambia l'ordine sta **dietro un campo di `Settings`**, con
    il comportamento attuale come default.
