@@ -59,6 +59,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optimized social share image (`og-image`) from ~5 MB to ~107 KB.
 
 ### Fixed
+- Typo matches that share no bigram with the query word were never found,
+  although within the allowed distance: fuzzy candidates came only from shared
+  bigrams, and one edit breaks up to two of them, a transposition three. With
+  the default thresholds "atre" missed "arte"; with Elasticsearch's thresholds
+  "187" missed "17"; with `fuzziness=1` "cut" missed "cat". When the query word
+  is too short for its bigrams to guarantee a shared one, the whole vocabulary
+  is scanned instead, with a length filter before the edit distance.
 - List fields (`["a", "b"]`) were stored but never indexed, silently: a word
   found only in a list returned no hits. Lists are now indexed element by
   element, strings and numbers, with a gap of 100 positions between elements so

@@ -1,6 +1,9 @@
 package engine
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 // DamerauLevenshtein calculates the distance between two strings
 // allowing transposition of adjacent characters (e.g. teh -> the).
@@ -84,11 +87,6 @@ func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance i
 		}
 	}
 
-	// Gather candidates from every bigram of the query term, not just the first
-	// one: documents index all their bigrams, so probing only the leading bigram
-	// would miss matches whose typo lands in the first two characters.
-	candidates := idx.fuzzyCandidates(queryTerm)
-
 	// As in Elasticsearch, a prefix longer than the query word is the whole word.
 	queryRunes := []rune(queryTerm)
 	exact := queryRunes
@@ -96,21 +94,26 @@ func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance i
 		exact = exact[:prefixLength]
 	}
 
-	for _, candidate := range candidates {
+	consider := func(candidate string) {
 		if candidate == queryTerm {
-			continue // Already handled
+			return // Already handled
 		}
 
 		// Prefix matching: if candidate starts with queryTerm, it's a match regardless of distance
 		if !noPrefix && len(queryTerm) >= 2 && len(candidate) > len(queryTerm) {
 			if candidate[:len(queryTerm)] == queryTerm {
 				matchedTerms = append(matchedTerms, candidate)
-				continue
+				return
 			}
 		}
 
 		if len(exact) > 0 && !strings.HasPrefix(candidate, string(exact)) {
-			continue
+			return
+		}
+
+		// The distance is at least the difference in length: skip the matrix.
+		if d := utf8.RuneCountInString(candidate) - len(queryRunes); d > maxDistance || -d > maxDistance {
+			return
 		}
 
 		dist := DamerauLevenshtein(queryTerm, candidate)
@@ -119,6 +122,25 @@ func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance i
 		}
 	}
 
+	// Two words within maxDistance edits share at least (n-1) - 3*maxDistance
+	// of the n-1 bigrams of the query word: an edit breaks up to two, a
+	// transposition three. When that bound drops below one, a term within
+	// reach may share no bigram ("atre" and "arte", "187" and "17"), and the
+	// bigram lookup would never look at it: the whole vocabulary is scanned
+	// instead. It happens only for short words with a typo allowed.
+	if maxDistance > 0 && len(queryRunes)-1-3*maxDistance < 1 {
+		for candidate := range idx.index {
+			consider(candidate)
+		}
+		return matchedTerms
+	}
+
+	// Gather candidates from every bigram of the query term, not just the first
+	// one: documents index all their bigrams, so probing only the leading bigram
+	// would miss matches whose typo lands in the first two characters.
+	for _, candidate := range idx.fuzzyCandidates(queryTerm) {
+		consider(candidate)
+	}
 	return matchedTerms
 }
 
