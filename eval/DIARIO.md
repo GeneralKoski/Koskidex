@@ -89,6 +89,9 @@ per costruzione.
 
 ### Dopo
 
+Nel codice il campo si chiama `Settings.Stemmer` (`json:"stemmer"`, commit
+`00b50ec`), non `Analyzer` come nella sezione qui sopra, scritta prima.
+
 **SciFact** (riferimento 0,6789)
 
 | analisi | nDCG@10 | delta | Recall@100 | a vuoto | candidati medi |
