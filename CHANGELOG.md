@@ -32,6 +32,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   all, as `best_fields` with `operator: and`). With these and the typo
   thresholds at 3 and 6, `scripts/esmirror` reproduces from committed code the
   divergence experiment of 23/09/2026, which needed a patch to the engine.
+- `tokenizer: "standard"` setting (default unchanged): word-internal
+  punctuation stays inside the word as in Elasticsearch's standard tokenizer
+  (UAX#29): an apostrophe, dot or colon between letters
+  (`dell'illuminazione`, `d.lgs`), an apostrophe, dot, comma or semicolon
+  between digits (`14.01.2026`, `3,5`), the underscore next to a letter or
+  digit. With it and the settings above, Koskidex returns exactly
+  Elasticsearch's result sets on the 24 queries of the albo comparison.
 - `substring_match` index setting (off by default): a search also finds the
   documents with an indexed term that contains the whole query, and adds to
   their score, as Elasticsearch's `wildcard` `*query*` next to a `match` in a

@@ -12,11 +12,11 @@ func TestElasticsearchCompatibilitySettingsOverHTTP(t *testing.T) {
 	defer cleanup()
 	richiesta(t, srv, "POST", "/indexes", `{"name":"documents"}`)
 	richiesta(t, srv, "PUT", "/indexes/documents/settings",
-		`{"disable_prefix_search": true, "prefix_length": 1, "all_terms_in_one_field": true}`)
+		`{"disable_prefix_search": true, "prefix_length": 1, "all_terms_in_one_field": true, "tokenizer": "standard"}`)
 
 	var s map[string]interface{}
 	_ = json.NewDecoder(richiesta(t, srv, "GET", "/indexes/documents/settings", "").Body).Decode(&s)
-	if s["disable_prefix_search"] != true || s["prefix_length"] != float64(1) || s["all_terms_in_one_field"] != true {
+	if s["disable_prefix_search"] != true || s["prefix_length"] != float64(1) || s["all_terms_in_one_field"] != true || s["tokenizer"] != "standard" {
 		t.Fatalf("le impostazioni devono tornare come sono state scritte: %v", s)
 	}
 

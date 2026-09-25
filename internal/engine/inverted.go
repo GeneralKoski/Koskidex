@@ -304,7 +304,18 @@ type Settings struct {
 	// AllTermsInOneField requires, when every term is required, one field of
 	// the document that holds every term, as best_fields with operator and.
 	AllTermsInOneField bool `json:"all_terms_in_one_field"`
+	// Tokenizer chooses the word boundaries. Empty = split on anything that is
+	// not a letter or a digit, the behaviour up to now. TokenizerStandard keeps
+	// word-internal punctuation as Elasticsearch's standard tokenizer does.
+	Tokenizer string `json:"tokenizer"`
 }
+
+// TokenizerStandard is Elasticsearch's standard tokenizer (Unicode UAX#29) for
+// the punctuation that matters in Latin text: one apostrophe, dot or colon
+// between two letters ("dell'illuminazione", "d.lgs"), one apostrophe, dot,
+// comma or semicolon between two digits ("14.01.2026", "3,5"), and the
+// underscore next to a letter or a digit stay inside the word.
+const TokenizerStandard = "standard"
 
 // How a term's contribution to a document's score is computed.
 //

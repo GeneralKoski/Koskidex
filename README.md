@@ -72,7 +72,7 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 | **Search operators** | `AND` (default), `OR`, `NOT` (prefix `-`)                                           |         |
 | **Field filters**    | `filter=genre=Sci-Fi,year>2000` with `=`, `!=`, `>`, `<`, `>=`, `<=`          |         |
 | **Pagination**       | `limit` (up to 10,000) and `offset` params, `total_hits` in response, `score` per hit, `ids_only` for id-and-score hits |         |
-| **Elasticsearch-like matching** | `disable_prefix_search`, `prefix_length`, `all_terms_in_one_field` settings, with typo thresholds 3 and 6 as `fuzziness: AUTO` |         |
+| **Elasticsearch-like matching** | `disable_prefix_search`, `prefix_length`, `all_terms_in_one_field`, `tokenizer: "standard"` settings, with typo thresholds 3 and 6 as `fuzziness: AUTO` |         |
 | **Substring match**  | `substring_match` setting: also finds documents with a term containing the whole query, as a `*query*` wildcard |         |
 | **Multi-index**      | Create and manage independent indexes with their own settings                               |         |
 | **Schemaless**       | Index any JSON object, only a unique `id` field is required                                |         |

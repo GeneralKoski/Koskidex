@@ -64,8 +64,10 @@ func Tokenize(text string, field string, settings Settings) []Token {
 		}
 	}
 
-	for _, r := range normalized {
-		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+	standard := settings.Tokenizer == TokenizerStandard
+	rs := []rune(normalized)
+	for i, r := range rs {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) || (standard && dentroLaParola(rs, i)) {
 			currentTerm.WriteRune(r)
 		} else {
 			addToken()
@@ -74,4 +76,30 @@ func Tokenize(text string, field string, settings Settings) []Token {
 	addToken() // flush remaining
 
 	return tokens
+}
+
+// dentroLaParola says whether the punctuation at rs[i] stays inside the word
+// under TokenizerStandard, following the UAX#29 rules Elasticsearch applies:
+// WB6-7 between letters, WB11-12 between digits, WB13a-b for the underscore.
+func dentroLaParola(rs []rune, i int) bool {
+	parola := func(j int) bool {
+		return j >= 0 && j < len(rs) && (unicode.IsLetter(rs[j]) || unicode.IsNumber(rs[j]) || rs[j] == '_')
+	}
+	r := rs[i]
+	if r == '_' {
+		return parola(i-1) || parola(i+1)
+	}
+	if i == 0 || i == len(rs)-1 {
+		return false
+	}
+	prima, dopo := rs[i-1], rs[i+1]
+	switch r {
+	case '\'', '\u2018', '\u2019', '.':
+		return (unicode.IsLetter(prima) && unicode.IsLetter(dopo)) || (unicode.IsNumber(prima) && unicode.IsNumber(dopo))
+	case ':', '\u00b7':
+		return unicode.IsLetter(prima) && unicode.IsLetter(dopo)
+	case ',', ';':
+		return unicode.IsNumber(prima) && unicode.IsNumber(dopo)
+	}
+	return false
 }

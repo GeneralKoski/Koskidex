@@ -1,5 +1,6 @@
 // Command esmirror misura quante divergenze fra Koskidex ed Elasticsearch
-// spiega ciascuna delle quattro cause trovate il 23/09/2026.
+// spiega ciascuna delle cause trovate: le prime quattro il 23/09/2026, il
+// tokenizer il 25/09/2026.
 //
 // Da' a Koskidex esattamente cio' che Elasticsearch ha indicizzato e accende
 // un'impostazione di compatibilita' alla volta, contando a ogni passo le query
@@ -36,6 +37,7 @@ type passo struct {
 	SoglieES    bool   `json:"soglie_refusi_es"`
 	NoPrefisso  bool   `json:"niente_prefisso"`
 	PrimaEsatta bool   `json:"prima_lettera_esatta"`
+	Standard    bool   `json:"tokenizer_standard"`
 
 	Identiche int      `json:"query_identiche"`
 	Query     int      `json:"query"`
@@ -78,6 +80,7 @@ func main() {
 		{Nome: "2. + soglie refusi di ES (3 -> 1, 6 -> 2)", PerCampo: true, SoglieES: true},
 		{Nome: "3. + niente ricerca per prefisso", PerCampo: true, SoglieES: true, NoPrefisso: true},
 		{Nome: "4. + prima lettera esatta (prefix_length 1)", PerCampo: true, SoglieES: true, NoPrefisso: true, PrimaEsatta: true},
+		{Nome: "5. + tokenizer standard (dell'illuminazione)", PerCampo: true, SoglieES: true, NoPrefisso: true, PrimaEsatta: true, Standard: true},
 	}
 
 	for i := range passi {
@@ -96,6 +99,9 @@ func main() {
 		s.DisablePrefixSearch = p.NoPrefisso
 		if p.PrimaEsatta {
 			s.PrefixLength = 1
+		}
+		if p.Standard {
+			s.Tokenizer = engine.TokenizerStandard
 		}
 
 		t0 := time.Now()
