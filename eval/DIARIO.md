@@ -814,3 +814,41 @@ difetti, tutti miei: tempi arrotondati a zero sotto il microsecondo; i file di
 risultato che, stando nel repository, facevano dichiarare "non committato"
 ogni esecuzione dopo la prima; un contatore di collisione che finiva dopo il
 nome e faceva sfuggire il file ai glob.
+
+## 24-25/09/2026 - Parte F: Koskidex completo, e gli stessi insiemi di Elasticsearch
+
+La regola era di non innestare in Documentale un motore incompleto. I buchi
+trovati provandolo contro il contratto di Documentale sono chiusi (F1-F7 del
+piano della tesi), ognuno con test scritti prima e visti fallire e con mutazioni
+per controllare che i test mordano. Due volte le mutazioni hanno trovato test
+che non mordevano: un punteggio costante passava il controllo d'ordine, e
+`prefix_length` contato in byte passava un test su "perché", perché la
+normalizzazione toglie gli accenti e l'italiano diventa ASCII.
+
+**F7 ha chiuso il conto con Elasticsearch: 24 query su 24 con lo stesso
+insieme.** Le due ipotesi che avevo scritto qui sui residui erano sbagliate
+tutte e due, ed è giusto lasciarle scritte sopra:
+
+- i 42 documenti "solo ES" di `ordinanza 187` non erano tokenizzazione dei
+  numeri ma un **difetto mio**: i candidati fuzzy venivano solo dai bigrammi in
+  comune, e `17` non ne ha con `187`. Una modifica rompe fino a due bigrammi,
+  una trasposizione tre, e sotto una certa lunghezza non resta garanzia. Con le
+  soglie predefinite capitava ad `atre` contro `arte`. Il motore prometteva la
+  distanza di Damerau e non la manteneva: corretto per tutti, con una scansione
+  del vocabolario per le parole corte;
+- `max_expansions` non c'entra: rilanciata con 10.000, Elasticsearch dà gli
+  stessi insiemi.
+
+L'ultima causa l'ha data `_explain` su un documento: *"dell'illuminazione"*. Il
+tokenizer standard di Elasticsearch tiene l'apostrofo fra due lettere dentro la
+parola, e con le stesse regole unisce date e decimali. Ora è un'impostazione.
+
+**Per Documentale è un difetto di produzione**: chi cerca "illuminazione" non
+trova gli atti che scrivono "dell'illuminazione". Koskidex spezza, e per le
+elisioni ha ragione; per le date, dove `18` non dovrebbe combaciare dentro
+`18.01.2026`, ha ragione Elasticsearch. Il tokenizer predefinito va ripensato
+per i numeri, non per le parole.
+
+La lezione, un'altra volta: le ipotesi scritte senza verificarle erano
+plausibili e sbagliate. Quella che ha risolto è venuta dal chiedere a
+Elasticsearch perché non trovava un documento preciso.
