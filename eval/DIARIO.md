@@ -179,6 +179,13 @@ sole stopword. È probabile che una parte del guadagno attribuito alle stopword
 venisse da questo difetto. Non è misurato: sarebbe da contare quanti punteggi
 delle query di SciFact vengono da espansioni di stopword.
 
+**Misurato il 25/09/2026** (`risultati/esperimenti/2026-09-25_stopword-espansioni/`
+nel repository della tesi): con la ricerca per prefisso spenta le stopword
+portano SciFact solo da 0,6634 a 0,6664. Il guadagno della voce E1 veniva quasi
+tutto dalle espansioni delle stopword (`of` in 173 query su 300, con 26
+espansioni di frequenza mediana 2), e le query senza stopword espandibili ne
+portano lo 0,7%.
+
 **Cosa resta.** Sulle known-item il divario con l'euristico è ancora 0,14, e
 spegnere il prefisso fa meglio di mescolare le frequenze. Due cose da provare,
 ciascuna con la sua voce qui prima di misurarla: una penalità per i match non
