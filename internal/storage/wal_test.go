@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -132,5 +133,56 @@ func TestWALSettingsOperation(t *testing.T) {
 	}
 	if ops[0].Settings.FieldWeights["title"] != 5.0 {
 		t.Errorf("expected field weight 5.0, got %f", ops[0].Settings.FieldWeights["title"])
+	}
+}
+
+// Un blocco di operazioni si scrive in una volta sola, con una sola
+// sincronizzazione: su macOS ogni Sync è un F_FULLFSYNC da qualche
+// millisecondo, e 10.000 documenti costavano mezzo minuto. Le righe restano
+// quelle di sempre, una per operazione, e il replay non cambia.
+func TestWALBatchAppendsEveryOperationInOrder(t *testing.T) {
+	dir := t.TempDir()
+	p := NewPersistence(Options{DataDir: dir})
+	defer p.Wait()
+
+	_ = p.AppendWAL(WALOperation{Op: "CREATE_INDEX", Index: "atti"})
+	blocco := []WALOperation{
+		{Op: "ADD_DOC", Index: "atti", DocID: "1", DocData: map[string]interface{}{"t": "uno"}},
+		{Op: "ADD_DOC", Index: "atti", DocID: "2", DocData: map[string]interface{}{"t": "due"}},
+		{Op: "ADD_DOC", Index: "atti", DocID: "3", DocData: map[string]interface{}{"t": "tre"}},
+	}
+	if err := p.AppendWALBatch(blocco); err != nil {
+		t.Fatalf("AppendWALBatch: %v", err)
+	}
+
+	letti, err := p.ReadWAL()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(letti) != 4 {
+		t.Fatalf("attese 4 operazioni, lette %d", len(letti))
+	}
+	for i, id := range []string{"1", "2", "3"} {
+		if letti[i+1].Op != "ADD_DOC" || letti[i+1].DocID != id {
+			t.Fatalf("operazione %d: attesa ADD_DOC %s, letta %+v", i+1, id, letti[i+1])
+		}
+	}
+}
+
+func TestWALBatchCostsOneSync(t *testing.T) {
+	dir := t.TempDir()
+	p := NewPersistence(Options{DataDir: dir})
+	defer p.Wait()
+
+	blocco := make([]WALOperation, 200)
+	for i := range blocco {
+		blocco[i] = WALOperation{Op: "ADD_DOC", Index: "atti", DocID: fmt.Sprint(i)}
+	}
+	prima := p.syncs
+	if err := p.AppendWALBatch(blocco); err != nil {
+		t.Fatal(err)
+	}
+	if n := p.syncs - prima; n != 1 {
+		t.Fatalf("200 operazioni in un blocco devono costare una sincronizzazione, ne sono costate %d", n)
 	}
 }

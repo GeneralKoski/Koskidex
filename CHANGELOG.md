@@ -68,6 +68,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optimized social share image (`og-image`) from ~5 MB to ~107 KB.
 
 ### Fixed
+- Adding documents synced the WAL once per document: about 2.6 ms each on
+  macOS, where a sync is an F_FULLFSYNC, so 10,018 documents took 32 seconds.
+  A request now writes all its WAL lines at once with one sync, and nothing
+  enters the index if the write fails. The WAL format is unchanged.
 - Typo matches that share no bigram with the query word were never found,
   although within the allowed distance: fuzzy candidates came only from shared
   bigrams, and one edit breaks up to two of them, a transposition three. With

@@ -44,6 +44,7 @@ type Persistence struct {
 	walPath    string
 	walFile    *os.File
 	walMutex   sync.Mutex
+	syncs      int // WAL syncs done, for the tests
 }
 
 func NewPersistence(opts Options) *Persistence {
@@ -142,6 +143,14 @@ func (p *Persistence) Save(data map[string]IndexData) {
 }
 
 func (p *Persistence) AppendWAL(op WALOperation) error {
+	return p.AppendWALBatch([]WALOperation{op})
+}
+
+// AppendWALBatch appends the operations in one write and one sync. A sync is
+// the expensive part (F_FULLFSYNC on macOS, a few milliseconds), so a request
+// that adds a thousand documents pays it once, not a thousand times. The
+// lines are the same as with AppendWAL, one per operation.
+func (p *Persistence) AppendWALBatch(ops []WALOperation) error {
 	p.walMutex.Lock()
 	defer p.walMutex.Unlock()
 
@@ -149,14 +158,19 @@ func (p *Persistence) AppendWAL(op WALOperation) error {
 		return nil
 	}
 
-	data, err := json.Marshal(op)
-	if err != nil {
-		return err
+	var buf bytes.Buffer
+	for _, op := range ops {
+		data, err := json.Marshal(op)
+		if err != nil {
+			return err
+		}
+		buf.Write(data)
+		buf.WriteByte('\n')
 	}
-	data = append(data, '\n')
-	_, err = p.walFile.Write(data)
+	_, err := p.walFile.Write(buf.Bytes())
 	if err == nil {
 		_ = p.walFile.Sync()
+		p.syncs++
 	}
 	return err
 }

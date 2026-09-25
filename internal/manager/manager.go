@@ -213,12 +213,17 @@ func (m *Manager) AddDocuments(indexName string, docs []map[string]interface{}) 
 		return 0, 0, &IDNonValidiError{Posizioni: sbagliati}
 	}
 
+	// Tutto il blocco nel WAL con una sola sincronizzazione, poi nell'indice:
+	// se la scrittura fallisce non entra niente.
+	ops := make([]storage.WALOperation, len(docs))
 	for i, doc := range docs {
-		idStr := ids[i]
-		if err := m.persistence.AppendWAL(storage.WALOperation{Op: "ADD_DOC", Index: indexName, DocID: idStr, DocData: doc}); err != nil {
-			return added, skipped, fmt.Errorf("WAL write failed: %w", err)
-		}
-		idx.Engine.AddDocument(idStr, doc, idx.Settings)
+		ops[i] = storage.WALOperation{Op: "ADD_DOC", Index: indexName, DocID: ids[i], DocData: doc}
+	}
+	if err := m.persistence.AppendWALBatch(ops); err != nil {
+		return 0, 0, fmt.Errorf("WAL write failed: %w", err)
+	}
+	for i, doc := range docs {
+		idx.Engine.AddDocument(ids[i], doc, idx.Settings)
 		added++
 	}
 
