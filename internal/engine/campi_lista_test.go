@@ -101,3 +101,20 @@ func TestListTokensCountTowardsTheDocumentLength(t *testing.T) {
 		t.Fatalf("attesi 3 token, contati %d", l)
 	}
 }
+
+// Il vettore di un documento non è testo. Arriva come lista, come i campi
+// lista, e senza campi dichiarati finiva nell'indice: un termine per valore,
+// e la lunghezza del documento per BM25 cresceva di mille token.
+func TestTheVectorIsNotIndexedAsText(t *testing.T) {
+	s := DefaultSettings()
+	senza, con := NewInvertedIndex(), NewInvertedIndex()
+	senza.AddDocument("1", map[string]interface{}{"title": "delibera di giunta"}, s)
+	con.AddDocument("1", map[string]interface{}{"title": "delibera di giunta", "_vector": []interface{}{0.5, 0.25, 0.125}}, s)
+
+	if a, b := senza.VocabularySize(), con.VocabularySize(); a != b {
+		t.Fatalf("il vettore ha aggiunto termini all'indice: %d invece di %d", b, a)
+	}
+	if a, b := senza.DocLength("1"), con.DocLength("1"); a != b {
+		t.Fatalf("il vettore ha allungato il documento: %d token invece di %d", b, a)
+	}
+}

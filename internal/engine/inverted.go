@@ -140,6 +140,9 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 		fields = settings.SearchableFields
 	} else {
 		for k, v := range doc {
+			if k == "_vector" {
+				continue
+			}
 			switch v.(type) {
 			case string, []interface{}, []string:
 				fields = append(fields, k)

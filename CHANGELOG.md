@@ -91,6 +91,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `position_increment_gap`). Without declared searchable fields, list fields are
   picked up automatically like string fields. A number on its own is indexed
   only in a declared searchable field.
+- Without declared searchable fields, the automatic pick-up of list fields
+  took `_vector` too: every value of the embedding became an index term, and
+  the document grew by as many tokens, which BM25 reads as length. `_vector` is
+  never indexed as text.
 - Integer ids were dropped with a `202` and `skipped: 1`. They are now accepted
   and stored as their canonical string (`7`, and `1000000` rather than `1e+06`).
 - Documents without a valid `id` were silently dropped while the API reported success.
