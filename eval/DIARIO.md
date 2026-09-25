@@ -51,6 +51,40 @@ tesi), committato prima della misura e prima di questo codice. Per il codice:
    più lungo di 2.048 token ha un vettore diverso da quello di oggi.
 3. `TestBaselineRankingIsFrozen` passa a default, senza modifiche al test.
 
+### Dopo: `num_ctx` da solo non basta
+
+La previsione 2 è **smentita**, ed è stata una prova su dati inventati a
+mostrarlo: sui 563 testi interi di Crispiano, A con `-contesto 8192` ha dato
+gli stessi numeri di A con il contesto predefinito, a quattro decimali e query
+per query. Chiesto direttamente a Ollama 0.34.4, sul testo più lungo
+(116.721 caratteri), quanti token legge (`prompt_eval_count`):
+
+| opzioni | token letti |
+|---|---|
+| nessuna | 2.048 |
+| `num_ctx` 4.096 | 2.048 |
+| `num_ctx` 8.192 | 2.048 |
+| `num_ctx` 8.192, `num_batch` 8.192 | 8.192 |
+| `num_ctx` 1.024 | 1.024 |
+
+Ollama tronca un testo da trasformare in vettore al minimo fra `num_ctx` e
+`num_batch`, e `num_batch` vale 2.048: il limite di prima non era il contesto
+ma il batch. Il codice di c37e2d3 mandava solo `num_ctx`, quindi non cambiava
+niente. Con `Context` impostato ora manda anche `num_batch` allo stesso
+valore; con zero la richiesta resta quella di sempre.
+
+I vettori calcolati in quella prova, finiti nella cache sotto il nome
+`ollama/bge-m3@8192` ma letti fino a 2.048 token, sono stati tolti dalla cache
+(562 testi e 75 query), altrimenti la correzione li avrebbe riusati. Nessuna
+valutazione archiviata usa quel nome.
+
+Previsioni per la correzione:
+
+4. Con `Context` 8.192 la richiesta porta `num_ctx` e `num_batch` 8.192, e sul
+   testo più lungo Ollama legge 8.192 token.
+5. Con `Context` a zero la richiesta resta `model` e `input`, byte per byte: i
+   vettori in cache e le valutazioni archiviate restano validi.
+
 ---
 
 ## 2026-09-25 - Difetto 3: fondere scale incomparabili
