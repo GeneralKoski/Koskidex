@@ -24,6 +24,34 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-25 - Difetto 2: dal re-ranking al recupero ibrido
+
+**Flag:** `Settings.HybridMode` (`hybrid_mode`), vuoto = re-ranking di oggi;
+`union` aggiunge ai candidati i primi `Settings.VectorTopK` (`vector_top_k`,
+100 se zero) per similarità; `vector` tiene solo quelli, come riferimento.
+
+**Perché.** Il vettore della query riordina soltanto i documenti trovati dal
+lessicale: un documento pertinente che non condivide parole con la query non
+entra mai. Con l'embedder acceso "traffico" non trova l'ordinanza di chiusura
+di una strada, né da sola né in ibrido.
+
+### Cosa cambia
+
+Chi entra fra i candidati, non come si fondono i punteggi: in tutti i rami il
+punteggio resta lessicale + `sim * 20` (difetto 3, dopo). Scansione esaustiva
+dei vettori.
+
+### Prima di misurare
+
+Le previsioni sono nel README dell'esperimento
+(`risultati/esperimenti/2026-09-25_ibrido-unione/`), committato prima del
+codice. In breve: il re-ranking migliora SciFact e NFCorpus e peggiora le
+known-item; l'unione porta richiamo ma quasi niente in nDCG@10, perché i
+documenti del solo vettore hanno al più 20 punti; il modello da solo fa fra
+0,55 e 0,72 su SciFact; l'unione costa meno di 10 ms per query.
+
+---
+
 ## 2026-09-25 - Analisi italiana: elisioni, stopword, stemmer leggero
 
 **Flag:** `Settings.ElisionArticles` (`elision_articles`), vuoto = comportamento
