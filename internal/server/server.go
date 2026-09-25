@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GeneralKoski/Koskidex/internal/embedder"
 	"github.com/GeneralKoski/Koskidex/internal/engine"
 	"github.com/GeneralKoski/Koskidex/internal/manager"
 )
@@ -21,6 +22,8 @@ type Server struct {
 	rateLimiter      *RateLimiter
 	cache            *engine.LRUCache
 	protectedIndexes map[string]bool
+	vettori          *embedder.Cache
+	clientEmbedder   *http.Client
 }
 
 // NewServer initializes the HTTP routing
@@ -35,6 +38,9 @@ func NewServer(mgr *manager.Manager, apiKey string, rateLimit int, corsOrigin st
 		corsOrigin: corsOrigin,
 		startTime:  time.Now(),
 		cache:      engine.NewLRUCache(1024),
+		vettori:    embedder.NewCache(),
+		// A block of documents on a laptop takes seconds per request.
+		clientEmbedder: &http.Client{Timeout: 5 * time.Minute},
 	}
 	if rateLimit > 0 {
 		s.rateLimiter = NewRateLimiter(rateLimit)
@@ -87,6 +93,18 @@ func (s *Server) Close() {
 	if s.rateLimiter != nil {
 		s.rateLimiter.Stop()
 	}
+	_ = s.vettori.Close()
+}
+
+// UseEmbeddingCache keeps the vectors the embedder computes in path, so that
+// they survive a restart. Call once at startup before serving.
+func (s *Server) UseEmbeddingCache(path string) error {
+	c, err := embedder.OpenCache(path)
+	if err != nil {
+		return err
+	}
+	s.vettori = c
+	return nil
 }
 
 // ServeHTTP implements http.Handler interface

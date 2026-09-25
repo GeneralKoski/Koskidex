@@ -326,6 +326,26 @@ type Settings struct {
 	// not a letter or a digit, the behaviour up to now. TokenizerStandard keeps
 	// word-internal punctuation as Elasticsearch's standard tokenizer does.
 	Tokenizer string `json:"tokenizer"`
+
+	// Embedder computes the documents' _vector when they are added, and the
+	// query's vector when a search asks for it (hybrid). Empty source, as up
+	// to now: vectors come from the client or not at all. Documents added
+	// before an embedder is set keep having no vector.
+	Embedder EmbedderSettings `json:"embedder"`
+}
+
+// EmbedderSettings names the model that turns text into vectors. The
+// embedding itself is done by the server (internal/embedder): the engine only
+// ever sees the vectors.
+type EmbedderSettings struct {
+	// Source is "" (none) or "ollama".
+	Source string `json:"source"`
+	Model  string `json:"model"`
+	// URL of the model server; empty is Ollama's default, localhost:11434.
+	URL string `json:"url"`
+	// Fields whose values make up a document's text, in this order; empty is
+	// SearchableFields.
+	Fields []string `json:"fields"`
 }
 
 // TokenizerStandard is Elasticsearch's standard tokenizer (Unicode UAX#29) for

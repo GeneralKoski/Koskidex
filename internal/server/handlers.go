@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GeneralKoski/Koskidex/internal/embedder"
 	"github.com/GeneralKoski/Koskidex/internal/engine"
 	"github.com/GeneralKoski/Koskidex/internal/manager"
 )
@@ -258,6 +260,13 @@ func (s *Server) handleAddDocuments(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Before anything reaches the index: if the model cannot be reached,
+	// nothing is added, rather than documents without a vector.
+	if err := s.aggiungiVettori(r.Context(), name, docs); err != nil {
+		sendError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
 	added, skipped, err := s.mgr.AddDocuments(name, docs)
 	if err != nil {
 		if err == manager.ErrIndexNotFound {
@@ -278,6 +287,55 @@ func (s *Server) handleAddDocuments(w http.ResponseWriter, r *http.Request) {
 		"added":   added,
 		"skipped": skipped,
 	})
+}
+
+// aggiungiVettori gives a _vector to the documents that lack one, when the
+// index has an embedder. A document with no text gets none.
+func (s *Server) aggiungiVettori(ctx context.Context, name string, docs []map[string]interface{}) error {
+	idx, err := s.mgr.GetIndex(name)
+	if err != nil || idx.Settings.Embedder.Source == "" {
+		return nil
+	}
+	e, err := embedder.New(idx.Settings.Embedder, s.clientEmbedder)
+	if err != nil {
+		return err
+	}
+	campi := idx.Settings.Embedder.Fields
+	if len(campi) == 0 {
+		campi = idx.Settings.SearchableFields
+	}
+	var testi []string
+	var dove []int
+	for i, doc := range docs {
+		if _, ok := doc["_vector"]; ok {
+			continue
+		}
+		if t := embedder.TestoDocumento(doc, campi); t != "" {
+			testi = append(testi, t)
+			dove = append(dove, i)
+		}
+	}
+	if len(testi) == 0 {
+		return nil
+	}
+	vettori, err := s.vettori.Embed(ctx, e, testi)
+	if err != nil {
+		return err
+	}
+	for j, i := range dove {
+		docs[i]["_vector"] = comeLista(vettori[j])
+	}
+	return nil
+}
+
+// comeLista stores a vector as JSON would decode it: the snapshot's gob only
+// knows []interface{}, and the search reads both.
+func comeLista(v []float64) []interface{} {
+	out := make([]interface{}, len(v))
+	for i, x := range v {
+		out[i] = x
+	}
+	return out
 }
 
 func (s *Server) handleListDocuments(w http.ResponseWriter, r *http.Request) {
@@ -422,6 +480,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if err := embedder.Valida(settings.Embedder); err != nil {
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	if err := s.mgr.UpdateSettings(name, settings); err != nil {
 		if err == manager.ErrIndexNotFound {
@@ -445,6 +507,9 @@ type SearchRequest struct {
 	Sort      string    `json:"sort"`
 	Facets    string    `json:"facets"`
 	IDsOnly   bool      `json:"ids_only"`
+	// Hybrid asks the index's embedder for the query's vector, when the
+	// request carries none.
+	Hybrid bool `json:"hybrid"`
 }
 
 // maxSearchLimit is as far as a search can page. Documentale asks for up to
@@ -461,6 +526,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	sortParam := r.URL.Query().Get("sort")
 	facetsParam := r.URL.Query().Get("facets")
 	idsOnly, _ := strconv.ParseBool(r.URL.Query().Get("ids_only"))
+	hybrid, _ := strconv.ParseBool(r.URL.Query().Get("hybrid"))
 	limit := 20
 	offset := 0
 	var vector []float64
@@ -494,6 +560,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 			if req.Offset >= 0 { offset = req.Offset }
 			if len(req.Vector) > 0 { vector = req.Vector }
 			if req.IDsOnly { idsOnly = true }
+			if req.Hybrid { hybrid = true }
 		}
 	}
 
@@ -515,6 +582,25 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if err == manager.ErrIndexNotFound {
 		sendError(w, http.StatusNotFound, "Index not found")
 		return
+	}
+
+	if hybrid && len(vector) == 0 && query != "" {
+		if idx.Settings.Embedder.Source == "" {
+			sendError(w, http.StatusBadRequest, "hybrid search needs an embedder in the index settings")
+			return
+		}
+		e, err := embedder.New(idx.Settings.Embedder, s.clientEmbedder)
+		if err == nil {
+			var vettori [][]float64
+			vettori, err = s.vettori.Embed(r.Context(), e, []string{query})
+			if err == nil {
+				vector = vettori[0]
+			}
+		}
+		if err != nil {
+			sendError(w, http.StatusBadGateway, err.Error())
+			return
+		}
 	}
 
 	if query == "" && len(vector) == 0 {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -96,6 +97,10 @@ func main() {
 	srv := server.NewServer(mgr, *apiKey, *rateLimit, *corsOrigin)
 	if *protectedIndexes != "" {
 		srv.SetProtectedIndexes(strings.Split(*protectedIndexes, ","))
+	}
+	if err := srv.UseEmbeddingCache(filepath.Join(*dataDir, "embeddings.jsonl")); err != nil {
+		slog.Error("Failed to open the embedding cache", "error", err)
+		os.Exit(1)
 	}
 	defer srv.Close()
 
