@@ -34,7 +34,7 @@ func main() {
 	uscita := flag.String("out", "eval/results", "cartella dove scrivere il file dei risultati")
 	modo := flag.String("mode", engine.RetrievalAll, "modalita' di recupero: all (congiuntivo) oppure any (disgiuntivo)")
 	punteggio := flag.String("scoring", engine.ScoringLegacy, "modalita' di punteggio: legacy oppure bm25")
-	analisi := flag.String("analyzer", "none", "analisi lessicale: none, stopwords, stemmer, english (stopword + stemmer)")
+	analisi := flag.String("analyzer", "none", "analisi lessicale: none, stopwords, stemmer, english (stopword + stemmer), italian-stopwords, italian-stemmer, italian (stopword + stemmer)")
 	rankings := flag.String("rankings", "", "rapporto di app:eval-run-queries da valutare al posto di Koskidex")
 	archivio := flag.String("archivio", "koskidex-beir", "sottocartella dell'archivio dei risultati")
 	k1 := flag.Float64("bm25-k1", engine.DefaultBM25K1, "k1 di BM25: saturazione della frequenza del termine")
@@ -44,6 +44,8 @@ func main() {
 	senzaPrefisso := flag.Bool("senza-prefisso", false, "spegne la ricerca per prefisso (Settings.DisablePrefixSearch)")
 	minimo := flag.String("minimum-should-match", "", "termini richiesti in recupero any, sintassi di Elasticsearch (Settings.MinimumShouldMatch)")
 	coordinazione := flag.Bool("coordinazione", false, "punteggio per quota di termini trovati, coord di Lucene (Settings.Coordination)")
+	tokenizer := flag.String("tokenizer", "", "tokenizer: vuoto (spezza su tutto cio' che non e' lettera o cifra) o standard (Settings.Tokenizer)")
+	elisione := flag.Bool("elisione", false, "toglie gli articoli elisi italiani, come l'analizzatore italian di Elasticsearch (Settings.ElisionArticles); vuole -tokenizer standard")
 	split := flag.String("split", "test", "giudizi da usare, qrels/<split>.tsv: test, oppure train per chi impara dalle query")
 	flag.Parse()
 
@@ -58,7 +60,7 @@ func main() {
 	}
 
 	if _, noto := analisiLessicali[*analisi]; !noto {
-		fmt.Fprintf(os.Stderr, "analisi %q sconosciuta, usa none, stopwords, stemmer o english\n", *analisi)
+		fmt.Fprintf(os.Stderr, "analisi %q sconosciuta, usa none, stopwords, stemmer, english, italian-stopwords, italian-stemmer o italian\n", *analisi)
 		os.Exit(1)
 	}
 
@@ -66,12 +68,23 @@ func main() {
 		fmt.Fprintf(os.Stderr, "espansioni %q sconosciute, usa %q o lascia vuoto\n", *espansioni, engine.BM25ExpansionBlended)
 		os.Exit(1)
 	}
+	if *tokenizer != "" && *tokenizer != engine.TokenizerStandard {
+		fmt.Fprintf(os.Stderr, "tokenizer %q sconosciuto, usa %q o lascia vuoto\n", *tokenizer, engine.TokenizerStandard)
+		os.Exit(1)
+	}
+	// Col tokenizer predefinito l'apostrofo spezza il termine prima che
+	// l'elisione lo veda: la run sarebbe identica a quella senza, e con
+	// un'etichetta che dice il contrario.
+	if *elisione && *tokenizer != engine.TokenizerStandard {
+		fmt.Fprintln(os.Stderr, "-elisione vuole -tokenizer standard")
+		os.Exit(1)
+	}
 	if _, err := engine.RequiredTerms(*minimo, 1); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni,
-		minimo: *minimo, coordinazione: *coordinazione, split: *split}
+		minimo: *minimo, coordinazione: *coordinazione, split: *split, tokenizer: *tokenizer, elisione: *elisione}
 	if err := esegui(*radice, *collezione, *nomeRun, *uscita, *modo, *punteggio, *analisi, *rankings, *archivio, opzioni); err != nil {
 		fmt.Fprintln(os.Stderr, "errore:", err)
 		os.Exit(1)
@@ -89,6 +102,12 @@ var analisiLessicali = map[string]func(*engine.Settings){
 		s.StopWords = engine.EnglishStopWords()
 		s.Stemmer = engine.StemmerPorter
 	},
+	"italian-stopwords": func(s *engine.Settings) { s.StopWords = engine.ItalianStopWords() },
+	"italian-stemmer":   func(s *engine.Settings) { s.Stemmer = engine.StemmerItalianLight },
+	"italian": func(s *engine.Settings) {
+		s.StopWords = engine.ItalianStopWords()
+		s.Stemmer = engine.StemmerItalianLight
+	},
 }
 
 // opzioni are the settings added after the first runs; their defaults leave a
@@ -101,6 +120,8 @@ type opzioni struct {
 	minimo        string
 	coordinazione bool
 	split         string
+	tokenizer     string
+	elisione      bool
 }
 
 func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, rankings, archivio string, o opzioni) error {
@@ -147,6 +168,10 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 			st.BM25Expansion = o.espansioni
 			st.MinimumShouldMatch = o.minimo
 			st.Coordination = o.coordinazione
+			st.Tokenizer = o.tokenizer
+			if o.elisione {
+				st.ElisionArticles = engine.ItalianElisionArticles()
+			}
 			analisiLessicali[analisi](st)
 		})
 		indicizzazione := time.Since(t0)
@@ -174,6 +199,12 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		}
 		if o.coordinazione {
 			res.Config["coordinazione"] = "accesa"
+		}
+		if o.tokenizer != "" {
+			res.Config["tokenizer"] = o.tokenizer
+		}
+		if o.elisione {
+			res.Config["elisione"] = "articoli italiani"
 		}
 	}
 	if o.top > 0 {
