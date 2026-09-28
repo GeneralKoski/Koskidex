@@ -24,6 +24,25 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-28 - Un ordine fisso per i termini trovati
+
+**Flag:** `Settings.StableTermOrder` (`stable_term_order`), spento = l'ordine di
+oggi; acceso, i termini che una parola trova, e quelli della ricerca per
+sottostringa, si visitano in ordine lessicografico. `scripts/evaluate
+-ordine-fisso`.
+
+**Perché.** Per le parole corte con un refuso e per `substring_match` il
+vocabolario si scorre come mappa, in un ordine che cambia a ogni chiamata;
+altrove l'ordine è quello di ingresso nell'indice, che l'istantanea su disco
+rimescola a ogni riavvio. L'ordine decide gli highlights e, a parità di
+distanza, il termine accreditato a un documento, e quindi il BM25. Trovato dal
+test di `510b9d2`.
+
+**Previsioni** nel README di `2026-09-28_ordine-fisso` nel repository della
+tesi, committato prima di questo codice.
+
+---
+
 ## 2026-09-28 - Allocare meno, senza cambiare un risultato
 
 **Nessun flag**, e il motivo è la condizione stessa del lavoro: questi
