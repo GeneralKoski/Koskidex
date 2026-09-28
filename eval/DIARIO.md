@@ -39,6 +39,16 @@ il giorno di ogni data combacia con un numero piccolo.
 **Previsioni** nel README di `2026-09-28_date-importi` nel repository della
 tesi, committato prima di questo codice.
 
+### Dopo
+
+`c059664`, poi `cec3b63` per il costo. Con il tokenizer standard una data in un
+formato diverso da quello dell'atto lo trova entro i primi dieci nello 0-8%
+delle query sintetiche, accesa nel 98-100%, con tutti e due i tokenizer; gli
+importi da 0% a 100%; le known-item automatiche non peggiorano (MRR@10 da 0,975
+a 0,977). Sei previsioni su otto: i numeri piccoli perdono meno candidati del
+previsto, e l'indicizzazione costa il 29-34% in più (46% prima di saltare i
+testi che non possono contenere un formato).
+
 ---
 
 ## 2026-09-28 - Un ordine fisso per i termini trovati
