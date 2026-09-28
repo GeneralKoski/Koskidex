@@ -11,7 +11,10 @@
 //     essere identici (e' il modo di aggirare la cache di Koskidex);
 //   - sequenziale: ogni query -ripetizioni volte, una alla volta;
 //   - carico: -concorrenza client senza pause, -durata per livello;
-//   - riposo: memoria e CPU senza richieste, per -durata.
+//   - riposo: memoria e CPU senza richieste, per -durata;
+//   - risposte: per ogni query l'impronta SHA-256 della lista completa dei
+//     risultati, id e punteggi come li scrive il motore, e quanti sono: due
+//     versioni del motore danno gli stessi risultati se le impronte coincidono.
 //
 // Le richieste sono quelle dell'app: per Elasticsearch il multi_match di
 // ElasticsearchService::cerca con size 10000 (-sorgente=false toglie il
@@ -61,7 +64,7 @@ var (
 	motore      = flag.String("motore", "", "es oppure koskidex")
 	base        = flag.String("url", "", "indirizzo del motore")
 	indice      = flag.String("indice", "search-documents-local", "indice da interrogare")
-	modo        = flag.String("modo", "sequenziale", "verifica, sequenziale, carico, riposo")
+	modo        = flag.String("modo", "sequenziale", "verifica, sequenziale, carico, riposo, risposte")
 	ripetizioni = flag.Int("ripetizioni", 5, "sequenziale: quante volte ogni query")
 	livelli     = flag.String("concorrenza", "1,2,4,8,16,32", "carico: client in parallelo, per livello")
 	durata      = flag.Duration("durata", 20*time.Second, "carico e riposo: durata di un livello")
@@ -100,6 +103,8 @@ func main() {
 		esito["carico"] = carico(queries)
 	case "riposo":
 		esito["riposo"] = campiona(*durata)
+	case "risposte":
+		esito["risposte"] = risposte(queries)
 	default:
 		fmt.Fprintln(os.Stderr, "modo sconosciuto:", *modo)
 		os.Exit(2)
@@ -323,6 +328,43 @@ func (s *spazi) testo(q query) string {
 	k := (s.n[q.ID]-1)%50 + 1
 	s.mu.Unlock()
 	return q.Testo + strings.Repeat(" ", k)
+}
+
+// risposte registra, per ogni query, l'impronta dei risultati così come il
+// motore li scrive: per Koskidex l'array hits con id e punteggio, byte per byte.
+func risposte(queries []query) map[string]interface{} {
+	out := map[string]interface{}{}
+	errori := 0
+	for _, q := range queries {
+		r, err := richiesta(q.Testo)
+		if err != nil {
+			errori++
+			continue
+		}
+		resp, err := client.Do(r)
+		if err != nil {
+			errori++
+			continue
+		}
+		b, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil || resp.StatusCode != 200 {
+			errori++
+			continue
+		}
+		var corpo struct {
+			Hits json.RawMessage `json:"hits"`
+		}
+		if json.Unmarshal(b, &corpo) != nil {
+			errori++
+			continue
+		}
+		h := sha256.Sum256(corpo.Hits)
+		n, _ := ids(b)
+		out[q.Famiglia+"/"+q.ID] = map[string]interface{}{"sha256": hex.EncodeToString(h[:]), "risultati": len(n)}
+	}
+	fmt.Printf("risposte: %d query, %d errori\n", len(out), errori)
+	return map[string]interface{}{"errori": errori, "query": out}
 }
 
 func verifica(queries []query) map[string]interface{} {
