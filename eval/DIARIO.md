@@ -41,6 +41,16 @@ test di `510b9d2`.
 **Previsioni** nel README di `2026-09-28_ordine-fisso` nel repository della
 tesi, committato prima di questo codice.
 
+### Dopo
+
+`c514c77`. Sei previsioni su sette. `scripts/evaluate` cerca con fuzziness
+`0`, quindi nessun suo numero dipende dall'ordine della mappa: cinque
+ripetizioni, spento e acceso, non variano mai. Ma acceso contro spento SciFact
+con BM25 `any` passa da 0,6694 a 0,6670 (2 query su 300): l'ordine di ingresso
+nell'indice, deterministico ma arbitrario, decide a parità di distanza quale
+espansione per prefisso si accredita. Documentale, con il punteggio euristico,
+non cambia (429 impronte su 429); il costo è nel rumore (fra −1,7% e +3,2%).
+
 ---
 
 ## 2026-09-28 - Allocare meno, senza cambiare un risultato
