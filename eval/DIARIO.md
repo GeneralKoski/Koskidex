@@ -24,6 +24,38 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-28 - Le allocazioni che restano
+
+**Flag:** nessuno: non deve cambiare un risultato, come le correzioni della voce
+"Allocare meno" qui sotto. Le previsioni stanno nel README di
+`2026-09-28_allocazioni` nel repository della tesi, committato prima del codice
+e prima di misurare il "prima".
+
+### Prima
+
+L'86% di quello che Koskidex alloca ancora sotto carico è la mappa dei doppioni
+in `fuzzyCandidates`, dimensionata sulla somma delle liste dei bigrammi, mentre
+quasi tutti quei termini vengono scartati subito dai controlli di lunghezza e di
+prefisso. Filtrare prima di togliere i doppioni dà gli stessi termini nello
+stesso ordine. Sette previsioni: nessun risultato cambia; allocazioni almeno
+-60%; `fuzzyCandidates` sotto il 10% dei byte; capacità nativa e nel container
+almeno +5%; a 100.000 documenti p95 e p99 almeno -15%; p50 una alla volta non
+peggiore di oltre il 5%.
+
+### Dopo
+
+`2e6beff`. Nessun risultato cambiato: 429 impronte su 429 a 10.018 e a 100.000
+documenti, `scripts/evaluate` uguale in 9 esecuzioni su 9. Contro un "prima"
+(`6f64947`) rimisurato nella stessa mezz'ora: allocazioni da 0,435 a 0,081 MB a
+ricerca; capacità nel container da 2.622 a 3.779 ricerche al secondo (+44%),
+nativa da 4.090 a 6.376 (+56%); p50 una alla volta nel container da 1,14 a
+0,92 ms. Cinque su sette. Smentite: `fuzzyCandidates` scende al 30% dei byte,
+non sotto il 10%, perché il totale è sceso con lei (da 385 a 25 KB a ricerca);
+a 100.000 documenti p95 -4% e p99 -7%, perché la copia ripete gli stessi testi
+e il vocabolario non cresce: la coda lì viene dalle liste di posting.
+
+---
+
 ## 2026-09-28 - Le espansioni come sinonimi
 
 **Flag:** un valore nuovo di `Settings.BM25Expansion`, `synonym`; `blended` e il
