@@ -43,6 +43,16 @@ senza normalizzazione gli importi fra formati non si trovano più (al più il
 totale dei risultati sulle query degli importi almeno il 20% sotto il profilo;
 il resto delle collezioni fermo.
 
+### Dopo
+
+`98701ad`, dall'app con Documentale `dad69da`. Senza refusi sugli importi e
+senza normalizzazione gli importi fra formati non si trovano più (0 su 52): il
+ponte era il refuso. Con tutte e due, 52 su 52, MRR@10 degli importi da 0,917 a
+0,990, risultati sulle query degli importi da 175 a 106. Sette su otto: la
+smentita è nel verso buono, le date col punto perdono i refusi e l'MRR@10 delle
+date sale da 0,315 a 0,333 (14 query, tutte in meglio). Known-item automatiche
+e umane identiche query per query.
+
 ---
 
 ## 2026-09-28 - Le allocazioni che restano
