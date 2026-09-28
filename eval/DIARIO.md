@@ -38,6 +38,15 @@ frequenza documentale più alta: nessuna regola di parità.
 **Previsioni** nel README di `2026-09-28_espansioni-sinonimo` nel repository
 della tesi, committato prima di questo codice.
 
+### Dopo
+
+`b958ea0`, sei previsioni su sei. Nessuna regola di parità: identico con e
+senza ordine fisso, stessi insiemi, stesso costo. SciFact `any` da 0,6694 a
+0,6667 (con stopword da 0,6757 a 0,6734), NFCorpus −0,001/−0,002, known-item
+uguali o +0,0025. Avevo previsto che la somma aiutasse come uno stemmer: non
+aiuta. Le due regole senza arbitrio, ordine lessicografico e somma, danno quasi
+lo stesso valore; lo 0,6694 è quello, un po' più alto, dell'ordine di ingresso.
+
 ---
 
 ## 2026-09-28 - Date e importi in una forma sola
