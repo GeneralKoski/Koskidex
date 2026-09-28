@@ -24,6 +24,22 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-28 - Le espansioni come sinonimi
+
+**Flag:** un valore nuovo di `Settings.BM25Expansion`, `synonym`; `blended` e il
+vuoto restano come sono. `scripts/evaluate -bm25-espansioni synonym`.
+
+**Perché.** Con `blended` a un documento si accredita una sola espansione, la
+più vicina e a parità la prima incontrata: una regola arbitraria che su SciFact
+vale 0,0024 di nDCG@10 (`2026-09-28_ordine-fisso`). Come la `SynonymQuery` di
+Lucene, `synonym` somma le occorrenze di tutte le espansioni presenti e usa la
+frequenza documentale più alta: nessuna regola di parità.
+
+**Previsioni** nel README di `2026-09-28_espansioni-sinonimo` nel repository
+della tesi, committato prima di questo codice.
+
+---
+
 ## 2026-09-28 - Date e importi in una forma sola
 
 **Flag:** `Settings.NormalizeDates` (`normalize_dates`) e
