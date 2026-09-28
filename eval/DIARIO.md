@@ -24,6 +24,35 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-28 - Allocare meno, senza cambiare un risultato
+
+**Nessun flag**, e il motivo è la condizione stessa del lavoro: questi
+interventi non devono cambiare nessun risultato, né l'insieme né l'ordine né
+un punteggio. Se ne cambiassero uno, non sarebbero questi interventi.
+
+**Perché.** La misura di carico del 28/09 (`2026-09-28_carico` nel repository
+della tesi) ha trovato circa 2 MB allocati a ricerca: il 43% in
+`findDocsForToken`, il 25% in `fuzzyCandidates`, il 15% in
+`DamerauLevenshtein`. Sotto carico il 20% della CPU è nel lock dell'allocatore
+e il 7% nel garbage collector; una ricerca alla volta occupa più di un core; il
+p50 tre volte migliore di Elasticsearch diventa 1,14 volte la sua capacità; a
+100.000 documenti il p99 arriva a 201 ms.
+
+**Cosa.** `DamerauLevenshtein` con tre righe riusate; nei candidati con refuso
+il prefisso esatto calcolato una volta e i bigrammi come sottostringhe; con il
+recupero congiuntivo i candidati trovati dal termine con meno posting, e i
+punteggi calcolati solo su di loro, nell'ordine originale dei termini, perché
+le somme in virgola mobile restino le stesse bit per bit.
+
+### Prima di misurare
+
+Le previsioni sono nel README di `2026-09-28_prestazioni`, committato prima di
+questo codice. Per il codice: le impronte di tutte le risposte coincidono prima
+e dopo, le metriche per query di `scripts/evaluate` coincidono, e
+`TestBaselineRankingIsFrozen` passa senza toccarlo.
+
+---
+
 ## 2026-09-25 - Il contesto che Ollama usa per i vettori
 
 **Flag:** `EmbedderSettings.Context` (`embedder.context`), zero = il contesto
