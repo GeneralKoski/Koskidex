@@ -24,6 +24,23 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-28 - Date e importi in una forma sola
+
+**Flag:** `Settings.NormalizeDates` (`normalize_dates`) e
+`Settings.NormalizeAmounts` (`normalize_amounts`), spenti = il testo passa al
+tokenizer com'è. `scripts/evaluate -date -importi`.
+
+**Perché.** Negli atti la stessa data è scritta `14/01/2026`, `14.01.2026` e
+`14 gennaio 2026`, gli importi con e senza i punti delle migliaia. Il tokenizer
+standard tiene insieme la data con i punti e spezza quella con la barra, quello
+di Koskidex spezza tutto: nessuno dei due collega i formati, e con il secondo
+il giorno di ogni data combacia con un numero piccolo.
+
+**Previsioni** nel README di `2026-09-28_date-importi` nel repository della
+tesi, committato prima di questo codice.
+
+---
+
 ## 2026-09-28 - Un ordine fisso per i termini trovati
 
 **Flag:** `Settings.StableTermOrder` (`stable_term_order`), spento = l'ordine di

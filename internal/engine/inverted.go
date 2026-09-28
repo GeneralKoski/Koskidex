@@ -329,6 +329,16 @@ type Settings struct {
 	// decides the highlights and, at equal distance, which term a document is
 	// credited with, and so its BM25 statistics.
 	StableTermOrder bool `json:"stable_term_order"`
+	// NormalizeDates rewrites dates in documents and queries, before the
+	// tokenizer, as one number: 14/01/2026 (or /26), 14.01.2026, 14-01-2026 and
+	// "14 gennaio 2026" all become 20260114, so a date is found whatever format
+	// it is written in, and its day no longer matches a small number. Off by
+	// default.
+	NormalizeDates bool `json:"normalize_dates"`
+	// NormalizeAmounts drops the thousands dots of 1.234.567 and 1.234,56,
+	// before the tokenizer, so 1.234,56 and 1234,56 are the same. Off by
+	// default.
+	NormalizeAmounts bool `json:"normalize_amounts"`
 
 	// Matching closer to Elasticsearch's multi_match as Documentale runs it
 	// (best_fields, operator and, fuzziness AUTO, prefix_length 1). All off by

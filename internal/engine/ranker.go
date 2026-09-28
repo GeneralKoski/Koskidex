@@ -233,6 +233,9 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 
+	// Before ParseQuery splits the query on spaces, or "14 gennaio 2026" would
+	// never be seen whole.
+	query = normalizzaNumeri(query, settings)
 	pq := ParseQuery(query, settings)
 	hasOR := len(pq.OrTerms) > 0
 	hasExclude := len(pq.ExcludeTerms) > 0

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `normalize_dates` and `normalize_amounts` settings, applied to documents and
+  queries before the tokenizer: 14/01/2026 (or /26), 14.01.2026, 14-01-2026
+  and "14 gennaio 2026" become the one number 20260114, so a date is found in
+  any format and its day no longer matches a small number; amounts lose their
+  thousands dots, so 1.234,56 and 1234,56 are the same. Invalid dates are left
+  as they are. Off by default. `scripts/evaluate -date -importi`.
 - `stable_term_order` setting: the index terms a query word matches, and those
   of `substring_match`, are visited in lexicographic order. Without it they
   come in the vocabulary map's order, which changes on every call, for short

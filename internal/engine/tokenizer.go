@@ -1,8 +1,12 @@
 package engine
 
 import (
+	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
@@ -40,7 +44,7 @@ func Tokenize(text string, field string, settings Settings) []Token {
 	norm := analizzatore(settings.Stemmer)
 
 	// 1. Single pass normalization (lowercase + remove accents)
-	normalized := removeAccents(strings.ToLower(text))
+	normalized := normalizzaNumeri(removeAccents(strings.ToLower(text)), settings)
 
 	var tokens []Token
 	var currentTerm strings.Builder
@@ -105,4 +109,113 @@ func dentroLaParola(rs []rune, i int) bool {
 		return unicode.IsNumber(prima) && unicode.IsNumber(dopo)
 	}
 	return false
+}
+
+var mesi = []string{"gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto",
+	"settembre", "ottobre", "novembre", "dicembre"}
+
+// A date or an amount is recognised only as a whole: the character before it
+// and the one after it must not continue it (Go's regexp has no lookbehind, so
+// the boundaries are checked by hand, in confine).
+var (
+	dataBarra    = regexp.MustCompile(`(\d{1,2})/(\d{1,2})/(\d{4}|\d{2})`)
+	dataPunto    = regexp.MustCompile(`(\d{1,2})\.(\d{1,2})\.(\d{4})`)
+	dataTrattino = regexp.MustCompile(`(\d{1,2})-(\d{1,2})-(\d{4})`)
+	dataMese     = regexp.MustCompile(`(?i)(\d{1,2})\s+(` + strings.Join(mesi, "|") + `)\s+(\d{4})`)
+	importo      = regexp.MustCompile(`\d{1,3}(?:\.\d{3})+(?:,\d+)?`)
+)
+
+// normalizzaNumeri rewrites dates and amounts into one form each, for
+// Settings.NormalizeDates and Settings.NormalizeAmounts, before the
+// tokenizer: the same text for documents and queries, so that a date written
+// 14/01/2026, 14.01.2026, 14-01-2026 or "14 gennaio 2026" is the one term
+// 20260114, and 1.234,56 is 1234,56. A date that cannot be one (month 13, day
+// 32, year outside 1900-2099) is left as it is.
+func normalizzaNumeri(s string, settings Settings) string {
+	if settings.NormalizeDates {
+		s = sostituisci(s, dataBarra, "./,-", "/", "", comeData)
+		s = sostituisci(s, dataPunto, "./,-", "", ".,/", comeData)
+		s = sostituisci(s, dataTrattino, "./,-", "-", "", comeData)
+		s = sostituisci(s, dataMese, "", "", "", comeData)
+	}
+	if settings.NormalizeAmounts {
+		s = sostituisci(s, importo, ".,", "", ".,", func(g []string) (string, bool) {
+			return strings.ReplaceAll(g[0], ".", ""), true
+		})
+	}
+	return s
+}
+
+func comeData(g []string) (string, bool) {
+	giorno, _ := strconv.Atoi(g[1])
+	mese, err := strconv.Atoi(g[2])
+	if err != nil {
+		mese = 0
+		for i, m := range mesi {
+			if strings.EqualFold(m, g[2]) {
+				mese = i + 1
+			}
+		}
+	}
+	anno, _ := strconv.Atoi(g[3])
+	if len(g[3]) == 2 {
+		anno += 2000
+	}
+	if giorno < 1 || giorno > 31 || mese < 1 || mese > 12 || anno < 1900 || anno > 2099 {
+		return "", false
+	}
+	return fmt.Sprintf("%04d%02d%02d", anno, mese, giorno), true
+}
+
+// sostituisci replaces each match of re that stands alone: not preceded by a
+// digit or by one of prima, not followed by a digit or by one of dopo, nor by
+// one of dopoCifra followed by a digit.
+func sostituisci(s string, re *regexp.Regexp, prima, dopo, dopoCifra string, nuovo func([]string) (string, bool)) string {
+	trovati := re.FindAllStringSubmatchIndex(s, -1)
+	if trovati == nil {
+		return s
+	}
+	var out strings.Builder
+	ultimo := 0
+	for _, m := range trovati {
+		if !confine(s, m[0], m[1], prima, dopo, dopoCifra) {
+			continue
+		}
+		g := make([]string, len(m)/2)
+		for i := range g {
+			if m[2*i] >= 0 {
+				g[i] = s[m[2*i]:m[2*i+1]]
+			}
+		}
+		v, ok := nuovo(g)
+		if !ok {
+			continue
+		}
+		out.WriteString(s[ultimo:m[0]])
+		out.WriteString(v)
+		ultimo = m[1]
+	}
+	out.WriteString(s[ultimo:])
+	return out.String()
+}
+
+func confine(s string, inizio, fine int, prima, dopo, dopoCifra string) bool {
+	if inizio > 0 {
+		r, _ := utf8.DecodeLastRuneInString(s[:inizio])
+		if unicode.IsDigit(r) || strings.ContainsRune(prima, r) {
+			return false
+		}
+	}
+	if fine < len(s) {
+		r, n := utf8.DecodeRuneInString(s[fine:])
+		if unicode.IsDigit(r) || strings.ContainsRune(dopo, r) {
+			return false
+		}
+		if strings.ContainsRune(dopoCifra, r) && fine+n < len(s) {
+			if r2, _ := utf8.DecodeRuneInString(s[fine+n:]); unicode.IsDigit(r2) {
+				return false
+			}
+		}
+	}
+	return true
 }

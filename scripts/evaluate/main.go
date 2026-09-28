@@ -46,6 +46,8 @@ func main() {
 	senzaPrefisso := flag.Bool("senza-prefisso", false, "spegne la ricerca per prefisso (Settings.DisablePrefixSearch)")
 	minimo := flag.String("minimum-should-match", "", "termini richiesti in recupero any, sintassi di Elasticsearch (Settings.MinimumShouldMatch)")
 	coordinazione := flag.Bool("coordinazione", false, "punteggio per quota di termini trovati, coord di Lucene (Settings.Coordination)")
+	date := flag.Bool("date", false, "date in qualunque formato come un numero solo, aaaammgg (Settings.NormalizeDates)")
+	importi := flag.Bool("importi", false, "importi senza i punti delle migliaia (Settings.NormalizeAmounts)")
 	ordineFisso := flag.Bool("ordine-fisso", false, "termini trovati visitati in ordine lessicografico, non in quello della mappa del vocabolario (Settings.StableTermOrder)")
 	tokenizer := flag.String("tokenizer", "", "tokenizer: vuoto (spezza su tutto cio' che non e' lettera o cifra) o standard (Settings.Tokenizer)")
 	elisione := flag.Bool("elisione", false, "toglie gli articoli elisi italiani, come l'analizzatore italian di Elasticsearch (Settings.ElisionArticles); vuole -tokenizer standard")
@@ -128,7 +130,7 @@ func main() {
 		os.Exit(1)
 	}
 	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni,
-		minimo: *minimo, coordinazione: *coordinazione, ordineFisso: *ordineFisso, split: *split, tokenizer: *tokenizer, elisione: *elisione,
+		minimo: *minimo, coordinazione: *coordinazione, ordineFisso: *ordineFisso, date: *date, importi: *importi, split: *split, tokenizer: *tokenizer, elisione: *elisione,
 		embedder: engine.EmbedderSettings{Model: *modello, URL: *ollama, Context: *contesto}, cacheVettori: *cacheVettori,
 		ibrido: *ibrido, vettoriK: *vettoriK, fusione: *fusione, pesoVettore: peso, alfa: pesoLessicale}
 	if *modello != "" {
@@ -169,6 +171,8 @@ type opzioni struct {
 	minimo        string
 	coordinazione bool
 	ordineFisso   bool
+	date          bool
+	importi       bool
 	split         string
 	tokenizer     string
 	elisione      bool
@@ -248,6 +252,8 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 			st.MinimumShouldMatch = o.minimo
 			st.Coordination = o.coordinazione
 			st.StableTermOrder = o.ordineFisso
+			st.NormalizeDates = o.date
+			st.NormalizeAmounts = o.importi
 			st.Tokenizer = o.tokenizer
 			st.HybridMode = o.ibrido
 			st.VectorTopK = o.vettoriK
@@ -287,6 +293,12 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		}
 		if o.ordineFisso {
 			res.Config["ordine_fisso"] = "acceso"
+		}
+		if o.date {
+			res.Config["date"] = "normalizzate"
+		}
+		if o.importi {
+			res.Config["importi"] = "normalizzati"
 		}
 		if o.tokenizer != "" {
 			res.Config["tokenizer"] = o.tokenizer
