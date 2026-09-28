@@ -149,7 +149,9 @@ func (idx *InvertedIndex) docsForTermsLocked(token Token, matchedTerms []string,
 					tokenDocBest[p.DocID].Typos = matchDist
 					// The closer term wins: its statistics are the ones to use.
 					tokenDocBest[p.DocID].MatchedTerm = mTerm
-					tokenDocBest[p.DocID].TF = 0
+					if settings.BM25Expansion != BM25ExpansionSynonym {
+						tokenDocBest[p.DocID].TF = 0
+					}
 				}
 				if weight > tokenDocBest[p.DocID].MaxWeight {
 					tokenDocBest[p.DocID].MaxWeight = weight
@@ -164,8 +166,9 @@ func (idx *InvertedIndex) docsForTermsLocked(token Token, matchedTerms []string,
 			}
 
 			// One posting is one occurrence, but only of the term currently
-			// credited to this document.
-			if tokenDocBest[p.DocID].MatchedTerm == mTerm {
+			// credited to this document; with BM25ExpansionSynonym, of any of
+			// the terms the token matched.
+			if tokenDocBest[p.DocID].MatchedTerm == mTerm || settings.BM25Expansion == BM25ExpansionSynonym {
 				tokenDocBest[p.DocID].TF++
 			}
 
@@ -529,7 +532,7 @@ func (idx *InvertedIndex) bm25Locked(match *TokenDocMatch, settings Settings) fl
 	}
 
 	df := float64(idx.docFreq[match.MatchedTerm])
-	if settings.BM25Expansion == BM25ExpansionBlended && float64(match.BlendedDF) > df {
+	if (settings.BM25Expansion == BM25ExpansionBlended || settings.BM25Expansion == BM25ExpansionSynonym) && float64(match.BlendedDF) > df {
 		df = float64(match.BlendedDF)
 	}
 	idf := math.Log(1 + (n-df+0.5)/(df+0.5))

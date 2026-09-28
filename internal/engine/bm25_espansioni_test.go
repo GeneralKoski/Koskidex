@@ -111,3 +111,28 @@ func TestBM25ExpansionDoesNotTouchTheLegacyScorer(t *testing.T) {
 		}
 	}
 }
+
+// With BM25ExpansionSynonym a document's TF is the occurrences of every
+// expansion it holds, so the credited term, and the order the terms are
+// visited in, no longer matter.
+func TestEspansioniSinonimo(t *testing.T) {
+	testi := map[string]string{"a": "cani cani cani cant", "b": "cant cant cani", "c": "casa cane"}
+	for _, ordine := range [][]string{{"a", "b", "c"}, {"c", "b", "a"}} {
+		settings := DefaultSettings()
+		settings.ScoringMode = ScoringBM25
+		settings.BM25Expansion = BM25ExpansionSynonym
+		settings.RetrievalMode = RetrievalAny
+		idx := NewInvertedIndex()
+		for _, id := range ordine {
+			idx.AddDocument(id, map[string]interface{}{"title": testi[id]}, settings)
+		}
+		idx.mu.RLock()
+		trovati := idx.docsForTermsLocked(Token{Term: "canx"}, idx.matchedTermsLocked(Token{Term: "canx"}, settings, "1"), settings, nil, nil, 0)
+		idx.mu.RUnlock()
+		for id, tf := range map[string]int{"a": 4, "b": 3, "c": 1} {
+			if trovati[id] == nil || trovati[id].TF != tf {
+				t.Errorf("ordine %v, %s: TF %v, atteso %d", ordine, id, trovati[id], tf)
+			}
+		}
+	}
+}

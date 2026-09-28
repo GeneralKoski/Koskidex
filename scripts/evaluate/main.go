@@ -42,7 +42,7 @@ func main() {
 	k1 := flag.Float64("bm25-k1", engine.DefaultBM25K1, "k1 di BM25: saturazione della frequenza del termine")
 	b := flag.Float64("bm25-b", engine.DefaultBM25B, "b di BM25: peso della normalizzazione della lunghezza")
 	top := flag.Int("top", 0, "quanti id della testa di ogni ranking salvare nel file (0 = nessuno)")
-	espansioni := flag.String("bm25-espansioni", "", "frequenza con cui BM25 pesa le espansioni: vuoto (il termine trovato) o blended")
+	espansioni := flag.String("bm25-espansioni", "", "frequenza con cui BM25 pesa le espansioni: vuoto (il termine trovato), blended o synonym (TF sommato)")
 	senzaPrefisso := flag.Bool("senza-prefisso", false, "spegne la ricerca per prefisso (Settings.DisablePrefixSearch)")
 	minimo := flag.String("minimum-should-match", "", "termini richiesti in recupero any, sintassi di Elasticsearch (Settings.MinimumShouldMatch)")
 	coordinazione := flag.Bool("coordinazione", false, "punteggio per quota di termini trovati, coord di Lucene (Settings.Coordination)")
@@ -78,8 +78,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *espansioni != "" && *espansioni != engine.BM25ExpansionBlended {
-		fmt.Fprintf(os.Stderr, "espansioni %q sconosciute, usa %q o lascia vuoto\n", *espansioni, engine.BM25ExpansionBlended)
+	if *espansioni != "" && *espansioni != engine.BM25ExpansionBlended && *espansioni != engine.BM25ExpansionSynonym {
+		fmt.Fprintf(os.Stderr, "espansioni %q sconosciute, usa %q, %q o lascia vuoto\n", *espansioni, engine.BM25ExpansionBlended, engine.BM25ExpansionSynonym)
 		os.Exit(1)
 	}
 	if *tokenizer != "" && *tokenizer != engine.TokenizerStandard {

@@ -307,7 +307,8 @@ type Settings struct {
 	BM25B           float64             `json:"bm25_b"`
 	// BM25Expansion is the document frequency a prefix or typo expansion is
 	// weighted with. Empty is the term found, as up to now; BM25ExpansionBlended
-	// is the highest among the terms the query term matched.
+	// is the highest among the terms the query term matched;
+	// BM25ExpansionSynonym also sums their term frequencies.
 	BM25Expansion string `json:"bm25_expansion"`
 	// MinimumShouldMatch is how many query terms a document must hold in
 	// RetrievalAny, with Elasticsearch's minimum_should_match syntax. Empty is
@@ -455,6 +456,12 @@ const (
 	// term found by prefix, such as a code starting with the searched number,
 	// then weighs no more than the most common of its siblings.
 	BM25ExpansionBlended = "blended"
+
+	// BM25ExpansionSynonym is BM25ExpansionBlended with the term frequency of
+	// all the expansions a document holds summed, as Lucene's SynonymQuery
+	// scores several terms as one: no expansion is credited over another, so
+	// no tie rule decides the score.
+	BM25ExpansionSynonym = "synonym"
 )
 
 // How many of the query terms a document has to carry to be retrieved.

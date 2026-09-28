@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `bm25_expansion: "synonym"`: like `blended`, but a document's term frequency
+  for a query word is the sum of the occurrences of all its expansions, as
+  Lucene's SynonymQuery scores several terms as one; no expansion is credited
+  over another, so no tie rule decides the score.
+  `scripts/evaluate -bm25-espansioni synonym`.
 - `normalize_dates` and `normalize_amounts` settings, applied to documents and
   queries before the tokenizer: 14/01/2026 (or /26), 14.01.2026, 14-01-2026
   and "14 gennaio 2026" become the one number 20260114, so a date is found in
