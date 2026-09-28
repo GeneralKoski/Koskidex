@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -147,9 +148,95 @@ func TestFuzzyCandidatesComePrima(t *testing.T) {
 		idx.AddDocument(string(rune('a'+i)), map[string]interface{}{"title": testo}, Settings{})
 	}
 	for _, q := range []string{"", "g", "go", "godfahter", "città", "pià", "日本", "a\xffb", "\xff\xfe", "zzz"} {
-		got, want := idx.fuzzyCandidates(q), prima(idx, q)
+		got, want := idx.fuzzyCandidates(q, nil), prima(idx, q)
 		if len(got) != len(want) || (len(want) > 0 && !reflect.DeepEqual(got, want)) {
 			t.Errorf("fuzzyCandidates(%q) = %v; prima %v", q, got, want)
 		}
 	}
+}
+
+// TestCandidatiFiltratiComePrima checks that filtering the typo candidates
+// before dropping the duplicates finds the same terms, in the same order, as
+// the path that dropped the duplicates first and then filtered them. Words
+// short enough to scan the whole vocabulary are skipped: they do not go
+// through fuzzyCandidates, and the map gives them a different order at every
+// call.
+func TestCandidatiFiltratiComePrima(t *testing.T) {
+	prima := func(idx *InvertedIndex, queryTerm string, maxDistance int, noPrefix bool, prefixLength int) []string {
+		var matched []string
+		if _, ok := idx.index[queryTerm]; ok {
+			matched = append(matched, queryTerm)
+		}
+		queryRunes := []rune(queryTerm)
+		exact := queryRunes
+		if prefixLength < len(exact) {
+			exact = exact[:prefixLength]
+		}
+		for _, c := range idx.fuzzyCandidates(queryTerm, nil) {
+			if c == queryTerm {
+				continue
+			}
+			if !noPrefix && len(queryTerm) >= 2 && len(c) > len(queryTerm) && c[:len(queryTerm)] == queryTerm {
+				matched = append(matched, c)
+				continue
+			}
+			if len(exact) > 0 && !strings.HasPrefix(c, string(exact)) {
+				continue
+			}
+			if DamerauLevenshtein(queryTerm, c) <= maxDistance {
+				matched = append(matched, c)
+			}
+		}
+		return matched
+	}
+
+	r := rand.New(rand.NewSource(28))
+	lettere := []rune("aeiocrtnslàèù")
+	parola := func() string {
+		w := make([]rune, 2+r.Intn(9))
+		for i := range w {
+			w[i] = lettere[r.Intn(len(lettere))]
+		}
+		return string(w)
+	}
+	idx := NewInvertedIndex()
+	for i := 0; i < 3000; i++ {
+		idx.AddDocument(string(rune('a'+i%26))+strings.Repeat("x", i/26), map[string]interface{}{"title": parola()}, Settings{})
+	}
+	var vocabolario []string
+	for term := range idx.index {
+		vocabolario = append(vocabolario, term)
+	}
+	sort.Strings(vocabolario)
+	var query []string
+	for i, w := range vocabolario {
+		if i%3 != 0 {
+			continue
+		}
+		rw := []rune(w)
+		k := r.Intn(len(rw))
+		refuso := append(append(append([]rune{}, rw[:k]...), lettere[r.Intn(len(lettere))]), rw[k+1:]...)
+		query = append(query, w, string(rw[:1+r.Intn(len(rw))]), string(refuso), parola())
+	}
+
+	confrontate := 0
+	for _, q := range query {
+		n := len([]rune(q))
+		for d := 0; d <= 2; d++ {
+			if d > 0 && n-1-3*d < 1 {
+				continue
+			}
+			for prefisso := 0; prefisso <= 2; prefisso++ {
+				for _, noPrefix := range []bool{false, true} {
+					got := idx.fuzzySearchTermsLocked(q, d, false, noPrefix, prefisso)
+					want := prima(idx, q, d, noPrefix, prefisso)
+					if !reflect.DeepEqual(got, want) {
+						t.Fatalf("%q d=%d prefisso=%d noPrefix=%v: %v; prima %v", q, d, prefisso, noPrefix, got, want)
+					}
+					confrontate++
+				}
+			}
+		}
+	}
+	t.Logf("%d vocaboli, %d confronti", len(vocabolario), confrontate)
 }

@@ -115,30 +115,30 @@ func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance i
 	}
 
 	exactStr := string(exact)
-	consider := func(candidate string) {
+	// Prefix matching: if candidate starts with queryTerm, it's a match regardless of distance
+	esteso := func(candidate string) bool {
+		return !noPrefix && len(queryTerm) >= 2 && len(candidate) > len(queryTerm) &&
+			candidate[:len(queryTerm)] == queryTerm
+	}
+	// passa is everything consider checks before the distance. It depends on
+	// the candidate alone, so fuzzyCandidates can apply it before dropping
+	// the duplicates and give back the same terms in the same order.
+	passa := func(candidate string) bool {
 		if candidate == queryTerm {
-			return // Already handled
+			return false // Already handled
 		}
-
-		// Prefix matching: if candidate starts with queryTerm, it's a match regardless of distance
-		if !noPrefix && len(queryTerm) >= 2 && len(candidate) > len(queryTerm) {
-			if candidate[:len(queryTerm)] == queryTerm {
-				matchedTerms = append(matchedTerms, candidate)
-				return
-			}
+		if esteso(candidate) {
+			return true
 		}
-
 		if len(exact) > 0 && !strings.HasPrefix(candidate, exactStr) {
-			return
+			return false
 		}
-
 		// The distance is at least the difference in length: skip the matrix.
-		if d := utf8.RuneCountInString(candidate) - len(queryRunes); d > maxDistance || -d > maxDistance {
-			return
-		}
-
-		dist := DamerauLevenshtein(queryTerm, candidate)
-		if dist <= maxDistance {
+		d := utf8.RuneCountInString(candidate) - len(queryRunes)
+		return d <= maxDistance && -d <= maxDistance
+	}
+	consider := func(candidate string) {
+		if passa(candidate) && (esteso(candidate) || DamerauLevenshtein(queryTerm, candidate) <= maxDistance) {
 			matchedTerms = append(matchedTerms, candidate)
 		}
 	}
@@ -159,7 +159,7 @@ func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance i
 	// Gather candidates from every bigram of the query term, not just the first
 	// one: documents index all their bigrams, so probing only the leading bigram
 	// would miss matches whose typo lands in the first two characters.
-	for _, candidate := range idx.fuzzyCandidates(queryTerm) {
+	for _, candidate := range idx.fuzzyCandidates(queryTerm, passa) {
 		consider(candidate)
 	}
 	return matchedTerms
@@ -167,11 +167,15 @@ func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance i
 
 // fuzzyCandidates returns the distinct terms sharing at least one bigram with
 // queryTerm, mirroring how addDocumentLocked indexes every bigram into
-// prefixMap. Caller must hold idx.mu.
-func (idx *InvertedIndex) fuzzyCandidates(queryTerm string) []string {
+// prefixMap, in order of first appearance, keeping only those passa accepts
+// (all of them when passa is nil). Caller must hold idx.mu.
+func (idx *InvertedIndex) fuzzyCandidates(queryTerm string, passa func(string) bool) []string {
+	if passa == nil {
+		passa = func(string) bool { return true }
+	}
 	runes := []rune(queryTerm)
 	if len(runes) < 2 {
-		return dedup(idx.prefixMap[queryTerm])
+		return dedup(idx.prefixMap[queryTerm], passa)
 	}
 	// A bigram is two runes; in valid UTF-8, as the tokenizer produces, it is
 	// the substring between their offsets, with no conversion to allocate.
@@ -189,16 +193,16 @@ func (idx *InvertedIndex) fuzzyCandidates(queryTerm string) []string {
 		return string(runes[k : k+2])
 	}
 
-	// Sized once for the longest the lists can make them, instead of growing
-	// by doubling: the lists of common bigrams hold thousands of terms.
-	totale := 0
-	for k := 0; k+2 < len(inizi); k++ {
-		totale += len(idx.prefixMap[bigramma(k)])
-	}
-	seen := make(map[string]struct{}, totale)
-	candidates := make([]string, 0, totale)
+	// The lists of common bigrams hold thousands of terms and passa rejects
+	// nearly all of them: checking it first keeps the map of the terms seen
+	// as small as the answer, instead of as large as the lists.
+	seen := make(map[string]struct{})
+	var candidates []string
 	for k := 0; k+2 < len(inizi); k++ {
 		for _, t := range idx.prefixMap[bigramma(k)] {
+			if !passa(t) {
+				continue
+			}
 			if _, ok := seen[t]; !ok {
 				seen[t] = struct{}{}
 				candidates = append(candidates, t)
@@ -208,11 +212,14 @@ func (idx *InvertedIndex) fuzzyCandidates(queryTerm string) []string {
 	return candidates
 }
 
-// dedup keeps the first occurrence of each term, in order.
-func dedup(terms []string) []string {
-	seen := make(map[string]struct{}, len(terms))
-	out := make([]string, 0, len(terms))
+// dedup keeps the first occurrence of each term passa accepts, in order.
+func dedup(terms []string, passa func(string) bool) []string {
+	seen := make(map[string]struct{})
+	var out []string
 	for _, t := range terms {
+		if !passa(t) {
+			continue
+		}
 		if _, ok := seen[t]; !ok {
 			seen[t] = struct{}{}
 			out = append(out, t)

@@ -87,7 +87,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Typo matching allocates far less, with identical results: the edit distance
   keeps three rows on the stack instead of a full matrix (no allocation for
   words up to 32 characters, about half the time), and the typo candidates are
-  collected from substrings with maps sized once.
+  collected from substrings; the candidates too far in length, or without the
+  exact prefix, are dropped before the duplicates, so the map that removes
+  them holds the few that remain instead of every term of the bigram lists.
 - A search that requires every term first finds, from the rarest term, the
   documents that hold them all, and scores only those: the others were scored
   and then dropped. Same results, same scores to the bit, same highlights for
