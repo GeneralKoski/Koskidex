@@ -85,6 +85,16 @@ func TestSearchScoredDeduplicatesHighlights(t *testing.T) {
 // prefixes, repeated and missing words, under the settings that touch the
 // must loop.
 func TestCandidatiCongiuntiviNonCambianoNulla(t *testing.T) {
+	confrontaCandidati(t, false)
+}
+
+// With StableTermOrder the vocabulary scan has a fixed order too, so every
+// query is compared, none skipped.
+func TestCandidatiCongiuntiviConOrdineFisso(t *testing.T) {
+	confrontaCandidati(t, true)
+}
+
+func confrontaCandidati(t *testing.T, ordineFisso bool) {
 	parole := []string{"gatto", "gatti", "gatta", "cane", "cani", "casa", "case", "cassa", "contratto",
 		"contratti", "noleggio", "noleggi", "comune", "comunale", "delibera", "determina", "lavori",
 		"lavoro", "strada", "strade", "manutenzione", "scuola", "scuole", "città", "perché", "2026", "123"}
@@ -127,6 +137,7 @@ func TestCandidatiCongiuntiviNonCambianoNulla(t *testing.T) {
 	for v, varia := range varianti {
 		settings := DefaultSettings()
 		varia(&settings)
+		settings.StableTermOrder = ordineFisso
 		idx := NewInvertedIndex()
 		for i := 0; i < 400; i++ {
 			idx.AddDocument(fmt.Sprint(i), map[string]interface{}{
@@ -155,14 +166,15 @@ func TestCandidatiCongiuntiviNonCambianoNulla(t *testing.T) {
 			fuzziness := []string{"auto", "0", "1", "2"}[r.Intn(4)]
 
 			// A short word with a typo allowed is matched by scanning the
-			// vocabulary map, whose order changes from call to call: there
-			// the same search already differs from itself, candidates or not.
+			// vocabulary map, whose order changes from call to call: without
+			// StableTermOrder the same search already differs from itself
+			// there, candidates or not.
 			instabile := false
 			for _, tk := range Tokenize(query, "", settings) {
 				d := MaxTypos(tk.Term, settings.TypoTolerance, fuzziness)
 				instabile = instabile || (d > 0 && len([]rune(tk.Term))-1-3*d < 1)
 			}
-			if instabile {
+			if instabile && !ordineFisso {
 				instabili++
 				continue
 			}
@@ -183,7 +195,57 @@ func TestCandidatiCongiuntiviNonCambianoNulla(t *testing.T) {
 		}
 	}
 	t.Logf("%d ricerche confrontate, %d saltate perché instabili anche senza i candidati (scansione del vocabolario)", confrontate, instabili)
-	if confrontate < 1500 {
+	minimo := 1500
+	if ordineFisso {
+		minimo = 4200
+	}
+	if confrontate < minimo {
 		t.Fatalf("solo %d ricerche confrontate", confrontate)
+	}
+}
+
+// A document holds two terms at the same distance from a short query word,
+// with different frequencies: which one it is credited with decides its BM25
+// score. With StableTermOrder the answer, and the highlights, never change,
+// from one call to the next or with the documents added in another order,
+// through the vocabulary scan and through substring_match alike.
+func TestStableTermOrder(t *testing.T) {
+	testi := map[string]string{
+		"a": "cani cani cani cant",
+		"b": "cant cant cani",
+		"c": "casa cane",
+		"d": "contratto cantiere canile",
+	}
+	riempi := func(ordine []string, settings Settings) *InvertedIndex {
+		idx := NewInvertedIndex()
+		for _, id := range ordine {
+			idx.AddDocument(id, map[string]interface{}{"title": testi[id]}, settings)
+		}
+		return idx
+	}
+	for _, sottostringa := range []bool{false, true} {
+		settings := DefaultSettings()
+		settings.ScoringMode = ScoringBM25
+		settings.StableTermOrder = true
+		settings.SubstringMatch = sottostringa
+		settings.RetrievalMode = RetrievalAny
+		query := "canx"
+		if sottostringa {
+			query = "can"
+		}
+		primo, hlPrimo := riempi([]string{"a", "b", "c", "d"}, settings).SearchScored(query, settings, "1", nil)
+		if len(primo) == 0 {
+			t.Fatalf("%q: nessun risultato", query)
+		}
+		for i := 0; i < 200; i++ {
+			ordine := []string{"d", "c", "b", "a"}
+			if i%2 == 0 {
+				ordine = []string{"a", "b", "c", "d"}
+			}
+			res, hl := riempi(ordine, settings).SearchScored(query, settings, "1", nil)
+			if !reflect.DeepEqual(res, primo) || !reflect.DeepEqual(hl, hlPrimo) {
+				t.Fatalf("%q, chiamata %d: %v %v, la prima dava %v %v", query, i, res, hl, primo, hlPrimo)
+			}
+		}
 	}
 }

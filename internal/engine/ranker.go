@@ -92,7 +92,11 @@ func (idx *InvertedIndex) matchedTermsLocked(token Token, settings Settings, fuz
 	maxTypos := MaxTypos(token.Term, settings.TypoTolerance, fuzziness)
 	// Search already holds idx.mu (read); use the lock-free variant to avoid
 	// recursive read-locking, which can deadlock against a concurrent writer.
-	return idx.fuzzySearchTermsLocked(token.Term, maxTypos, false, settings.DisablePrefixSearch, settings.PrefixLength)
+	terms := idx.fuzzySearchTermsLocked(token.Term, maxTypos, false, settings.DisablePrefixSearch, settings.PrefixLength)
+	if settings.StableTermOrder {
+		sort.Strings(terms)
+	}
+	return terms
 }
 
 // docsForTermsLocked collects, per document, how the token matched through
@@ -442,12 +446,19 @@ func (idx *InvertedIndex) addSubstringMatchesLocked(query string, settings Setti
 		return
 	}
 
-	best := make(map[string]*TokenDocMatch)
-	for term, postings := range idx.index {
-		if !strings.Contains(term, needle) {
-			continue
+	var terms []string
+	for term := range idx.index {
+		if strings.Contains(term, needle) {
+			terms = append(terms, term)
 		}
-		for _, p := range postings {
+	}
+	if settings.StableTermOrder {
+		sort.Strings(terms)
+	}
+
+	best := make(map[string]*TokenDocMatch)
+	for _, term := range terms {
+		for _, p := range idx.index[term] {
 			weight := 1.0
 			if w, ok := settings.FieldWeights[p.Field]; ok {
 				weight = w

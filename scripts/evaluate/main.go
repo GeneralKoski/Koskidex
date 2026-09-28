@@ -46,6 +46,7 @@ func main() {
 	senzaPrefisso := flag.Bool("senza-prefisso", false, "spegne la ricerca per prefisso (Settings.DisablePrefixSearch)")
 	minimo := flag.String("minimum-should-match", "", "termini richiesti in recupero any, sintassi di Elasticsearch (Settings.MinimumShouldMatch)")
 	coordinazione := flag.Bool("coordinazione", false, "punteggio per quota di termini trovati, coord di Lucene (Settings.Coordination)")
+	ordineFisso := flag.Bool("ordine-fisso", false, "termini trovati visitati in ordine lessicografico, non in quello della mappa del vocabolario (Settings.StableTermOrder)")
 	tokenizer := flag.String("tokenizer", "", "tokenizer: vuoto (spezza su tutto cio' che non e' lettera o cifra) o standard (Settings.Tokenizer)")
 	elisione := flag.Bool("elisione", false, "toglie gli articoli elisi italiani, come l'analizzatore italian di Elasticsearch (Settings.ElisionArticles); vuole -tokenizer standard")
 	modello := flag.String("embedder", "", "modello Ollama per i vettori di documenti e query (per esempio bge-m3); vuoto = senza vettori")
@@ -127,7 +128,7 @@ func main() {
 		os.Exit(1)
 	}
 	opzioni := opzioni{k1: *k1, b: *b, top: *top, senzaPrefisso: *senzaPrefisso, espansioni: *espansioni,
-		minimo: *minimo, coordinazione: *coordinazione, split: *split, tokenizer: *tokenizer, elisione: *elisione,
+		minimo: *minimo, coordinazione: *coordinazione, ordineFisso: *ordineFisso, split: *split, tokenizer: *tokenizer, elisione: *elisione,
 		embedder: engine.EmbedderSettings{Model: *modello, URL: *ollama, Context: *contesto}, cacheVettori: *cacheVettori,
 		ibrido: *ibrido, vettoriK: *vettoriK, fusione: *fusione, pesoVettore: peso, alfa: pesoLessicale}
 	if *modello != "" {
@@ -167,6 +168,7 @@ type opzioni struct {
 	espansioni    string
 	minimo        string
 	coordinazione bool
+	ordineFisso   bool
 	split         string
 	tokenizer     string
 	elisione      bool
@@ -245,6 +247,7 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 			st.BM25Expansion = o.espansioni
 			st.MinimumShouldMatch = o.minimo
 			st.Coordination = o.coordinazione
+			st.StableTermOrder = o.ordineFisso
 			st.Tokenizer = o.tokenizer
 			st.HybridMode = o.ibrido
 			st.VectorTopK = o.vettoriK
@@ -281,6 +284,9 @@ func esegui(radice, collezione, nomeRun, uscita, modo, punteggio, analisi, ranki
 		}
 		if o.coordinazione {
 			res.Config["coordinazione"] = "accesa"
+		}
+		if o.ordineFisso {
+			res.Config["ordine_fisso"] = "acceso"
 		}
 		if o.tokenizer != "" {
 			res.Config["tokenizer"] = o.tokenizer

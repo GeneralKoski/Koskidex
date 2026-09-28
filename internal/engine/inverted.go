@@ -321,6 +321,14 @@ type Settings struct {
 	// whole query, as Elasticsearch's wildcard *query* on a text field. Off by
 	// default.
 	SubstringMatch bool `json:"substring_match"`
+	// StableTermOrder visits the index terms a query word matches, and those
+	// of SubstringMatch, in lexicographic order. Off, as up to now, they come
+	// in the vocabulary map's order, which changes on every call, for short
+	// words with a typo allowed and for SubstringMatch, and otherwise in the
+	// order they entered the index, which a restart can reshuffle. The order
+	// decides the highlights and, at equal distance, which term a document is
+	// credited with, and so its BM25 statistics.
+	StableTermOrder bool `json:"stable_term_order"`
 
 	// Matching closer to Elasticsearch's multi_match as Documentale runs it
 	// (best_fields, operator and, fuzziness AUTO, prefix_length 1). All off by

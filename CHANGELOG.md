@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `stable_term_order` setting: the index terms a query word matches, and those
+  of `substring_match`, are visited in lexicographic order. Without it they
+  come in the vocabulary map's order, which changes on every call, for short
+  words with a typo allowed and for `substring_match`, and otherwise in the
+  order they entered the index, which a restart can reshuffle; the order
+  decides highlights and, at equal distance, the term a document is credited
+  with, so its BM25 score. Off by default. `scripts/evaluate -ordine-fisso`.
 - `embedder.context` setting: the number of tokens Ollama reads of each text,
   sent as both `num_ctx` and `num_batch`, since Ollama cuts an input at the
   smaller of the two. Zero keeps Ollama's default, 2,048 tokens, so longer
