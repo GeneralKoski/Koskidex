@@ -245,6 +245,9 @@ func MaxTypos(term string, settings TypoSettings, fuzziness string) int {
 	if settings.DisableOnNumbers && soloCifre(term) {
 		return 0
 	}
+	if settings.DisableOnAmounts && cifreESeparatori(term) {
+		return 0
+	}
 	l := len([]rune(term))
 	if l < settings.MinWordLengthOneTypo {
 		return 0
@@ -253,6 +256,25 @@ func MaxTypos(term string, settings TypoSettings, fuzziness string) int {
 		return 1
 	}
 	return 2
+}
+
+// cifreESeparatori: digits with at least one dot or comma, a digit at both ends.
+func cifreESeparatori(term string) bool {
+	separatori := 0
+	for _, r := range term {
+		switch {
+		case r == '.' || r == ',':
+			separatori++
+		case !unicode.IsDigit(r):
+			return false
+		}
+	}
+	if separatori == 0 {
+		return false
+	}
+	primo, _ := utf8.DecodeRuneInString(term)
+	ultimo, _ := utf8.DecodeLastRuneInString(term)
+	return unicode.IsDigit(primo) && unicode.IsDigit(ultimo)
 }
 
 func soloCifre(term string) bool {

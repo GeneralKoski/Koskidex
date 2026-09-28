@@ -490,6 +490,11 @@ type TypoSettings struct {
 	// DisableOnNumbers denies typos to a query term made only of digits, as
 	// Meilisearch's typoTolerance.disableOnNumbers: 1209 must not match 1109.
 	DisableOnNumbers bool `json:"disable_on_numbers"`
+	// DisableOnAmounts denies typos to a query term made of digits and at
+	// least one dot or comma, starting and ending with a digit: 5.056,03
+	// must not match 5.056,08. The standard tokenizer keeps such a term
+	// whole, and DisableOnNumbers does not see it as a number.
+	DisableOnAmounts bool `json:"disable_on_amounts"`
 }
 
 // DefaultSettings returns sane defaults

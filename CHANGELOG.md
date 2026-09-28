@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `typo_tolerance.disable_on_amounts`: denies typos to a query term made of
+  digits and at least one dot or comma, with a digit at both ends (1.234,56,
+  5056,03, 14.01.2026). With the standard tokenizer such a term stays whole,
+  and `disable_on_numbers` does not see it as a number, so 5.056,03 matched
+  5.056,08. Off by default.
 - `bm25_expansion: "synonym"`: like `blended`, but a document's term frequency
   for a query word is the sum of the occurrences of all its expansions, as
   Lucene's SynonymQuery scores several terms as one; no expansion is credited

@@ -24,6 +24,27 @@ della tesi, che è il posto dove stanno le esecuzioni che contano.
 
 ---
 
+## 2026-09-28 - Gli importi senza refusi
+
+**Flag:** `Settings.TypoTolerance.DisableOnAmounts`
+(`typo_tolerance.disable_on_amounts`), `false` = comportamento di oggi.
+`scripts/evaluate` non la misura: cerca senza refusi, e lì il difetto non c'è.
+Si misura dall'app, in `2026-09-28_importi-esatti` nel repository della tesi,
+dove stanno domanda e previsioni, committate prima del codice.
+
+### Prima
+
+Con il tokenizer standard un importo resta un termine solo, e con la
+tolleranza AUTO `5056,03` combacia con `5.056,03` ma anche con `5.056,08`:
+`disable_on_numbers` guarda solo i termini di sole cifre. Otto previsioni,
+dall'app nelle quattro combinazioni con `normalize_amounts`: senza refusi e
+senza normalizzazione gli importi fra formati non si trovano più (al più il
+10%), con tutte e due almeno il 90% e MRR@10 degli importi almeno 0,95, e il
+totale dei risultati sulle query degli importi almeno il 20% sotto il profilo;
+il resto delle collezioni fermo.
+
+---
+
 ## 2026-09-28 - Le allocazioni che restano
 
 **Flag:** nessuno: non deve cambiare un risultato, come le correzioni della voce
