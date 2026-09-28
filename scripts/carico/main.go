@@ -74,6 +74,7 @@ var (
 	container   = flag.String("container", "", "container di cui campionare CPU e memoria")
 	pid         = flag.Int("pid", 0, "processo di cui campionare CPU e memoria")
 	etichetta   = flag.String("etichetta", "", "nome del file di esito")
+	esperimento = flag.String("esperimento", "2026-09-28_carico", "cartella dell'esperimento nell'archivio")
 	seme        = flag.Int64("seme", 20260928, "seme per l'ordine delle query")
 	fileDiQuery fileQuery
 )
@@ -110,7 +111,7 @@ func main() {
 		os.Exit(2)
 	}
 	dati, _ := json.MarshalIndent(esito, "", "  ")
-	path, err := eval.Archivia("esperimenti/2026-09-28_carico", *etichetta, dati)
+	path, err := eval.Archivia("esperimenti/"+*esperimento, *etichetta, dati)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
