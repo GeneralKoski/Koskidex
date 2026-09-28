@@ -9,7 +9,12 @@ import (
 // DamerauLevenshtein calculates the distance between two strings
 // allowing transposition of adjacent characters (e.g. teh -> the).
 func DamerauLevenshtein(a, b string) int {
-	rA, rB := []rune(a), []rune(b)
+	// The recurrence reads only the two rows above the current one, so three
+	// rows are enough. For the short words of a query they, and the runes,
+	// live in arrays on the stack: the whole matrix was allocated on every
+	// call, and this runs once per candidate term of every search.
+	var bufA, bufB [32]rune
+	rA, rB := appendRunes(bufA[:0], a), appendRunes(bufB[:0], b)
 	lenA, lenB := len(rA), len(rB)
 
 	if lenA == 0 {
@@ -19,16 +24,20 @@ func DamerauLevenshtein(a, b string) int {
 		return lenA
 	}
 
-	d := make([][]int, lenA+1)
-	for i := range d {
-		d[i] = make([]int, lenB+1)
-		d[i][0] = i
+	var bufRighe [3 * 33]int
+	righe := bufRighe[:0]
+	if 3*(lenB+1) <= len(bufRighe) {
+		righe = bufRighe[:3*(lenB+1)]
+	} else {
+		righe = make([]int, 3*(lenB+1))
 	}
-	for j := range d[0] {
-		d[0][j] = j
+	dueSopra, sopra, riga := righe[:lenB+1], righe[lenB+1:2*(lenB+1)], righe[2*(lenB+1):]
+	for j := range sopra {
+		sopra[j] = j
 	}
 
 	for i := 1; i <= lenA; i++ {
+		riga[0] = i
 		for j := 1; j <= lenB; j++ {
 			cost := 1
 			if rA[i-1] == rB[j-1] {
@@ -36,20 +45,30 @@ func DamerauLevenshtein(a, b string) int {
 			}
 
 			// substitution, insertion, deletion
-			d[i][j] = min3(
-				d[i-1][j]+1,      // deletion
-				d[i][j-1]+1,      // insertion
-				d[i-1][j-1]+cost, // substitution
+			v := min3(
+				sopra[j]+1,      // deletion
+				riga[j-1]+1,     // insertion
+				sopra[j-1]+cost, // substitution
 			)
 
 			// transposition
 			if i > 1 && j > 1 && rA[i-1] == rB[j-2] && rA[i-2] == rB[j-1] {
-				d[i][j] = min2(d[i][j], d[i-2][j-2]+cost)
+				v = min2(v, dueSopra[j-2]+cost)
 			}
+			riga[j] = v
 		}
+		dueSopra, sopra, riga = sopra, riga, dueSopra
 	}
 
-	return d[lenA][lenB]
+	return sopra[lenB]
+}
+
+// appendRunes is []rune(s) into dst, so that dst can be a stack array.
+func appendRunes(dst []rune, s string) []rune {
+	for _, r := range s {
+		dst = append(dst, r)
+	}
+	return dst
 }
 
 func min2(a, b int) int {
@@ -95,6 +114,7 @@ func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance i
 		exact = exact[:prefixLength]
 	}
 
+	exactStr := string(exact)
 	consider := func(candidate string) {
 		if candidate == queryTerm {
 			return // Already handled
@@ -108,7 +128,7 @@ func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance i
 			}
 		}
 
-		if len(exact) > 0 && !strings.HasPrefix(candidate, string(exact)) {
+		if len(exact) > 0 && !strings.HasPrefix(candidate, exactStr) {
 			return
 		}
 
@@ -149,29 +169,56 @@ func (idx *InvertedIndex) fuzzySearchTermsLocked(queryTerm string, maxDistance i
 // queryTerm, mirroring how addDocumentLocked indexes every bigram into
 // prefixMap. Caller must hold idx.mu.
 func (idx *InvertedIndex) fuzzyCandidates(queryTerm string) []string {
-	seen := make(map[string]bool)
-	var candidates []string
-	add := func(term string) {
-		if !seen[term] {
-			seen[term] = true
-			candidates = append(candidates, term)
-		}
-	}
-
 	runes := []rune(queryTerm)
 	if len(runes) < 2 {
-		for _, t := range idx.prefixMap[queryTerm] {
-			add(t)
-		}
-		return candidates
+		return dedup(idx.prefixMap[queryTerm])
 	}
-	for i := 0; i <= len(runes)-2; i++ {
-		bigram := string(runes[i : i+2])
-		for _, t := range idx.prefixMap[bigram] {
-			add(t)
+	// A bigram is two runes; in valid UTF-8, as the tokenizer produces, it is
+	// the substring between their offsets, with no conversion to allocate.
+	var bufInizi [64]int
+	inizi := bufInizi[:0]
+	for i := range queryTerm {
+		inizi = append(inizi, i)
+	}
+	inizi = append(inizi, len(queryTerm))
+	valido := utf8.ValidString(queryTerm)
+	bigramma := func(k int) string {
+		if valido {
+			return queryTerm[inizi[k]:inizi[k+2]]
+		}
+		return string(runes[k : k+2])
+	}
+
+	// Sized once for the longest the lists can make them, instead of growing
+	// by doubling: the lists of common bigrams hold thousands of terms.
+	totale := 0
+	for k := 0; k+2 < len(inizi); k++ {
+		totale += len(idx.prefixMap[bigramma(k)])
+	}
+	seen := make(map[string]struct{}, totale)
+	candidates := make([]string, 0, totale)
+	for k := 0; k+2 < len(inizi); k++ {
+		for _, t := range idx.prefixMap[bigramma(k)] {
+			if _, ok := seen[t]; !ok {
+				seen[t] = struct{}{}
+				candidates = append(candidates, t)
+			}
 		}
 	}
 	return candidates
+}
+
+// dedup keeps the first occurrence of each term, in order.
+func dedup(terms []string) []string {
+	seen := make(map[string]struct{}, len(terms))
+	out := make([]string, 0, len(terms))
+	for _, t := range terms {
+		if _, ok := seen[t]; !ok {
+			seen[t] = struct{}{}
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // MaxTypos is standard logic for allowed typos based on word length

@@ -66,6 +66,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Elasticsearch's `_source: false`.
 
 ### Changed
+- Typo matching allocates far less, with identical results: the edit distance
+  keeps three rows on the stack instead of a full matrix (no allocation for
+  words up to 32 characters, about half the time), and the typo candidates are
+  collected from substrings with maps sized once.
 - `POST /indexes/{name}/documents` rejects the whole request with `400` when any
   document has a missing or unusable id, and says at which positions; nothing is
   added. `skipped` stays in the success response for compatibility and is
