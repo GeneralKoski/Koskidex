@@ -1,6 +1,12 @@
 package engine
 
-import "testing"
+import (
+	"fmt"
+	"math/rand"
+	"reflect"
+	"strings"
+	"testing"
+)
 
 func scoredTestIndex() (*InvertedIndex, Settings) {
 	idx := NewInvertedIndex()
@@ -70,5 +76,114 @@ func TestSearchScoredDeduplicatesHighlights(t *testing.T) {
 	if len(fromSearch) != len(fromScored) {
 		t.Fatalf("highlight per %d documenti da Search, %d da SearchScored",
 			len(fromSearch), len(fromScored))
+	}
+}
+
+// The candidate step of a conjunctive search must change nothing: same
+// documents, same order, same scores to the last bit, same highlights for
+// every document returned. Random documents and queries, with typos,
+// prefixes, repeated and missing words, under the settings that touch the
+// must loop.
+func TestCandidatiCongiuntiviNonCambianoNulla(t *testing.T) {
+	parole := []string{"gatto", "gatti", "gatta", "cane", "cani", "casa", "case", "cassa", "contratto",
+		"contratti", "noleggio", "noleggi", "comune", "comunale", "delibera", "determina", "lavori",
+		"lavoro", "strada", "strade", "manutenzione", "scuola", "scuole", "città", "perché", "2026", "123"}
+	r := rand.New(rand.NewSource(7))
+	frase := func(n int) string {
+		out := make([]string, n)
+		for i := range out {
+			out[i] = parole[r.Intn(len(parole))]
+		}
+		return strings.Join(out, " ")
+	}
+	refuso := func(w string) string {
+		rw := []rune(w)
+		switch k := r.Intn(len(rw)); r.Intn(4) {
+		case 0:
+			return string(rw[:len(rw)-1])
+		case 1:
+			if k+1 < len(rw) {
+				rw[k], rw[k+1] = rw[k+1], rw[k]
+			}
+		case 2:
+			rw[k] = 'x'
+		}
+		return string(rw)
+	}
+
+	varianti := []func(*Settings){
+		func(s *Settings) {},
+		func(s *Settings) { s.ScoringMode = ScoringBM25 },
+		func(s *Settings) { s.ScoringMode = ScoringBM25; s.BM25Expansion = BM25ExpansionBlended },
+		func(s *Settings) { s.ScoringMode = ScoringBM25; s.AllTermsInOneField = true },
+		func(s *Settings) { s.Coordination = true; s.DisablePrefixSearch = true; s.PrefixLength = 1 },
+		func(s *Settings) {
+			s.ScoringMode = ScoringBM25
+			s.RetrievalMode = RetrievalAll
+			s.FieldWeights = map[string]float64{"title": 5, "tags": 4}
+		},
+	}
+	instabili, confrontate := 0, 0
+	for v, varia := range varianti {
+		settings := DefaultSettings()
+		varia(&settings)
+		idx := NewInvertedIndex()
+		for i := 0; i < 400; i++ {
+			idx.AddDocument(fmt.Sprint(i), map[string]interface{}{
+				"title": frase(1 + r.Intn(4)), "body": frase(r.Intn(30)), "tags": frase(r.Intn(3)),
+			}, settings)
+		}
+		for q := 0; q < 700; q++ {
+			termini := strings.Fields(frase(2 + r.Intn(4)))
+			for i := range termini {
+				switch r.Intn(6) {
+				case 0:
+					termini[i] = refuso(termini[i])
+				case 1:
+					termini[i] = string([]rune(termini[i])[:3])
+				case 2:
+					termini[i] = termini[0]
+				}
+			}
+			if r.Intn(10) == 0 {
+				termini = append(termini, "inesistente")
+			}
+			query := strings.Join(termini, " ")
+			if r.Intn(8) == 0 {
+				query += " -" + parole[r.Intn(len(parole))]
+			}
+			fuzziness := []string{"auto", "0", "1", "2"}[r.Intn(4)]
+
+			// A short word with a typo allowed is matched by scanning the
+			// vocabulary map, whose order changes from call to call: there
+			// the same search already differs from itself, candidates or not.
+			instabile := false
+			for _, tk := range Tokenize(query, "", settings) {
+				d := MaxTypos(tk.Term, settings.TypoTolerance, fuzziness)
+				instabile = instabile || (d > 0 && len([]rune(tk.Term))-1-3*d < 1)
+			}
+			if instabile {
+				instabili++
+				continue
+			}
+			veloce, hlVeloce := idx.SearchScored(query, settings, fuzziness, nil)
+			senzaCandidati = true
+			lento, hlLento := idx.SearchScored(query, settings, fuzziness, nil)
+			senzaCandidati = false
+			confrontate++
+
+			if !reflect.DeepEqual(veloce, lento) {
+				t.Fatalf("variante %d, %q (%s): risultati diversi\n  con i candidati %v\n  senza %v", v, query, fuzziness, veloce, lento)
+			}
+			for _, m := range veloce {
+				if !reflect.DeepEqual(hlVeloce[m.DocID], hlLento[m.DocID]) {
+					t.Fatalf("variante %d, %q: highlights di %s diversi: %v contro %v", v, query, m.DocID, hlVeloce[m.DocID], hlLento[m.DocID])
+				}
+			}
+		}
+	}
+	t.Logf("%d ricerche confrontate, %d saltate perché instabili anche senza i candidati (scansione del vocabolario)", confrontate, instabili)
+	if confrontate < 1500 {
+		t.Fatalf("solo %d ricerche confrontate", confrontate)
 	}
 }

@@ -83,12 +83,26 @@ func ParseQuery(raw string, settings Settings) ParsedQuery {
 }
 
 func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highlights map[string][]string, fuzziness string) map[string]*TokenDocMatch {
+	return idx.docsForTermsLocked(token, idx.matchedTermsLocked(token, settings, fuzziness), settings, highlights, nil, 0)
+}
+
+// matchedTermsLocked is the index terms a query token matches, exactly,
+// by prefix or with typos.
+func (idx *InvertedIndex) matchedTermsLocked(token Token, settings Settings, fuzziness string) []string {
 	maxTypos := MaxTypos(token.Term, settings.TypoTolerance, fuzziness)
 	// Search already holds idx.mu (read); use the lock-free variant to avoid
 	// recursive read-locking, which can deadlock against a concurrent writer.
-	matchedTerms := idx.fuzzySearchTermsLocked(token.Term, maxTypos, false, settings.DisablePrefixSearch, settings.PrefixLength)
+	return idx.fuzzySearchTermsLocked(token.Term, maxTypos, false, settings.DisablePrefixSearch, settings.PrefixLength)
+}
 
+// docsForTermsLocked collects, per document, how the token matched through
+// matchedTerms. With candidati set, only the documents whose count there is
+// servono are collected: the others are skipped as if they had no posting.
+func (idx *InvertedIndex) docsForTermsLocked(token Token, matchedTerms []string, settings Settings, highlights map[string][]string, candidati map[string]int, servono int) map[string]*TokenDocMatch {
 	tokenDocBest := make(map[string]*TokenDocMatch)
+	if candidati != nil {
+		tokenDocBest = make(map[string]*TokenDocMatch, len(candidati))
+	}
 
 	mescolata := 0
 	for _, mTerm := range matchedTerms {
@@ -108,6 +122,9 @@ func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highl
 		postings := idx.index[mTerm]
 
 		for _, p := range postings {
+			if candidati != nil && candidati[p.DocID] != servono {
+				continue
+			}
 			matchDist := dist
 			if isPrefix && dist > 0 {
 				_ = matchDist // prefix match tracking
@@ -161,6 +178,51 @@ func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highl
 	return tokenDocBest
 }
 
+// senzaCandidati turns the candidate step off, for tests that compare the
+// two paths.
+var senzaCandidati bool
+
+// candidatiCongiuntiviLocked returns the terms each token matches and, per
+// document, how many tokens in a row it holds, counted from the token with
+// the fewest postings: the postings of the others are only looked up in the
+// map, never scored. A count of len(tokens) means the document holds every
+// token.
+func (idx *InvertedIndex) candidatiCongiuntiviLocked(tokens []Token, settings Settings, fuzziness string) ([][]string, map[string]int) {
+	termini := make([][]string, len(tokens))
+	quanti := make([]int, len(tokens))
+	ordine := make([]int, len(tokens))
+	for i, token := range tokens {
+		termini[i] = idx.matchedTermsLocked(token, settings, fuzziness)
+		for _, t := range termini[i] {
+			quanti[i] += len(idx.index[t])
+		}
+		ordine[i] = i
+	}
+	sort.SliceStable(ordine, func(a, b int) bool { return quanti[ordine[a]] < quanti[ordine[b]] })
+
+	candidati := make(map[string]int, quanti[ordine[0]])
+	for _, t := range termini[ordine[0]] {
+		for _, p := range idx.index[t] {
+			candidati[p.DocID] = 1
+		}
+	}
+	for passo, i := range ordine[1:] {
+		avanti := 0
+		for _, t := range termini[i] {
+			for _, p := range idx.index[t] {
+				if candidati[p.DocID] == passo+1 {
+					candidati[p.DocID] = passo + 2
+					avanti++
+				}
+			}
+		}
+		if avanti == 0 {
+			break
+		}
+	}
+	return termini, candidati
+}
+
 // SearchScored fuzzy searches and returns the ranked matches, scores included.
 // This is the whole search: Search is only a thin wrapper over it.
 func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzziness string, queryVector []float64) ([]SearchMatch, map[string][]string) {
@@ -189,9 +251,25 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 	unCampo := settings.AllTermsInOneField && settings.RetrievalMode != RetrievalAny
 	campiComuni := make(map[string]map[string]bool)
 
+	// When every must term is required and no later step can bring a
+	// document back, only the documents that hold them all need scoring;
+	// the rest would be dropped by the filter below. They are found first,
+	// from the rarest term, and each token is then scored as before, in the
+	// query's order, so every score is the same sum in the same order.
+	var termini [][]string
+	var candidati map[string]int
+	if !senzaCandidati && settings.RetrievalMode != RetrievalAny && len(allTokens) > 1 && !hasOR && !settings.SubstringMatch && len(queryVector) == 0 {
+		termini, candidati = idx.candidatiCongiuntiviLocked(allTokens, settings, fuzziness)
+	}
+
 	// Process must (AND) terms
 	for n, token := range allTokens {
-		tokenDocBest := idx.findDocsForToken(token, settings, highlights, fuzziness)
+		var tokenDocBest map[string]*TokenDocMatch
+		if candidati != nil {
+			tokenDocBest = idx.docsForTermsLocked(token, termini[n], settings, highlights, candidati, len(allTokens))
+		} else {
+			tokenDocBest = idx.findDocsForToken(token, settings, highlights, fuzziness)
+		}
 
 		for docID, match := range tokenDocBest {
 			if _, ok := docMatches[docID]; !ok {

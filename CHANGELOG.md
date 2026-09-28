@@ -70,6 +70,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   keeps three rows on the stack instead of a full matrix (no allocation for
   words up to 32 characters, about half the time), and the typo candidates are
   collected from substrings with maps sized once.
+- A search that requires every term first finds, from the rarest term, the
+  documents that hold them all, and scores only those: the others were scored
+  and then dropped. Same results, same scores to the bit, same highlights for
+  every document returned. Only when nothing later can add documents (no `OR`,
+  no `substring_match`, no query vector).
 - `POST /indexes/{name}/documents` rejects the whole request with `400` when any
   document has a missing or unusable id, and says at which positions; nothing is
   added. `skipped` stays in the success response for compatibility and is
