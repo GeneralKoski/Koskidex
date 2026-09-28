@@ -51,6 +51,22 @@ questo codice. Per il codice: le impronte di tutte le risposte coincidono prima
 e dopo, le metriche per query di `scripts/evaluate` coincidono, e
 `TestBaselineRankingIsFrozen` passa senza toccarlo.
 
+### Dopo
+
+Due commit, `60f7a43` (distanza e candidati) e `510b9d2` (candidati del
+congiuntivo). Nessun risultato cambiato: 429 impronte su 429 uguali a 10.018 e
+a 100.000 documenti, metriche di `scripts/evaluate` uguali query per query in
+9 esecuzioni su 9. Allocazioni per ricerca da 2,57 a 0,44 MB. Nel container,
+una alla volta, p50 da 2,12 a 1,12 ms e p95 da 12,4 a 2,7; capacità da 653 a
+2.614 ricerche al secondo; a 32 client p99 da 215 a 43 ms; a 100.000
+documenti p95 da 133 a 10,4 ms. Otto previsioni su otto confermate
+(`2026-09-28_prestazioni` nel repository della tesi).
+
+Resta, e precede questo lavoro: con una parola corta e un refuso ammesso il
+vocabolario si scorre come mappa, in un ordine che cambia a ogni chiamata;
+cambia l'ordine degli highlights e, a parità di distanza, quale termine viene
+accreditato a un documento. Il test del percorso veloce esclude quelle query.
+
 ---
 
 ## 2026-09-25 - Il contesto che Ollama usa per i vettori
