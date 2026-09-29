@@ -934,7 +934,9 @@ Previsioni:
 2. **Presa.** NFCorpus 0,2810, dentro la fascia 0,25-0,33, l'87% del
    riferimento.
 3. **Smentita.** Il recall si è mosso, e parecchio: +0,117 su SciFact, +0,038
-   su NFCorpus, contro un ±0,02 dichiarato. Sotto sta l'indagine, perché una
+   su NFCorpus, contro un ±0,02 dichiarato. *(Nota del 29/09/2026: la differenza esatta
+   è 0,1175, da 0,75706 a 0,87456; +0,117 era troncato, la tesi scrive
+   +0,1175.)* Sotto sta l'indagine, perché una
    guardia che scatta o vuol dire che il risultato è falso o vuol dire che la
    guardia era scritta male.
 4. **Mal posta da me.** `TestBaselineIdentifierTieBreaksByDocID` gira a
