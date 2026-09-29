@@ -117,7 +117,10 @@ Gli atti dell'albo contengono nomi di persone. Cercando marcatori espliciti
 (`sig.`, `nato a`, `codice fiscale`, `residente in`, `pubblicazione di
 matrimonio`):
 
-- FVG: **79 oggetti su 9.457**
+- FVG: **79 oggetti su 9.457** (*nota del 29/09/2026*: il conteggio non si
+  riproduce. Con gli stessi marcatori come parole intere, cioè senza contare
+  *consig.* e *assegnato a*, sono 53, il numero che la tesi usa e archivia
+  con `strumenti/conteggi.py`; come sottostringhe in minuscolo sono 143.)
 - Crispiano: le pubblicazioni di matrimonio riportano nomi, date e luoghi di
   nascita nel corpo del PDF
 
