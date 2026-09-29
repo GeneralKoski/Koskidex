@@ -89,6 +89,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Elasticsearch's `_source: false`.
 
 ### Changed
+- Accent folding no longer builds a new NFD, strip marks, NFC chain (two 4 KB
+  buffers) for every text it tokenizes: ASCII text, which the chain returns
+  unchanged, skips it, and other text takes a chain from a pool. Same
+  results; this was the largest allocation left under load.
 - Typo matching allocates far less, with identical results: the edit distance
   keeps three rows on the stack instead of a full matrix (no allocation for
   words up to 32 characters, about half the time), and the typo candidates are

@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -20,11 +21,33 @@ type Token struct {
 	Field    string
 }
 
-// removeAccents strips diacritical marks from letters (e.g., è -> e)
+// removeAccents strips diacritical marks from letters (e.g., è -> e).
+//
+// A chain allocates two 4 KB buffers, and this runs on every text Tokenize
+// sees, so chains come from a pool: transform.String resets one before use,
+// and the pool never hands the same chain to two goroutines. ASCII text,
+// which the chain would return unchanged, does not take one at all.
 func removeAccents(s string) string {
-	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+	if soloASCII(s) {
+		return s
+	}
+	t := catene.Get().(transform.Transformer)
 	result, _, _ := transform.String(t, s)
+	catene.Put(t)
 	return result
+}
+
+var catene = sync.Pool{New: func() any {
+	return transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+}}
+
+func soloASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
 }
 
 // Tokenize processes a string, removes stops, lowercases, and splits by non-letter/number characters
