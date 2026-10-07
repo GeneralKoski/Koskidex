@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	targetURL  = flag.String("url", "http://localhost:8080", "Base URL of the Koskidex Server")
-	indexName  = flag.String("index", "massive", "Name of the index to create and seed")
-	docCount   = flag.Int("count", 100000, "Total number of documents to seed")
-	chunkSize  = flag.Int("chunk", 5000, "Number of documents per HTTP request")
+	targetURL = flag.String("url", "http://localhost:8080", "Base URL of the Koskidex Server")
+	indexName = flag.String("index", "massive", "Name of the index to create and seed")
+	docCount  = flag.Int("count", 100000, "Total number of documents to seed")
+	chunkSize = flag.Int("chunk", 5000, "Number of documents per HTTP request")
 )
 
 var (
@@ -28,10 +28,35 @@ func randomString(arr []string) string {
 	return arr[rand.Intn(len(arr))]
 }
 
+func existingDocs() (int, bool) {
+	resp, err := http.Get(*targetURL + "/indexes/" + *indexName)
+	if err != nil {
+		return 0, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 0, false
+	}
+	var body struct {
+		Docs int `json:"docs"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return 0, false
+	}
+	return body.Docs, true
+}
+
 func main() {
 	flag.Parse()
 
 	fmt.Printf("🎯 Target API: %s\n", *targetURL)
+
+	// 0. Skip if already seeded: the seeder runs on every `docker compose up`.
+	if n, ok := existingDocs(); ok && n >= *docCount {
+		fmt.Printf("✅ Index '%s' already has %d documents. Skipping seed.\n", *indexName, n)
+		return
+	}
+
 	fmt.Printf("📦 Creating Index: '%s'\n", *indexName)
 
 	// 1. Create Index
@@ -51,10 +76,10 @@ func main() {
 
 	// 2. Generate and Seed in Chunks
 	fmt.Printf("🚀 Seeding %d documents in chunks of %d...\n", *docCount, *chunkSize)
-	
+
 	start := time.Now()
 	var docs []map[string]interface{}
-	
+
 	for i := 1; i <= *docCount; i++ {
 		docs = append(docs, map[string]interface{}{
 			"id":       fmt.Sprintf("doc_%d", i),
@@ -70,16 +95,16 @@ func main() {
 		if len(docs) == *chunkSize || i == *docCount {
 			chunkJson, _ := json.Marshal(docs)
 			url := fmt.Sprintf("%s/indexes/%s/documents", *targetURL, *indexName)
-			
+
 			reqStart := time.Now()
 			chunkResp, err := http.Post(url, "application/json", bytes.NewBuffer(chunkJson))
-			
+
 			if err != nil {
 				fmt.Printf("\n❌ Error sending chunk: %v\n", err)
 				return
 			}
 			_ = chunkResp.Body.Close()
-			
+
 			fmt.Printf("📤 Seeded %d/%d documents (Took %v)\n", i, *docCount, time.Since(reqStart))
 			docs = nil // Reset chunk
 		}

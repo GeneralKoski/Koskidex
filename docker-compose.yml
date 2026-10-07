@@ -49,12 +49,7 @@ services:
         condition: service_healthy
     volumes:
       - ./scripts:/scripts
-      - ./data:/data
     restart: "no"
-    command: >
-      sh -c "if [ ! -f /data/wal.log ]; then
-               echo 'First deployment detected. Automatically seeding 100,000 documents...';
-               go run /scripts/seed.go -url http://backend:7700 -index massive -count 100000;
-             else
-               echo 'Data volume already exists (/data/wal.log). Skipping auto-seed.';
-             fi"
+    # seed.go asks the API how many documents the index already holds and
+    # skips when it is full, so this is safe on every `docker compose up`.
+    command: ["go", "run", "/scripts/seed.go", "-url", "http://backend:7700", "-index", "massive", "-count", "100000"]

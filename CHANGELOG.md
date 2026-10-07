@@ -117,6 +117,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optimized social share image (`og-image`) from ~5 MB to ~107 KB.
 
 ### Fixed
+- The Docker Compose seeder reseeded the `massive` index on every
+  `docker compose up`: it treated a missing `/data/wal.log` as a first
+  deployment, but Koskidex writes `koskidex.db` and `operations.log`, never
+  `wal.log`. Each deploy rewrote 100,000 documents with new random values,
+  about ten minutes of load and 100,000 more lines in the WAL. `seed.go` now
+  asks the API how many documents the index holds and skips when it already
+  has the requested count, finishing an interrupted seed otherwise; the
+  seeder no longer mounts the data directory.
 - Adding documents synced the WAL once per document: about 2.6 ms each on
   macOS, where a sync is an F_FULLFSYNC, so 10,018 documents took 32 seconds.
   A request now writes all its WAL lines at once with one sync, and nothing
