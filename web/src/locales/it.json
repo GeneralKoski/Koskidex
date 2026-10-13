@@ -1,156 +1,266 @@
 {
   "common": {
     "copy": "Copia",
-    "search_engine": "Motore di Ricerca"
+    "copied": "Copiato",
+    "search_engine": "Motore di ricerca"
+  },
+  "meta": {
+    "home_title": "Koskidex | Motore di ricerca self-hosted in Go",
+    "home_desc": "Koskidex è un motore di ricerca full-text self-hosted scritto in Go: un solo binario, un'API REST, tolleranza ai refusi, faccette, filtri geografici e ricerca vettoriale ibrida.",
+    "docs_title": "Documentazione | Koskidex",
+    "docs_desc": "Riferimento API e guide di integrazione per Koskidex: indicizzazione, ricerca, filtri, faccette, ricerca geografica e vettoriale, impostazioni degli indici, configurazione del server e client.",
+    "not_found_title": "Pagina non trovata | Koskidex",
+    "not_found_desc": "La pagina che cerchi non esiste."
   },
   "nav": {
     "features": "Documentazione",
-    "demo": "Demo",
-    "integration": "Integrazione",
+    "demo": "Playground",
+    "integration": "Avvio rapido",
     "github": "GitHub",
-    "select_language": "Seleziona Lingua"
+    "select_language": "Seleziona la lingua",
+    "toggle_menu": "Apri o chiudi il menu",
+    "skip": "Vai al contenuto"
   },
   "hero": {
-    "the": "Il",
-    "title_lightning": "Velocità Fulminea",
-    "title_rest": "Motore di Ricerca <15MB",
-    "subtitle": "Un motore di ricerca full-text completamente self-hosted, basato su REST e tollerante ai refusi, scritto in Go. Integralo in qualsiasi stack tecnologico e potenzia la tua ricerca in pochi minuti.",
-    "cta_demo": "Prova la Demo",
-    "cta_docs": "Leggi la Documentazione",
-    "stats": {
-      "binary_size": "Dimensione Binario",
-      "ram_usage": "Utilizzo RAM",
-      "response_time": "Tempo di Risposta",
-      "dependencies": "Dipendenze",
-      "zero": "Zero"
+    "title": "Ricerca full-text che gestisci tu.",
+    "subtitle": "Koskidex è un motore di ricerca scritto in Go. Un solo binario, un'API REST e risultati che perdonano i refusi. Avvialo accanto alla tua app con Docker e interrogalo da qualsiasi linguaggio.",
+    "cta_demo": "Prova il playground",
+    "cta_docs": "Leggi la documentazione",
+    "trace": {
+      "caption": "Cosa succede a una query con un refuso",
+      "query": "query",
+      "tokens": "token",
+      "match": "match con refuso",
+      "edit": "1 modifica",
+      "postings": "posting list",
+      "result": "primo risultato"
+    },
+    "specs": {
+      "title": "Scheda tecnica",
+      "language": "Scritto in",
+      "language_value": "Go 1.25",
+      "runtime": "Dipendenze a runtime",
+      "runtime_value": "Nessuna, un solo binario statico",
+      "runtime_note": "La ricerca ibrida richiede anche Ollama per gli embedding.",
+      "api": "Interfaccia",
+      "api_value": "REST e JSON",
+      "storage": "Durabilità",
+      "storage_value": "Snapshot più write-ahead log",
+      "latency": "Latenza mediana",
+      "latency_value": "1,1 ms",
+      "latency_note": "10.018 documenti, una query alla volta, in Docker.",
+      "ranking": "Ranking",
+      "ranking_value": "Punteggio legacy o BM25, fusione vettoriale opzionale"
     }
   },
   "demo": {
-    "title": "Playground Live",
-    "subtitle": "Testa il motore su un'istanza locale reale. Genera dati demo e digita qui sotto!",
+    "title": "Playground",
+    "subtitle": "Carica un dataset di esempio nell'istanza Koskidex dietro questa pagina e cercaci dentro. Prova un refuso, come matrx o interstelar.",
     "setup": {
-      "title": "1. Configurazione Dataset",
-      "subtitle": "Popola il motore di ricerca con dati di esempio per testare le query localmente.",
-      "load_movies": "Carica Film",
-      "load_products": "Carica Prodotti",
-      "clear": "Pulisci",
+      "title": "Dataset",
+      "subtitle": "Scegli un dataset da indicizzare, poi cerca qui sotto.",
+      "load_movies": "Carica film",
+      "load_products": "Carica prodotti",
+      "clear": "Elimina indice",
       "status": {
-        "creating": "Creazione indice '{{name}}'...",
-        "loading": "Caricamento di {{count}} documenti...",
+        "creating": "Creazione dell'indice '{{name}}'...",
+        "loading": "Indicizzazione di {{count}} documenti...",
         "loading_plain": "Caricamento",
-        "success": "Successo! L'indice {{name}} è pronto. Prova a cercare.",
-        "clearing": "Pulizia indice...",
-        "cleared": "Indice pulito.",
-        "error_connection": "Errore: Impossibile connettersi a Koskidex su {{url}}. È attivo?",
-        "error_clear": "Errore durante la pulizia dell'indice."
+        "success": "L'indice '{{name}}' è pronto. Inizia a scrivere.",
+        "clearing": "Eliminazione dell'indice...",
+        "cleared": "Indice eliminato.",
+        "error_connection": "Impossibile raggiungere Koskidex su {{url}}. Avvia il backend e riprova.",
+        "error_clear": "Non è stato possibile eliminare l'indice. Controlla che Koskidex sia attivo."
       },
-      "preview_title": "Dataset Caricato",
+      "preview_title": "Dataset caricato",
       "preview_subtitle": "Ecco alcuni esempi di cosa puoi cercare ora:"
     },
     "search": {
-      "placeholder": "Cerca film o prodotti... (Prova con un refuso!)",
+      "placeholder": "Cerca film o prodotti, i refusi sono ammessi",
       "search_plain": "Cerca",
-      "load_dataset": "Carica un dataset sopra per iniziare a cercare.",
-      "no_results": "Nessun risultato trovato per \"{{query}}\".",
+      "load_dataset": "Carica un dataset per iniziare a cercare.",
+      "no_results": "Nessun risultato per \"{{query}}\".",
       "ms": "ms",
+      "hits": "{{count}} risultati",
       "sort_relevance": "Rilevanza",
-      "sort_year_desc": "Anno (recenti)",
-      "sort_year_asc": "Anno (vecchi)",
-      "sort_rating_desc": "Voto (migliori)",
+      "sort_year_desc": "Anno (più recenti)",
+      "sort_year_asc": "Anno (meno recenti)",
+      "sort_rating_desc": "Voto (più alto)",
       "sort_price_asc": "Prezzo (crescente)",
       "sort_price_desc": "Prezzo (decrescente)",
-      "fuzziness": "Fuzziness",
-      "sort": "Ordina"
+      "fuzziness": "Refusi ammessi",
+      "sort": "Ordina per",
+      "facets": "Filtra per valore",
+      "remove_filter": "Rimuovi il filtro {{value}}",
+      "results": "Risultati della ricerca"
     }
   },
   "integration": {
-    "title": "Quick Start",
+    "title": "Avvio rapido",
     "subtitle": "Clona, avvia, cerca. Tre passaggi per un motore di ricerca funzionante.",
-    "step1_title": "Clona la repository",
+    "step1_title": "Clona il repository",
     "step2_title": "Avvia con Docker",
+    "step2_note": "L'API risponde su localhost:7700 e la UI web su localhost:8080. Un seeder carica anche 100.000 documenti di esempio in un indice protetto chiamato massive.",
     "step3_title": "Inizia a cercare",
-    "view_full": "Vai alla Documentazione Completa"
+    "view_full": "Leggi la documentazione completa"
   },
   "docs": {
-    "title": "Documentazione Tecnica",
-    "subtitle": "Guida passo-passo completa per integrare Koskidex nel tuo progetto.",
-    "back_home": "Torna alla Home",
+    "title": "Documentazione",
+    "subtitle": "Tutto quello che serve per avviare Koskidex, indicizzare i tuoi dati e cercarli dal tuo progetto.",
+    "back_home": "Torna alla home",
+    "on_this_page": "In questa pagina",
     "sections": {
       "quickstart": {
-        "title": "Quick Start con Docker",
-        "desc": "Il modo più veloce per avviare Koskidex. Serve solo Docker e un comando.",
+        "title": "Avvio rapido con Docker",
+        "desc": "Il modo più veloce per avviare Koskidex. Serve solo Docker.",
         "step1": "Clona e avvia",
-        "step2": "Verifica che funzioni",
+        "step2": "Verifica che sia attivo",
         "step3": "Crea un indice e aggiungi documenti",
-        "step4": "Cerca (con tolleranza ai refusi!)",
-        "running_at": "Koskidex è ora in esecuzione su http://localhost:7700"
+        "step4": "Cerca, refusi compresi",
+        "running_at": "Koskidex è ora attivo su http://localhost:7700. Lo stesso comando avvia anche la UI web sulla porta 8080 e un seeder che riempie un indice protetto massive con 100.000 documenti."
       },
       "docker_compose": {
         "title": "Aggiungi al tuo Docker Compose",
-        "desc": "Aggiungi Koskidex come servizio accanto alla tua applicazione esistente. Funziona con qualsiasi stack.",
+        "desc": "Avvia Koskidex come servizio accanto alla tua applicazione. Funziona con qualsiasi stack.",
         "add_service": "Aggiungi il servizio al tuo docker-compose.yml:",
-        "env_vars": "Poi imposta la variabile d'ambiente nella tua app per connetterti:",
-        "sail_title": "Integrazione con Laravel Sail",
-        "sail_desc": "Se usi Laravel Sail, aggiungi il servizio koskidex al tuo docker-compose.yml e referenzialo nel tuo .env:"
+        "clone_hint": "Prima clona Koskidex dentro il tuo progetto:",
+        "env_vars": "Poi imposta le variabili che la tua app usa per connettersi:",
+        "env_note": "Lascia vuoto KOSKIDEX_API_KEY per disattivare l'autenticazione. L'immagine avvia già il binario con --data-dir /data, quindi configuralo con le variabili d'ambiente e non con una riga command:.",
+        "sail_title": "Laravel Sail",
+        "sail_desc": "Con Laravel Sail, aggiungi il servizio koskidex al tuo docker-compose.yml e referenzialo nel tuo .env:"
       },
       "php": {
         "title": "PHP / Laravel",
-        "desc": "Integrazione completa con modelli Eloquent e sync automatico su save/update/delete.",
-        "step1_title": "1. Installa il pacchetto",
-        "step2_title": "2. Pubblica la configurazione",
-        "step3_title": "3. Configura .env",
-        "step4_title": "4. Configura il mapping dei modelli",
+        "desc": "Un trait Eloquent che tiene i modelli sincronizzati con Koskidex a ogni salvataggio ed eliminazione, più un piccolo client HTTP.",
+        "step1_title": "1. Copia i file di integrazione",
+        "step1_desc": "Copia il client, il trait e la configurazione dal repository di Koskidex nel tuo progetto Laravel:",
+        "step2_title": "2. Configura .env",
+        "step2_desc": "KoskidexClient legge questi valori e invia il Bearer token a ogni richiesta.",
+        "step3_title": "3. Associa i modelli agli indici",
+        "step4_title": "4. Crea l'indice una volta",
+        "step4_desc": "Il trait non crea gli indici. Crea ognuno prima del primo salvataggio, per esempio da tinker o da una migration:",
         "step5_title": "5. Aggiungi il trait al modello",
         "step6_title": "6. Cerca",
-        "sync_note": "I modelli vengono sincronizzati automaticamente con Koskidex ad ogni save(), update() e delete(). Nessun worker necessario."
+        "tip": "Suggerimento",
+        "sync_note": "I modelli vengono inviati a Koskidex a ogni salvataggio e rimossi all'eliminazione, in modo sincrono, senza worker di coda. Se l'indice non esiste, la sincronizzazione fallisce senza errori."
       },
       "js": {
         "title": "JavaScript / Node.js",
-        "desc": "Client leggero per ambienti Node.js e browser.",
-        "step1_title": "1. Installa",
-        "step2_title": "2. Inizializza il client",
-        "step3_title": "3. Indicizza documenti",
+        "desc": "Un piccolo client CommonJS per Node.js, basato su axios.",
+        "step1_title": "1. Copia il client",
+        "step2_title": "2. Inizializzalo",
+        "step3_title": "3. Indicizza i documenti",
         "step4_title": "4. Cerca"
       },
       "python": {
         "title": "Python",
-        "desc": "Client semplice basato su requests. Funziona con Django, Flask, FastAPI o standalone.",
-        "step1_title": "1. Installa",
-        "step2_title": "2. Usa"
+        "desc": "Un client in un solo file basato su requests. Funziona con Django, Flask, FastAPI o semplici script.",
+        "step1_title": "1. Copia il client",
+        "step2_title": "2. Usalo"
       },
       "api": {
         "title": "Riferimento API REST",
-        "desc": "Koskidex espone una semplice API REST. Usala da qualsiasi linguaggio con supporto HTTP.",
+        "desc": "Koskidex parla HTTP e JSON, quindi si usa da qualsiasi linguaggio.",
         "endpoints_title": "Endpoint",
+        "method": "Metodo",
+        "endpoint": "Endpoint",
+        "description": "Descrizione",
         "auth_title": "Autenticazione",
-        "auth_desc": "Se avviato con --api-key, tutte le richieste richiedono un Bearer token:",
-        "search_params": "La ricerca supporta paginazione e filtri:"
+        "auth_desc": "Se Koskidex parte con una API key, ogni richiesta tranne /health richiede un Bearer token:",
+        "search_params": "Parametri di ricerca",
+        "search_params_desc": "Ogni parametro funziona nella query string (GET) e in un body JSON (POST). Limit vale 20 di default e si ferma a 10.000; q ha al massimo 1.000 caratteri.",
+        "response_title": "Risposta della ricerca",
+        "response_desc": "Ogni risultato riporta il suo score e, in highlights, i termini trovati racchiusi in <em>. Con ids_only=true i risultati contengono solo id e score."
+      },
+      "settings": {
+        "title": "Impostazioni dell'indice",
+        "desc": "Ogni indice ha le sue impostazioni, lette con GET e scritte con PUT su /indexes/{name}/settings.",
+        "warning": "PUT sostituisce l'intero oggetto delle impostazioni. I campi che ometti tornano al valore zero, quindi typo_tolerance.enabled diventa false. Leggi prima le impostazioni, cambia quello che serve e rimanda tutto.",
+        "example": "Esempio",
+        "fields_title": "Campi principali",
+        "fields": {
+          "searchable_fields": "Campi indicizzati per la ricerca full-text. Vuoto significa tutti i campi.",
+          "displayed_fields": "Campi restituiti nei risultati. Vuoto significa il documento intero.",
+          "field_weights": "Moltiplicatore del punteggio per campo.",
+          "synonyms": "Parole che si trovano a vicenda, come mappa da parola a lista.",
+          "stop_words": "Parole ignorate dall'indice, come mappa da parola a true.",
+          "typo_tolerance": "enabled, min_word_length_one_typo (4), min_word_length_two_typos (8), disable_on_numbers, disable_on_amounts.",
+          "scoring_mode": "legacy (default) o bm25, regolato con bm25_k1 e bm25_b. bm25_expansion blended o synonym pesa i match per prefisso e con refuso.",
+          "retrieval_mode": "all (tutti i termini richiesti, default) o any, con minimum_should_match e coordination.",
+          "stemmer": "porter o italian_light; elision_articles toglie forme come dell' prima di indicizzare.",
+          "tokenizer": "standard tiene la punteggiatura dentro le parole, come d.lgs o 14.01.2026.",
+          "normalize": "normalize_dates e normalize_amounts rendono 14/01/2026 e \"14 gennaio 2026\" lo stesso termine, e 1.234,56 uguale a 1234,56.",
+          "embedder": "source ollama, model, url, fields, context: calcola _vector all'inserimento e il vettore della query con hybrid=true.",
+          "hybrid": "hybrid_mode union o vector, vector_top_k, fusion_mode rrf o convex, vector_weight (20), fusion_alpha (0.5).",
+          "sitemap": "base_url, url_field, changefreq per GET /indexes/{name}/sitemap.xml."
+        }
+      },
+      "config": {
+        "title": "Configurazione del server",
+        "desc": "Ogni flag ha una variabile d'ambiente. Se ci sono entrambi, vince il flag.",
+        "flag": "Flag",
+        "env": "Variabile d'ambiente",
+        "default": "Default",
+        "port": "Porta HTTP",
+        "data_dir": "Dove stanno snapshot, WAL e cache degli embedding",
+        "api_key": "Bearer token richiesto su ogni richiesta tranne /health",
+        "log_level": "debug, info, warn o error",
+        "rate_limit": "Richieste al secondo per IP, 0 lo disattiva",
+        "cors_origin": "Origine CORS ammessa",
+        "tls": "Certificato e chiave, entrambi necessari per attivare HTTPS",
+        "protected": "Indici separati da virgola che rifiutano eliminazione e modifica delle impostazioni senza API key",
+        "version": "Stampa la versione ed esce"
       },
       "architecture": {
-        "title": "Architettura & Concetti",
-        "desc": "Scopri come funziona Koskidex sotto il cofano.",
+        "title": "Architettura e concetti",
+        "desc": "Come funziona Koskidex dietro le quinte.",
         "concepts": {
           "indices": "Indici",
-          "indices_desc": "Un indice è una collezione di documenti simili. Ogni indice ha le proprie impostazioni, sinonimi e regole di ranking.",
+          "indices_desc": "Un indice è una collezione di documenti simili. Ogni indice ha le sue impostazioni: campi ricercabili, sinonimi, stop word, pesi dei campi, tolleranza ai refusi e punteggio.",
           "documents": "Documenti",
-          "documents_desc": "I documenti sono oggetti JSON. Koskidex è schemaless — ogni documento necessita solo di un campo 'id' unico.",
-          "search": "Ricerca & Ranking",
-          "search_desc": "Indice inverso con fuzzy matching Damerau-Levenshtein, indicizzazione bigram a prefisso, pesi per campo, fuzziness dinamica, ordinamento esplicito, ricerca a faccette, filtro geospaziale e ricerca vettoriale ibrida.",
-          "storage": "Storage & Durabilità",
-          "storage_desc": "Snapshot binari GOB con Write-Ahead Log (WAL) per il recupero da crash. Ogni mutazione viene scritta nel WAL prima di rispondere, garantendo zero perdita di dati."
+          "documents_desc": "I documenti sono oggetti JSON senza schema fisso. Ognuno richiede un id unico, stringa o intero. _geo contiene le coordinate e _vector un embedding.",
+          "search": "Ricerca e ranking",
+          "search_desc": "Un indice inverso con match dei refusi Damerau-Levenshtein, ricerca per prefisso, rimozione degli accenti, pesi dei campi, punteggio legacy o BM25, ordinamento, faccette, filtri geografici e ricerca vettoriale ibrida con fusione RRF o convessa.",
+          "storage": "Storage e durabilità",
+          "storage_desc": "Snapshot binari GOB più un write-ahead log. Ogni modifica viene scritta nel WAL e sincronizzata su disco prima che la richiesta risponda, e rieseguita dopo un crash."
         }
       }
+    },
+    "endpoints": {
+      "create_index": "Crea un indice",
+      "list_indexes": "Elenca tutti gli indici",
+      "get_index": "Nome dell'indice e numero di documenti",
+      "delete_index": "Elimina un indice",
+      "add_documents": "Aggiungi documenti: uno, un array o un file caricato",
+      "list_documents": "Elenca i documenti, con limit (max 1.000) e offset",
+      "get_document": "Leggi un documento per id",
+      "delete_document": "Elimina un documento",
+      "delete_batch": "Elimina più documenti da un array JSON di id",
+      "search_get": "Cerca con parametri nella query string",
+      "search_post": "Cerca con un body JSON",
+      "get_settings": "Leggi le impostazioni dell'indice",
+      "put_settings": "Sostituisci le impostazioni dell'indice",
+      "sitemap": "Sitemap XML dei documenti dell'indice",
+      "robots": "robots.txt",
+      "health": "Stato, uptime, conteggi e versione, senza autenticazione"
     }
   },
   "search_status": {
-    "offline_title": "Koskidex Engine Offline",
-    "offline_desc": "Impossibile connettersi al servizio di ricerca su {{url}}.",
+    "offline_title": "Koskidex non è raggiungibile",
+    "offline_desc": "Impossibile connettersi al servizio di ricerca su {{url}}. Avvia il backend e riprova.",
     "instant": "< 1"
   },
+  "errors": {
+    "page_not_found": "Questa pagina non esiste. Controlla l'indirizzo o torna alla home."
+  },
   "error": {
-    "oops": "Ops!",
-    "something_wrong": "Qualcosa è andato storto nell'interfaccia. Non preoccuparti, è colpa nostra.",
-    "retry": "Riprova"
+    "oops": "Qualcosa si è rotto",
+    "something_wrong": "L'interfaccia ha incontrato un errore imprevisto. Ricarica la pagina per riprovare.",
+    "retry": "Ricarica"
+  },
+  "footer": {
+    "license": "Open source con licenza MIT.",
+    "made_by": "Realizzato da Martin Trajkovski."
   },
   "datasets": {
     "movies": {

@@ -1,63 +1,94 @@
 @import "tailwindcss";
 
+/* Layout: left-aligned "index card" pages on cool paper. Ink for text and code,
+   a single highlighter yellow for matched terms, index blue for links and focus. */
 @theme {
-  --color-brand-glow: #3b82f6;
-  --color-secondary-glow: #8b5cf6;
-  --color-accent-blue: #3b82f6;
-  --color-dark-bg: #0f172a;
-  --color-dark-card: rgba(30, 41, 59, 0.7);
-  --color-border-subtle: rgba(255, 255, 255, 0.1);
-  --font-outfit: 'Outfit', sans-serif;
-  
-  --animate-float: float 10s infinite alternate;
+  --color-paper: #f2f3ee;
+  --color-surface: #fafaf7;
+  --color-ink: #15171c;
+  --color-muted: #555a66;
+  --color-rule: #d3d5cc;
+  --color-mark: #f3e15b;
+  --color-mark-ink: #15171c;
+  --color-link: #2b44c7;
+  --color-code: #15171c;
+  --color-code-ink: #e4e5df;
+  --color-code-muted: #8d929c;
+  --color-ok: #1d7a4c;
+  --color-bad: #b42318;
 
-  @keyframes float {
-    0% { transform: translate(0, 0) scale(1); }
-    100% { transform: translate(50px, 50px) scale(1.1); }
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #121419;
+    --color-surface: #1a1d24;
+    --color-ink: #ecede6;
+    --color-muted: #a0a5b0;
+    --color-rule: #2c3039;
+    --color-mark: #e9d648;
+    --color-link: #9aabff;
+    --color-code: #0b0d11;
+    --color-ok: #5cc98f;
+    --color-bad: #ff8a7a;
+    color-scheme: dark;
   }
 }
 
-@utility glass-effect {
-  @apply bg-slate-900/60 backdrop-blur-2xl border border-white/10 shadow-2xl rounded-[2rem];
-  cursor: default;
-}
-
-.btn, button, select, a {
-  cursor: pointer;
-}
-
-@utility text-gradient {
-  background: linear-gradient(135deg, #60a5fa, #c084fc);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+@utility font-wide {
+  font-stretch: 125%;
+  font-variation-settings: "wdth" 125;
 }
 
 body {
-  font-family: var(--font-outfit);
-  background-color: var(--color-dark-bg);
-  color: #f8fafc;
+  font-family: var(--font-sans);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3 {
-  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
-/* Custom Scrollbar for Code blocks */
-pre::-webkit-scrollbar {
-  height: 8px;
+button, select, a, summary {
+  cursor: pointer;
 }
-pre::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.5);
-}
-pre::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+
+:focus-visible {
+  outline: 2px solid var(--color-link);
+  outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* Hide scrollbar for horizontal nav */
+::selection {
+  background: var(--color-mark);
+  color: var(--color-mark-ink);
+}
+
+/* Matched terms, as the engine returns them (<em>...</em>). */
+.hl em {
+  font-style: normal;
+  background: var(--color-mark);
+  color: var(--color-mark-ink);
+  border-radius: 2px;
+  padding: 0 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+pre::-webkit-scrollbar {
+  height: 8px;
+}
+pre::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -66,18 +97,38 @@ pre::-webkit-scrollbar-thumb {
   display: none;
 }
 
-/* Custom Scrollbar for Results */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+/* Hero trace: each line is revealed once, in order, on page load. */
+@keyframes trace-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
 }
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.2);
-  border-radius: 4px;
+@keyframes marker {
+  from { background-size: 0% 100%; }
+  to { background-size: 100% 100%; }
 }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+@keyframes caret {
+  50% { opacity: 0; }
 }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
+
+.trace-line {
+  animation: trace-in 360ms ease-out both;
+}
+.marker {
+  background-image: linear-gradient(var(--color-mark), var(--color-mark));
+  background-repeat: no-repeat;
+  color: var(--color-mark-ink);
+  animation: marker 520ms ease-out both;
+}
+.caret {
+  animation: caret 1s steps(1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -1,4 +1,4 @@
-import { Github, Globe, Menu, X, Zap } from "lucide-react";
+import { Github, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -13,6 +13,44 @@ import Documentation from "./pages/Documentation";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
 
+const LANGUAGES = ["en", "it"] as const;
+
+function Logo() {
+  return (
+    <span className="flex items-center gap-2.5">
+      <span
+        aria-hidden="true"
+        className="grid place-items-center w-7 h-7 rounded-[5px] bg-ink text-paper font-wide font-black text-sm"
+      >
+        k
+      </span>
+      <span className="font-wide font-extrabold text-lg tracking-tight">Koskidex</span>
+    </span>
+  );
+}
+
+function LanguageSwitch({ changeLanguage }: { changeLanguage: (lng: string) => void }) {
+  const { t, i18n } = useTranslation();
+  const current = i18n.language.split("-")[0];
+  return (
+    <div role="group" aria-label={t("nav.select_language")} className="flex rounded-md border border-rule p-0.5 text-xs font-semibold">
+      {LANGUAGES.map((lng) => (
+        <button
+          key={lng}
+          type="button"
+          onClick={() => changeLanguage(lng)}
+          aria-pressed={current === lng}
+          className={`px-2 py-1 rounded-[4px] uppercase transition-colors ${
+            current === lng ? "bg-ink text-paper" : "text-muted hover:text-ink"
+          }`}
+        >
+          {lng}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function Navbar({
   changeLanguage,
   lastScrollY,
@@ -22,7 +60,7 @@ function Navbar({
   lastScrollY: number;
   showNav: boolean;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const location = useLocation();
   const isHome = location.pathname === "/";
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -31,147 +69,84 @@ function Navbar({
     setMobileOpen(false);
   }, [location.pathname]);
 
+  const linkClass = "text-muted hover:text-ink transition-colors";
+
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 transform ${
-        showNav || mobileOpen ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0"
+      className={`fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${
+        showNav || mobileOpen ? "translate-y-0" : "-translate-y-full"
       } ${
-        lastScrollY > 50 || mobileOpen
-          ? "glass-effect bg-slate-900/80 border-b border-white/5 py-3 md:py-4 shadow-2xl shadow-blue-500/10 rounded-b-3xl rounded-t-none"
-          : "bg-transparent py-5 md:py-7 border-transparent"
+        lastScrollY > 20 || mobileOpen
+          ? "bg-paper/90 backdrop-blur-md border-b border-rule"
+          : "bg-transparent border-b border-transparent"
       }`}
     >
-      <div className="container mx-auto px-4 md:px-6 h-14 md:h-20 flex justify-between items-center">
+      <div className="max-w-6xl mx-auto px-4 md:px-6 h-16 flex justify-between items-center">
         <Link
           to="/"
+          aria-label="Koskidex"
           onClick={(e) => {
             if (isHome) {
               e.preventDefault();
               window.scrollTo({ top: 0, behavior: "smooth" });
             }
           }}
-          className="text-2xl md:text-3xl font-black flex items-center gap-2 tracking-tighter text-white"
         >
-          <Zap className="w-6 h-6 md:w-8 md:h-8 text-blue-500 fill-blue-500" />
-          Koskidex
+          <Logo />
         </Link>
 
-        {/* Mobile controls */}
-        <div className="flex md:hidden items-center gap-3">
-          <label className="flex items-center gap-1.5 bg-slate-800/40 px-2 py-1 rounded-lg border border-white/5 cursor-pointer">
-            <Globe className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={i18n.language.split("-")[0]}
-              onChange={(e) => changeLanguage(e.target.value)}
-              className="bg-transparent text-xs text-slate-300 focus:outline-none cursor-pointer font-medium appearance-none"
-              aria-label={t("nav.select_language")}
-            >
-              <option value="en" className="bg-slate-900">EN</option>
-              <option value="it" className="bg-slate-900">IT</option>
-            </select>
-          </label>
+        <div className="flex md:hidden items-center gap-2">
+          <LanguageSwitch changeLanguage={changeLanguage} />
           <button
+            type="button"
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="p-2 text-slate-300 hover:text-white transition-colors"
-            aria-label="Toggle menu"
+            className="p-2 -mr-2 text-ink"
+            aria-label={t("nav.toggle_menu")}
+            aria-expanded={mobileOpen}
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
 
-        {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-8 font-medium">
+        <div className="hidden md:flex items-center gap-7 text-sm font-medium">
           {isHome ? (
             <>
-              <a
-                href="#demo"
-                className="text-slate-300 hover:text-white transition-colors"
-              >
-                {t("nav.demo")}
-              </a>
-              <a
-                href="#integration"
-                className="text-slate-300 hover:text-white transition-colors"
-              >
-                {t("nav.integration")}
-              </a>
+              <a href="#demo" className={linkClass}>{t("nav.demo")}</a>
+              <a href="#integration" className={linkClass}>{t("nav.integration")}</a>
             </>
           ) : (
-            <Link
-              to="/"
-              className="text-slate-300 hover:text-white transition-colors"
-            >
-              {t("docs.back_home")}
-            </Link>
+            <Link to="/" className={linkClass}>{t("docs.back_home")}</Link>
           )}
-
-          <Link
-            to="/docs"
-            className="text-slate-300 hover:text-white transition-colors"
-          >
-            {t("nav.features")}
-          </Link>
-
-          <label
-            className="flex items-center gap-2 bg-slate-800/40 hover:bg-slate-800/60 px-3 py-1.5 rounded-lg border border-white/5 hover:border-white/10 transition-all duration-300 cursor-pointer group"
-            onClick={(e) => {
-              const select = e.currentTarget.querySelector("select");
-              if (select) {
-                try {
-                  select.showPicker();
-                } catch {
-                  select.focus();
-                }
-              }
-            }}
-          >
-            <Globe className="w-4 h-4 text-slate-400 group-hover:text-blue-400 transition-colors" />
-            <select
-              value={i18n.language.split("-")[0]}
-              onChange={(e) => changeLanguage(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-transparent text-sm text-slate-300 group-hover:text-white focus:outline-none cursor-pointer font-medium appearance-none"
-              aria-label={t("nav.select_language")}
-            >
-              <option value="en" className="bg-slate-900">
-                EN
-              </option>
-              <option value="it" className="bg-slate-900">
-                IT
-              </option>
-            </select>
-          </label>
-
+          <Link to="/docs" className={linkClass}>{t("nav.features")}</Link>
+          <LanguageSwitch changeLanguage={changeLanguage} />
           <a
             href="https://github.com/GeneralKoski/Koskidex"
             target="_blank"
             rel="noreferrer"
-            className="group relative inline-flex items-center gap-2 px-3 py-1.5 bg-slate-800/40 hover:bg-slate-800/60 text-slate-300 hover:text-white rounded-lg border border-white/5 hover:border-blue-500/30 transition-all duration-300 shadow-lg hover:shadow-blue-500/10"
-            aria-label={t("nav.github")}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-ink/80 text-ink hover:bg-ink hover:text-paper transition-colors"
           >
-            <Github className="w-4 h-4 group-hover:scale-110 transition-transform duration-300" />
-            <span className="text-sm font-medium">{t("nav.github")}</span>
+            <Github className="w-4 h-4" />
+            {t("nav.github")}
           </a>
         </div>
       </div>
 
-      {/* Mobile dropdown */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-white/5 px-4 py-4 flex flex-col gap-3 bg-slate-900/95 backdrop-blur-xl">
+        <div className="md:hidden border-t border-rule bg-paper px-4 py-3 flex flex-col text-base font-medium">
           {isHome ? (
             <>
-              <a href="#demo" onClick={() => setMobileOpen(false)} className="text-slate-300 hover:text-white transition-colors py-2 text-sm font-medium">{t("nav.demo")}</a>
-              <a href="#integration" onClick={() => setMobileOpen(false)} className="text-slate-300 hover:text-white transition-colors py-2 text-sm font-medium">{t("nav.integration")}</a>
+              <a href="#demo" onClick={() => setMobileOpen(false)} className="py-3 border-b border-rule">{t("nav.demo")}</a>
+              <a href="#integration" onClick={() => setMobileOpen(false)} className="py-3 border-b border-rule">{t("nav.integration")}</a>
             </>
           ) : (
-            <Link to="/" className="text-slate-300 hover:text-white transition-colors py-2 text-sm font-medium">{t("docs.back_home")}</Link>
+            <Link to="/" className="py-3 border-b border-rule">{t("docs.back_home")}</Link>
           )}
-          <Link to="/docs" className="text-slate-300 hover:text-white transition-colors py-2 text-sm font-medium">{t("nav.features")}</Link>
+          <Link to="/docs" className="py-3 border-b border-rule">{t("nav.features")}</Link>
           <a
             href="https://github.com/GeneralKoski/Koskidex"
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors py-2 text-sm font-medium"
+            className="py-3 flex items-center gap-2"
           >
             <Github className="w-4 h-4" />
             {t("nav.github")}
@@ -207,12 +182,18 @@ function AppContent() {
 
   return (
     <>
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:px-3 focus:py-2 focus:bg-ink focus:text-paper focus:rounded-md"
+      >
+        {t("nav.skip")}
+      </a>
       <Navbar
         showNav={showNav}
         lastScrollY={lastScrollY}
         changeLanguage={changeLanguage}
       />
-      <main className="min-h-screen">
+      <main id="main" className="min-h-screen">
         <Routes>
           <Route
             path="/"
@@ -229,13 +210,17 @@ function AppContent() {
         </Routes>
       </main>
 
-      <footer className="py-12 border-t border-slate-800/50 text-center text-slate-500 bg-[#0B1120]">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Zap className="w-5 h-5 text-blue-500/50" />
-            <span className="font-semibold text-slate-400">
-              Koskidex {t("common.search_engine")}
-            </span>
+      <footer className="border-t border-rule">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-10 flex flex-col sm:flex-row gap-6 sm:items-center justify-between text-sm text-muted">
+          <div className="flex flex-col gap-1">
+            <span className="text-ink"><Logo /></span>
+            <span className="mt-2">{t("footer.license")} {t("footer.made_by")}</span>
+          </div>
+          <div className="flex gap-6">
+            <Link to="/docs" className="hover:text-ink transition-colors">{t("nav.features")}</Link>
+            <a href="https://github.com/GeneralKoski/Koskidex" target="_blank" rel="noreferrer" className="hover:text-ink transition-colors">
+              {t("nav.github")}
+            </a>
           </div>
         </div>
       </footer>
@@ -247,8 +232,6 @@ function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <div className="blob blob-1"></div>
-        <div className="blob blob-2"></div>
         <AppContent />
       </BrowserRouter>
     </ErrorBoundary>

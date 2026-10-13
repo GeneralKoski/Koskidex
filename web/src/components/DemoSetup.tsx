@@ -197,67 +197,67 @@ export default function DemoSetup({
 
   const isLoading = status.type === "loading";
 
+  const datasetButton = (
+    name: string,
+    label: string,
+    count: number,
+    Icon: typeof Film,
+    onClick: () => void,
+  ) => {
+    const active = activeIndex === name;
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={isLoading}
+        aria-pressed={active}
+        className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-md border text-left transition-colors disabled:opacity-50 ${
+          active
+            ? "border-ink bg-ink text-paper"
+            : "border-rule bg-paper hover:border-ink"
+        }`}
+      >
+        <Icon className="w-4 h-4 shrink-0" />
+        <span className="flex-1 font-semibold text-sm">{label}</span>
+        <span className={`font-mono text-xs tabular-nums ${active ? "text-paper/70" : "text-muted"}`}>{count}</span>
+      </button>
+    );
+  };
+
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <h3 className="text-sm font-semibold">{t("demo.setup.title")}</h3>
+      {datasetButton("movies", t("demo.setup.load_movies"), MOVIES_RAW.length, Film, handleLoadMovies)}
+      {datasetButton("products", t("demo.setup.load_products"), PRODUCTS_RAW.length, Package, handleLoadProducts)}
+
+      {activeIndex && (
         <button
-          onClick={handleLoadMovies}
+          type="button"
+          onClick={handleClear}
           disabled={isLoading}
-          aria-label={t("demo.setup.load_movies")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-            activeIndex === "movies"
-              ? "bg-blue-500/15 text-blue-400 border border-blue-500/30 shadow-sm shadow-blue-500/10"
-              : "bg-white/5 text-slate-400 border border-white/5 hover:bg-white/10 hover:text-slate-200"
-          } disabled:opacity-50`}
+          className="self-start flex items-center gap-1.5 py-1 text-sm text-bad hover:underline underline-offset-4 disabled:opacity-40"
         >
-          <Film className="w-4 h-4" />
-          {t("demo.setup.load_movies")}
+          <Trash2 className="w-3.5 h-3.5" />
+          {t("demo.setup.clear")}
         </button>
+      )}
 
-        <button
-          onClick={handleLoadProducts}
-          disabled={isLoading}
-          aria-label={t("demo.setup.load_products")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-            activeIndex === "products"
-              ? "bg-purple-500/15 text-purple-400 border border-purple-500/30 shadow-sm shadow-purple-500/10"
-              : "bg-white/5 text-slate-400 border border-white/5 hover:bg-white/10 hover:text-slate-200"
-          } disabled:opacity-50`}
-        >
-          <Package className="w-4 h-4" />
-          {t("demo.setup.load_products")}
-        </button>
-
-        <div className="flex-1" />
-
-        {activeIndex && (
-          <button
-            onClick={handleClear}
-            disabled={isLoading}
-            aria-label={t("demo.setup.clear")}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-30"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            {t("demo.setup.clear")}
-          </button>
+      <div role="status" aria-live="polite">
+        {status.msg && (
+          <p className={`flex items-start gap-2 text-sm ${
+            status.type === "success" ? "text-ok" :
+            status.type === "error" ? "text-bad" :
+            "text-muted"
+          }`}>
+            {status.type === "loading" && (
+              <span className="mt-1 animate-spin w-3 h-3 border-2 border-current border-t-transparent rounded-full shrink-0" />
+            )}
+            {status.type === "success" && <CheckCircle2 className="mt-0.5 w-4 h-4 shrink-0" />}
+            {status.type === "error" && <AlertCircle className="mt-0.5 w-4 h-4 shrink-0" />}
+            <span>{status.msg}</span>
+          </p>
         )}
       </div>
-
-      {status.msg && (
-        <div className={`flex items-center gap-2 text-xs font-medium px-1 ${
-          status.type === "loading" ? "text-blue-400" :
-          status.type === "success" ? "text-emerald-400" :
-          status.type === "error" ? "text-red-400" :
-          "text-slate-500"
-        }`}>
-          {status.type === "loading" && (
-            <span className="animate-spin w-3 h-3 border-2 border-current border-t-transparent rounded-full shrink-0" />
-          )}
-          {status.type === "success" && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
-          {status.type === "error" && <AlertCircle className="w-3.5 h-3.5 shrink-0" />}
-          {status.msg}
-        </div>
-      )}
     </div>
   );
 }

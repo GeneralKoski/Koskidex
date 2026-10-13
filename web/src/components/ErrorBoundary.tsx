@@ -27,26 +27,25 @@ class ErrorBoundary extends Component<Props, State> {
     const { t } = this.props;
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#0B1120] flex items-center justify-center p-6 text-center">
-          <div className="glass-effect p-12 max-w-lg rounded-[2.5rem] border-red-500/20 shadow-2xl shadow-red-500/10">
-            <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 animate-pulse">
-              <AlertTriangle className="w-10 h-10 text-red-500" />
-            </div>
-            <h1 className="text-4xl font-black text-white mb-4 tracking-tight uppercase">{t("error.oops")}</h1>
-            <p className="text-slate-400 text-lg mb-10 leading-relaxed font-light">
+        <div className="min-h-screen bg-paper text-ink flex items-center px-4 md:px-6">
+          <div className="max-w-xl mx-auto">
+            <AlertTriangle className="w-8 h-8 text-bad" aria-hidden="true" />
+            <h1 className="mt-4 font-wide font-black text-4xl md:text-5xl tracking-[-0.03em]">{t("error.oops")}</h1>
+            <p className="mt-4 text-lg text-muted leading-relaxed">
               {t("error.something_wrong")}
             </p>
-            <div className="flex flex-col gap-4">
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <button
+                type="button"
                 onClick={() => window.location.reload()}
-                className="btn btn-primary py-4 rounded-2xl font-black flex items-center justify-center gap-2 transform hover:scale-105 transition-transform"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-ink text-paper font-semibold hover:bg-link transition-colors"
               >
-                <RefreshCcw className="w-5 h-5" />
+                <RefreshCcw className="w-4 h-4" />
                 {t("error.retry")}
               </button>
               <a
                 href="/"
-                className="text-slate-500 hover:text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors mt-4"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md border border-rule font-semibold hover:border-ink transition-colors"
               >
                 <Home className="w-4 h-4" />
                 {t("docs.back_home")}

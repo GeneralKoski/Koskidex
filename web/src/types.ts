@@ -22,6 +22,7 @@ export type Hit = {
   id: string;
   document: Document;
   highlights: Record<string, string>;
+  score: number;
 };
 
 export type SearchResponse = {
@@ -30,4 +31,6 @@ export type SearchResponse = {
   total_hits: number;
   hits: Hit[];
   facets: Record<string, Record<string, number>>;
+  limit: number;
+  offset: number;
 };

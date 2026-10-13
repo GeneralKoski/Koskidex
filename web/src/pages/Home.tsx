@@ -19,9 +19,8 @@ export default function Home({
   const { t } = useTranslation();
 
   useDocumentMeta({
-    title: "Koskidex | Blazing Fast, Lightweight Go Search Engine",
-    description:
-      "Koskidex is a lightning-fast, sub-15MB full-text search engine written in Go. Self-hosted, REST-based, and typo-tolerant with zero dependencies.",
+    title: t("meta.home_title"),
+    description: t("meta.home_desc"),
     path: "/",
   });
 
@@ -29,32 +28,25 @@ export default function Home({
     <>
       <Hero />
 
-      <section
-        id="demo"
-        className="py-20 bg-slate-900/40 relative border-y border-slate-800/50"
-      >
-        <div className="container mx-auto px-4 relative z-10">
-          <h2 className="text-4xl font-bold text-center mb-4">
-            {t("demo.title")}
-          </h2>
-          <p className="text-slate-400 text-center mb-12 text-lg">
-            {t("demo.subtitle")}
-          </p>
-
-          <div className="max-w-3xl mx-auto">
-            <div className="glass-effect rounded-2xl p-5 md:p-7 shadow-xl shadow-blue-500/5 border border-white/5 flex flex-col gap-5">
+      <section id="demo" className="scroll-mt-16 bg-surface border-y border-rule">
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-16 md:py-24 grid lg:grid-cols-[18rem_1fr] gap-10 lg:gap-14">
+          <div className="min-w-0">
+            <h2 className="font-wide font-black text-3xl md:text-4xl tracking-[-0.02em]">
+              {t("demo.title")}
+            </h2>
+            <p className="mt-4 text-muted leading-relaxed">{t("demo.subtitle")}</p>
+            <div className="mt-8">
               <DemoSetup
                 activeIndex={activeIndex}
                 onIndexReady={onIndexReady}
                 onClear={onClear}
               />
-              <div className="h-px bg-gradient-to-r from-transparent via-slate-700/50 to-transparent" />
-              <SearchUI activeIndex={activeIndex} />
             </div>
           </div>
+          <div className="min-w-0">
+            <SearchUI activeIndex={activeIndex} />
+          </div>
         </div>
-
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay pointer-events-none"></div>
       </section>
 
       <IntegrationSnippets />

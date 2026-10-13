@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Search as SearchIcon, Ghost, Video, Calendar, Tag, DollarSign, Ticket, AlertCircle, Star, ShoppingBag, ArrowUpDown, Zap, X } from 'lucide-react';
+import { Search as SearchIcon, Ghost, Video, Calendar, Tag, DollarSign, Ticket, AlertCircle, Star, ShoppingBag, ArrowUpDown, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { SearchResponse, Hit, MovieDocument, ProductDocument } from '../types';
 
@@ -122,65 +122,68 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
   const facetData = results?.facets?.[getFacetField(activeIndex)] || {};
   const facetEntries = Object.entries(facetData).sort((a, b) => b[1] - a[1]);
 
+  const controlLabel = "text-xs text-muted";
+
   return (
-    <div className="flex flex-col gap-4">
-      {/* Search input */}
-      <div className="relative group">
-        <SearchIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors w-5 h-5" />
+    <div className="flex flex-col gap-5">
+      <div className="relative">
+        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-muted w-5 h-5 pointer-events-none" />
         <input
           ref={inputRef}
-          type="text"
+          type="search"
           value={query}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
           placeholder={activeIndex ? t('demo.search.placeholder') : t('demo.search.load_dataset')}
           disabled={!activeIndex}
           aria-label={t('demo.search.placeholder')}
-          className="w-full bg-slate-950/50 border border-slate-700/40 rounded-xl py-3.5 pl-12 pr-28 text-[15px] text-white placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/40 transition-all disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+          className="w-full bg-paper border-2 border-ink rounded-lg py-3.5 pl-12 pr-28 text-base placeholder:text-muted focus:shadow-[4px_4px_0_var(--color-mark)] transition-shadow disabled:border-rule disabled:cursor-not-allowed"
         />
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-          <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-800/50 border border-slate-700/40 rounded text-[10px] text-slate-500 font-mono">
-            <span className="text-[11px]">⌘</span>K
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
+          <kbd className="hidden md:inline-flex items-center px-1.5 py-0.5 border border-rule rounded text-[11px] text-muted font-mono">
+            ⌘K
           </kbd>
           {displayTime !== null && (
-            <div className="bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider flex items-center gap-1.5">
+            <span className="font-mono text-xs tabular-nums text-muted flex items-center gap-1.5">
               {isSearching && (
-                <span className="animate-spin w-2.5 h-2.5 border-[1.5px] border-blue-400 border-t-transparent rounded-full" />
+                <span className="animate-spin w-2.5 h-2.5 border-[1.5px] border-current border-t-transparent rounded-full" />
               )}
-              {displayTime}{t('demo.search.ms')}
-            </div>
+              {displayTime} {t('demo.search.ms')}
+            </span>
           )}
         </div>
       </div>
 
-      {/* Controls: Sort + Fuzziness */}
       {activeIndex && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
-            <select
-              value={sortValue}
-              onChange={(e) => setSortValue(e.target.value)}
-              className="bg-slate-900/60 border border-slate-700/40 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-500/40 cursor-pointer"
-            >
-              {sortOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {t(`demo.search.${opt.label}`)}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+          <label className="flex flex-col gap-1.5">
+            <span className={controlLabel}>{t('demo.search.sort')}</span>
+            <span className="relative flex items-center">
+              <ArrowUpDown className="absolute left-2.5 w-3.5 h-3.5 text-muted pointer-events-none" />
+              <select
+                value={sortValue}
+                onChange={(e) => setSortValue(e.target.value)}
+                className="appearance-none bg-paper border border-rule hover:border-ink rounded-md pl-8 pr-3 py-1.5 text-sm"
+              >
+                {sortOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {t(`demo.search.${opt.label}`)}
+                  </option>
+                ))}
+              </select>
+            </span>
+          </label>
 
-          <div className="flex items-center gap-1.5">
-            <Zap className="w-3.5 h-3.5 text-slate-500" />
-            <div className="flex rounded-lg border border-slate-700/40 overflow-hidden">
+          <div className="flex flex-col gap-1.5">
+            <span id="fuzziness-label" className={controlLabel}>{t('demo.search.fuzziness')}</span>
+            <div role="group" aria-labelledby="fuzziness-label" className="flex rounded-md border border-rule p-0.5">
               {FUZZINESS_OPTIONS.map((opt) => (
                 <button
                   key={opt}
+                  type="button"
                   onClick={() => setFuzziness(opt)}
-                  className={`px-2.5 py-1.5 text-xs font-medium transition-all ${
-                    fuzziness === opt
-                      ? "bg-blue-500/15 text-blue-400"
-                      : "bg-slate-900/60 text-slate-500 hover:text-slate-300"
+                  aria-pressed={fuzziness === opt}
+                  className={`px-2.5 py-1 rounded-[4px] font-mono text-xs transition-colors ${
+                    fuzziness === opt ? "bg-ink text-paper" : "text-muted hover:text-ink"
                   }`}
                 >
                   {opt}
@@ -188,69 +191,80 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
               ))}
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Facets */}
-      {activeIndex && facetEntries.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {activeFacet && (
-            <button
-              onClick={() => setActiveFacet(null)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-all"
-            >
-              <X className="w-3 h-3" />
-              {activeFacet}
-            </button>
+          {results && !error && (
+            <span className="ml-auto font-mono text-xs tabular-nums text-muted">
+              {t('demo.search.hits', { count: results.total_hits })}
+            </span>
           )}
-          {!activeFacet && facetEntries.map(([value, count]) => (
-            <button
-              key={value}
-              onClick={() => setActiveFacet(value)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-900/40 text-slate-400 border border-slate-800/40 hover:bg-slate-800/40 hover:text-slate-200 hover:border-blue-500/20 transition-all"
-            >
-              {value}
-              <span className="text-[10px] text-slate-600 bg-slate-800/60 px-1.5 py-0.5 rounded-full">{count}</span>
-            </button>
-          ))}
         </div>
       )}
 
-      {/* Results area */}
-      <div className="min-h-[240px]">
+      {activeIndex && facetEntries.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5" aria-label={t('demo.search.facets')} role="group">
+          {activeFacet ? (
+            <button
+              type="button"
+              onClick={() => setActiveFacet(null)}
+              aria-label={t('demo.search.remove_filter', { value: activeFacet })}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-mark text-mark-ink"
+            >
+              {activeFacet}
+              <X className="w-3 h-3" />
+            </button>
+          ) : (
+            facetEntries.map(([value, count]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setActiveFacet(value)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs border border-rule bg-paper hover:border-ink transition-colors"
+              >
+                {value}
+                <span className="font-mono tabular-nums text-muted">{count}</span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
+      <div className="min-h-[260px]">
         {!activeIndex ? (
-          <div className="flex flex-col items-center justify-center h-[240px] text-slate-600 text-center">
-            <Ghost className="w-12 h-12 mb-3 opacity-30" />
-            <p className="text-sm">{t('demo.search.load_dataset')}</p>
+          <div className="h-[260px] grid place-items-center text-center border border-dashed border-rule rounded-lg px-6">
+            <div>
+              <Ghost className="w-8 h-8 mx-auto mb-3 text-muted" />
+              <p className="text-sm text-muted">{t('demo.search.load_dataset')}</p>
+            </div>
           </div>
         ) : isSearching && !results ? (
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col">
             {[1, 2, 3].map(i => (
-              <div key={i} className="bg-slate-900/30 border border-slate-800/40 p-4 rounded-xl animate-pulse">
-                <div className="h-5 bg-slate-800/60 rounded w-3/4 mb-2.5"></div>
-                <div className="flex gap-3">
-                  <div className="h-3.5 bg-slate-800/40 rounded w-1/4"></div>
-                  <div className="h-3.5 bg-slate-800/40 rounded w-1/4"></div>
-                </div>
+              <div key={i} className="py-4 border-b border-rule animate-pulse">
+                <div className="h-4 bg-rule rounded w-2/3 mb-2.5"></div>
+                <div className="h-3 bg-rule/70 rounded w-1/3"></div>
               </div>
             ))}
           </div>
         ) : error === "connection_error" ? (
-          <div className="flex flex-col items-center justify-center h-[240px] text-red-400 text-center">
-            <AlertCircle className="w-12 h-12 mb-3 opacity-40" />
-            <p className="text-sm font-semibold">{t('search_status.offline_title')}</p>
-            <p className="text-slate-500 max-w-xs mt-1.5 text-xs">{t('search_status.offline_desc', { url: API_URL })}</p>
+          <div className="h-[260px] grid place-items-center text-center border border-dashed border-bad/50 rounded-lg px-6">
+            <div>
+              <AlertCircle className="w-8 h-8 mx-auto mb-3 text-bad" />
+              <p className="text-sm font-semibold text-bad">{t('search_status.offline_title')}</p>
+              <p className="text-muted max-w-xs mt-1.5 text-sm">{t('search_status.offline_desc', { url: API_URL })}</p>
+            </div>
           </div>
         ) : results?.hits?.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-[240px] text-slate-500 text-center">
-            <SearchIcon className="w-12 h-12 mb-3 opacity-20" />
-            <p className="text-sm break-words max-w-full">
-              {t("demo.search.no_results", { query })}
-            </p>
+          <div className="h-[260px] grid place-items-center text-center border border-dashed border-rule rounded-lg px-6">
+            <div>
+              <SearchIcon className="w-8 h-8 mx-auto mb-3 text-muted" />
+              <p className="text-sm text-muted break-words max-w-full">
+                {t("demo.search.no_results", { query })}
+              </p>
+            </div>
           </div>
         ) : (
-          <ul className="flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-2 custom-scrollbar" aria-label="Search results">
-            {results?.hits?.map((hit: Hit, index: number) => {
+          <ul className="max-h-[420px] overflow-y-auto border-t border-rule" aria-label={t('demo.search.results')}>
+            {results?.hits?.map((hit: Hit) => {
               let titleLine = '';
               let metaItems: { icon: React.ReactNode; text: string }[] = [];
 
@@ -275,23 +289,13 @@ export default function SearchUI({ activeIndex }: SearchUIProps) {
               }
 
               return (
-                <li
-                  key={hit.id}
-                  style={{ animationDelay: `${index * 40}ms` }}
-                  className="shrink-0 bg-slate-900/30 border border-slate-800/40 px-4 py-3 rounded-xl hover:bg-slate-800/40 hover:border-blue-500/20 transition-all cursor-default flex flex-col gap-1 relative overflow-hidden group animate-in slide-in-from-bottom-2 fade-in duration-300 fill-mode-both"
-                >
-                  <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-
-                  <div className="text-[15px] font-semibold text-slate-100 group-hover:text-blue-400 transition-colors break-words">
+                <li key={hit.id} className="hl py-3.5 border-b border-rule flex flex-col gap-1.5">
+                  <div className="font-semibold leading-snug break-words">
                     {renderHighlightLine(titleLine)}
                   </div>
-
-                  <div className="flex flex-wrap gap-2 text-[11px] text-slate-400">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-muted">
                     {metaItems.map((item, idx) => (
-                      <span
-                        key={idx}
-                        className="flex items-center gap-1 bg-slate-900/40 px-2 py-0.5 rounded border border-slate-800/40"
-                      >
+                      <span key={idx} className="flex items-center gap-1.5">
                         {item.icon}
                         {renderHighlightLine(item.text)}
                       </span>
