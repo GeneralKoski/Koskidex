@@ -21,6 +21,7 @@ type InvertedIndex struct {
 	docs       map[string]map[string]interface{} // docID -> original document
 	docToTerms map[string][]string               // docID -> list of terms in it (for fast deletion)
 	prefixMap  map[string][]string               // first 2 chars -> list of terms for fuzzy search
+	prefissati map[string]bool                   // terms whose bigrams are already in prefixMap
 	norme      map[string]float64                // docID -> norm of its _vector
 
 	// Collection statistics BM25 needs. Maintained while indexing rather than
@@ -38,6 +39,7 @@ func NewInvertedIndex() *InvertedIndex {
 		docs:       make(map[string]map[string]interface{}),
 		docToTerms: make(map[string][]string),
 		prefixMap:  make(map[string][]string),
+		prefissati: make(map[string]bool),
 		norme:      make(map[string]float64),
 		docFreq:    make(map[string]int),
 		docLengths: make(map[string]int),
@@ -63,6 +65,7 @@ func (idx *InvertedIndex) Reindex(settings Settings) {
 	idx.docs = make(map[string]map[string]interface{})
 	idx.docToTerms = make(map[string][]string)
 	idx.prefixMap = make(map[string][]string)
+	idx.prefissati = make(map[string]bool)
 	idx.norme = make(map[string]float64)
 	idx.docFreq = make(map[string]int)
 	idx.docLengths = make(map[string]int)
@@ -214,6 +217,14 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 					// Substring Indexing (Bigrams):
 					// Instead of just the first 2 chars, we index all 2-char slices.
 					// This allows matching "amsung" to "samsung".
+					// Una volta per termine: prefixMap non si svuota quando un
+					// termine sparisce, quindi un termine già visto ha già tutti
+					// i suoi bigrammi, e cercarlo nelle liste costava O(vocabolario)
+					// per ogni termine nuovo (quadratico con id e codici unici).
+					if idx.prefissati[t.Term] {
+						continue
+					}
+					idx.prefissati[t.Term] = true
 					runes := []rune(t.Term)
 					if len(runes) < 2 {
 						idx.addToPrefixMap(t.Term, t.Term)
@@ -528,26 +539,63 @@ func (idx *InvertedIndex) DeleteDocument(docID string) {
 	idx.deleteDocumentLocked(docID)
 }
 
+// DeleteDocuments removes a batch of documents in one pass over the posting
+// lists they touch.
+func (idx *InvertedIndex) DeleteDocuments(docIDs []string) {
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+	idx.deleteDocumentsLocked(docIDs)
+}
+
+// AddDocuments adds a batch. The documents already in the index leave all
+// together first: replacing them one by one rebuilt the posting list of each
+// of their terms once per document, quadratic when a whole corpus is re-sent.
+func (idx *InvertedIndex) AddDocuments(docIDs []string, docs []map[string]interface{}, settings Settings) {
+	idx.mu.Lock()
+	defer idx.mu.Unlock()
+	idx.deleteDocumentsLocked(docIDs)
+	for i, id := range docIDs {
+		idx.addDocumentLocked(id, docs[i], settings)
+	}
+}
+
 // deleteDocumentLocked removes a document from the index. Caller must hold idx.mu.
 func (idx *InvertedIndex) deleteDocumentLocked(docID string) {
-	// 1. Get terms associated with this document for targeted removal
-	terms, ok := idx.docToTerms[docID]
-	if !ok {
+	idx.deleteDocumentsLocked([]string{docID})
+}
+
+// deleteDocumentsLocked removes documents from the index, rebuilding each
+// affected posting list once for the whole batch. Caller must hold idx.mu.
+func (idx *InvertedIndex) deleteDocumentsLocked(docIDs []string) {
+	// 1. Collect the documents that are there and the terms they use.
+	via := make(map[string]bool, len(docIDs))
+	termini := make(map[string]bool)
+	for _, docID := range docIDs {
+		terms, ok := idx.docToTerms[docID]
+		if !ok || via[docID] {
+			continue
+		}
+		via[docID] = true
+		// terms is deduplicated, so each iteration is one document leaving
+		// that term's posting list: exactly one decrement.
+		for _, term := range terms {
+			idx.docFreq[term]--
+			if idx.docFreq[term] <= 0 {
+				delete(idx.docFreq, term)
+			}
+			termini[term] = true
+		}
+	}
+	if len(via) == 0 {
 		return
 	}
 
-	// 2. Remove from inverted index. terms is deduplicated, so each iteration
-	// is one document leaving that term's posting list: exactly one decrement.
-	for _, term := range terms {
-		idx.docFreq[term]--
-		if idx.docFreq[term] <= 0 {
-			delete(idx.docFreq, term)
-		}
-
+	// 2. Remove from inverted index.
+	for term := range termini {
 		postings := idx.index[term]
 		newPostings := make([]Posting, 0, len(postings))
 		for _, p := range postings {
-			if p.DocID != docID {
+			if !via[p.DocID] {
 				newPostings = append(newPostings, p)
 			}
 		}
@@ -559,11 +607,13 @@ func (idx *InvertedIndex) deleteDocumentLocked(docID string) {
 	}
 
 	// 3. Cleanup document maps
-	idx.totalLen -= idx.docLengths[docID]
-	delete(idx.docLengths, docID)
-	delete(idx.docs, docID)
-	delete(idx.norme, docID)
-	delete(idx.docToTerms, docID)
+	for docID := range via {
+		idx.totalLen -= idx.docLengths[docID]
+		delete(idx.docLengths, docID)
+		delete(idx.docs, docID)
+		delete(idx.norme, docID)
+		delete(idx.docToTerms, docID)
+	}
 }
 
 // DocFrequency returns how many documents contain a term.
@@ -605,13 +655,15 @@ func (idx *InvertedIndex) averageDocLengthLocked() float64 {
 	return float64(idx.totalLen) / float64(len(idx.docLengths))
 }
 
+// addToPrefixMap si chiama solo per un termine mai visto, con tutti i suoi
+// bigrammi di fila: un doppione può essere solo lo stesso bigramma ripetuto
+// nel termine ("abab"), e in quel caso il termine è l'ultimo della lista.
 func (idx *InvertedIndex) addToPrefixMap(prefix, term string) {
-	for _, t := range idx.prefixMap[prefix] {
-		if t == term {
-			return
-		}
+	l := idx.prefixMap[prefix]
+	if len(l) > 0 && l[len(l)-1] == term {
+		return
 	}
-	idx.prefixMap[prefix] = append(idx.prefixMap[prefix], term)
+	idx.prefixMap[prefix] = append(l, term)
 }
 
 // GetAllDocs returns all documents in the index. The outer map is a fresh copy

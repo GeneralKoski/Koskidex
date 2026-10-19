@@ -117,6 +117,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optimized social share image (`og-image`) from ~5 MB to ~107 KB.
 
 ### Fixed
+- Indexing slowed down with every new distinct term: each one's bigrams were
+  checked against the whole list of terms sharing them, so documents with
+  unique values in a searchable field (string ids, codes, protocol numbers)
+  loaded in quadratic time. A term's bigrams are now registered once, the
+  first time the term is seen. One million documents with a string `id`:
+  from about 20 minutes to 24 seconds; a restart reloads them in 14 seconds.
+- Every write request copied all the documents of all indexes for the next
+  snapshot while holding the write lock, so a bulk load copied the corpus
+  once per block and searches waited behind each copy. The snapshot is now
+  built by the persistence worker when it writes, at most once a second, and
+  the WAL keeps the operations that arrived while it was being built (it
+  used to be truncated whole, losing them if Koskidex stopped before the
+  next snapshot: killed right after loading 200,000 documents, it came back
+  with 190,000; now with all of them).
+- Replacing or deleting documents already in the index rebuilt the posting
+  list of each of their terms once per document, quadratic when a whole
+  corpus is sent again or a long WAL is replayed at startup. A request (and
+  a run of WAL lines from one request) now rebuilds each affected list once:
+  sending 100,000 documents again took more than four minutes, now 4.5
+  seconds, and the restart after that crash 50 seconds, now 2.7.
+- The HTTP write timeout was 60 seconds while adding documents can wait up
+  to 5 minutes on the embedder, so a large block was cut off mid-request with
+  its documents still being added. It is now 6 minutes.
+- The backend's `command:` in `docker-compose.yml` and in the README snippet
+  started with `/app/koskidex`, a path that does not exist in the image: the
+  binary read it as an argument and ignored every flag after it, so the
+  README's `--api-key` was silently dropped and the API stayed open. The
+  compose file drops the line, and the README passes the key as
+  `KOSKIDEX_API_KEY`.
 - The Docker Compose seeder reseeded the `massive` index on every
   `docker compose up`: it treated a missing `/data/wal.log` as a first
   deployment, but Koskidex writes `koskidex.db` and `operations.log`, never

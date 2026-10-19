@@ -14,7 +14,6 @@ services:
     # movies/products stay fully open for the demo.
     environment:
       - KOSKIDEX_PROTECTED_INDEXES=massive
-    command: ["/app/koskidex", "--port", "7700", "--data-dir", "/data"]
     healthcheck:
       test:
         [

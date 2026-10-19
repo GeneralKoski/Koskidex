@@ -77,7 +77,8 @@ func NewManager(opts storage.Options) (*Manager, error) {
 	}
 
 	walOps, _ := p.ReadWAL()
-	for _, op := range walOps {
+	for i := 0; i < len(walOps); i++ {
+		op := walOps[i]
 		switch op.Op {
 		case "CREATE_INDEX":
 			if _, exists := mgr.indexes[op.Index]; !exists {
@@ -94,8 +95,20 @@ func NewManager(opts storage.Options) (*Manager, error) {
 				idx.Settings = *op.Settings
 			}
 		case "ADD_DOC":
-			if idx, ok := mgr.indexes[op.Index]; ok && op.DocData != nil {
-				idx.Engine.AddDocument(op.DocID, op.DocData, idx.Settings)
+			// The ADD_DOCs of one request follow each other: replayed as one
+			// batch, the documents the snapshot already has leave together.
+			var ids []string
+			var docs []map[string]interface{}
+			j := i
+			for ; j < len(walOps) && walOps[j].Op == "ADD_DOC" && walOps[j].Index == op.Index; j++ {
+				if walOps[j].DocData != nil {
+					ids = append(ids, walOps[j].DocID)
+					docs = append(docs, walOps[j].DocData)
+				}
+			}
+			i = j - 1
+			if idx, ok := mgr.indexes[op.Index]; ok {
+				idx.Engine.AddDocuments(ids, docs, idx.Settings)
 			}
 		case "DELETE_DOC":
 			if idx, ok := mgr.indexes[op.Index]; ok && op.DocID != "" {
@@ -103,9 +116,7 @@ func NewManager(opts storage.Options) (*Manager, error) {
 			}
 		case "DELETE_DOCS":
 			if idx, ok := mgr.indexes[op.Index]; ok {
-				for _, id := range op.DocIDs {
-					idx.Engine.DeleteDocument(id)
-				}
+				idx.Engine.DeleteDocuments(op.DocIDs)
 			}
 		}
 	}
@@ -222,10 +233,8 @@ func (m *Manager) AddDocuments(indexName string, docs []map[string]interface{}) 
 	if err := m.persistence.AppendWALBatch(ops); err != nil {
 		return 0, 0, fmt.Errorf("WAL write failed: %w", err)
 	}
-	for i, doc := range docs {
-		idx.Engine.AddDocument(ids[i], doc, idx.Settings)
-		added++
-	}
+	idx.Engine.AddDocuments(ids, docs, idx.Settings)
+	added = len(docs)
 
 	m.invalidateCache(indexName)
 	return added, skipped, m.triggerSaveLocked()
@@ -324,9 +333,7 @@ func (m *Manager) DeleteDocuments(indexName string, rawIDs []interface{}) (delet
 	if err := m.persistence.AppendWAL(storage.WALOperation{Op: "DELETE_DOCS", Index: indexName, DocIDs: presenti}); err != nil {
 		return 0, fmt.Errorf("WAL write failed: %w", err)
 	}
-	for _, id := range presenti {
-		idx.Engine.DeleteDocument(id)
-	}
+	idx.Engine.DeleteDocuments(presenti)
 	m.invalidateCache(indexName)
 	return len(presenti), m.triggerSaveLocked()
 }
@@ -394,7 +401,17 @@ func idCanonico(v interface{}) (string, bool) {
 // triggerSaveLocked saves all data to disk using the debounced save in the
 // persistence layer. The caller must hold m.mu.
 func (m *Manager) triggerSaveLocked() error {
-	// Extract data to save
+	m.persistence.SaveFunc(m.snapshot)
+	return nil
+}
+
+// snapshot copia lo stato da salvare. La chiama il worker della persistenza,
+// al più una volta al secondo, e non chi scrive: copiare tutti i documenti a
+// ogni blocco caricato rendeva quadratico un caricamento grande.
+func (m *Manager) snapshot() map[string]storage.IndexData {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	saveData := make(map[string]storage.IndexData)
 	for name, idx := range m.indexes {
 		var docs []storage.DocRecord
@@ -409,9 +426,7 @@ func (m *Manager) triggerSaveLocked() error {
 			Docs:     docs,
 		}
 	}
-
-	m.persistence.Save(saveData)
-	return nil
+	return saveData
 }
 
 func (m *Manager) Close() {

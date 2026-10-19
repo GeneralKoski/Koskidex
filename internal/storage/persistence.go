@@ -37,14 +37,17 @@ type WALOperation struct {
 }
 
 type Persistence struct {
-	opts       Options
-	filePath   string
-	saveCh     chan map[string]IndexData
-	wg         sync.WaitGroup
-	walPath    string
-	walFile    *os.File
-	walMutex   sync.Mutex
-	syncs      int // WAL syncs done, for the tests
+	opts     Options
+	filePath string
+	saveCh   chan struct{}
+	wg       sync.WaitGroup
+	pendMu   sync.Mutex
+	pending  func() map[string]IndexData // snapshot da scrivere, nil se non c'è niente
+	gen      int                         // cresce a ogni SaveFunc
+	walPath  string
+	walFile  *os.File
+	walMutex sync.Mutex
+	syncs    int // WAL syncs done, for the tests
 }
 
 func NewPersistence(opts Options) *Persistence {
@@ -58,7 +61,7 @@ func NewPersistence(opts Options) *Persistence {
 		filePath: filepath.Join(opts.DataDir, "koskidex.db"),
 		walPath:  walPath,
 		walFile:  walFile,
-		saveCh:   make(chan map[string]IndexData, 10),
+		saveCh:   make(chan struct{}, 1),
 	}
 
 	p.wg.Add(1)
@@ -70,48 +73,57 @@ func NewPersistence(opts Options) *Persistence {
 func (p *Persistence) worker() {
 	defer p.wg.Done()
 
-	var latestData map[string]IndexData
 	timer := time.NewTimer(0)
 	if !timer.Stop() {
 		<-timer.C
 	}
-	timerRunning := false
 
 	for {
 		select {
-		case data, ok := <-p.saveCh:
+		case _, ok := <-p.saveCh:
 			if !ok {
-				if timerRunning {
-					timer.Stop()
-				}
-				if latestData != nil {
-					_ = p.writeToDisk(latestData) // best-effort flush on shutdown
-				}
+				timer.Stop()
+				_ = p.flush() // best-effort flush on shutdown
 				return
 			}
-			latestData = data
-			if timerRunning {
-				timer.Stop()
-			}
 			timer.Reset(1 * time.Second)
-			timerRunning = true
 
 		case <-timer.C:
-			timerRunning = false
-			if latestData != nil {
-				if err := p.writeToDisk(latestData); err != nil {
-					// Snapshot failed: keep latestData and the WAL intact so
-					// nothing is lost, and retry on the next tick.
-					timer.Reset(1 * time.Second)
-					timerRunning = true
-				} else {
-					// Snapshot is durable; the WAL is now redundant.
-					p.truncateWAL()
-					latestData = nil
-				}
+			if err := p.flush(); err != nil {
+				// Snapshot failed: keep the pending snapshot and the WAL intact
+				// so nothing is lost, and retry on the next tick.
+				timer.Reset(1 * time.Second)
 			}
 		}
 	}
+}
+
+// flush costruisce lo snapshot in attesa, lo scrive e toglie dal WAL le
+// operazioni che contiene. Costruirlo qui, una volta per giro del timer, e
+// non a ogni scrittura evita di copiare tutti i documenti per ogni blocco
+// caricato. Le operazioni scritte nel WAL prima di offset sono già nello stato
+// che snapshot legge (il manager scrive il WAL e applica l'operazione sotto
+// lo stesso lock); quelle arrivate dopo restano nel WAL.
+func (p *Persistence) flush() error {
+	p.pendMu.Lock()
+	snapshot, gen := p.pending, p.gen
+	p.pendMu.Unlock()
+	if snapshot == nil {
+		return nil
+	}
+
+	offset := p.walSize()
+	if err := p.writeToDisk(snapshot()); err != nil {
+		return err
+	}
+	p.truncateWALBefore(offset)
+
+	p.pendMu.Lock()
+	if p.gen == gen {
+		p.pending = nil
+	}
+	p.pendMu.Unlock()
+	return nil
 }
 
 func (p *Persistence) writeToDisk(data map[string]IndexData) error {
@@ -138,8 +150,24 @@ func (p *Persistence) writeToDisk(data map[string]IndexData) error {
 	return nil
 }
 
+// SaveFunc chiede uno snapshot: snapshot si chiama più tardi, dal worker, e
+// deve leggere lo stato corrente. Non blocca mai: più richieste ravvicinate
+// diventano una sola scrittura.
+func (p *Persistence) SaveFunc(snapshot func() map[string]IndexData) {
+	p.pendMu.Lock()
+	p.pending = snapshot
+	p.gen++
+	p.pendMu.Unlock()
+	select {
+	case p.saveCh <- struct{}{}:
+	default:
+	}
+}
+
+// Save salva dati già pronti: le operazioni nel WAL che non contengono vanno
+// perse al troncamento, quindi il manager usa SaveFunc.
 func (p *Persistence) Save(data map[string]IndexData) {
-	p.saveCh <- data
+	p.SaveFunc(func() map[string]IndexData { return data })
 }
 
 func (p *Persistence) AppendWAL(op WALOperation) error {
@@ -175,13 +203,52 @@ func (p *Persistence) AppendWALBatch(ops []WALOperation) error {
 	return err
 }
 
-func (p *Persistence) truncateWAL() {
+func (p *Persistence) walSize() int64 {
 	p.walMutex.Lock()
 	defer p.walMutex.Unlock()
-	if p.walFile != nil {
-		_ = p.walFile.Close()
+	if p.walFile == nil {
+		return 0
 	}
-	p.walFile, _ = os.OpenFile(p.walPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+	fi, err := p.walFile.Stat()
+	if err != nil {
+		return 0
+	}
+	return fi.Size()
+}
+
+// truncateWALBefore toglie dal WAL i primi offset byte, già nello snapshot.
+// Quello che segue si riscrive in un file nuovo rinominato al suo posto, così
+// un crash a metà lascia il WAL vecchio, che si può rigiocare per intero.
+func (p *Persistence) truncateWALBefore(offset int64) {
+	p.walMutex.Lock()
+	defer p.walMutex.Unlock()
+	if p.walFile == nil {
+		return
+	}
+
+	var coda []byte
+	if fi, err := p.walFile.Stat(); err == nil && fi.Size() > offset {
+		coda = make([]byte, fi.Size()-offset)
+		if _, err := p.walFile.ReadAt(coda, offset); err != nil {
+			return // il WAL intero resta: rigiocarlo è sicuro
+		}
+	}
+	if len(coda) > 0 {
+		tmp := p.walPath + ".tmp"
+		if err := os.WriteFile(tmp, coda, 0644); err != nil {
+			return
+		}
+		if err := os.Rename(tmp, p.walPath); err != nil {
+			return
+		}
+	}
+
+	_ = p.walFile.Close()
+	flag := os.O_CREATE | os.O_RDWR | os.O_APPEND
+	if len(coda) == 0 {
+		flag |= os.O_TRUNC
+	}
+	p.walFile, _ = os.OpenFile(p.walPath, flag, 0644)
 }
 
 func (p *Persistence) ReadWAL() ([]WALOperation, error) {

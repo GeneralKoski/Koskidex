@@ -225,7 +225,8 @@ services:
       - "${KOSKIDEX_PORT:-7700}:7700"
     volumes:
       - koskidex_data:/data
-    command: ["/app/koskidex", "--port", "7700", "--data-dir", "/data", "--api-key", "${KOSKIDEX_API_KEY}"]
+    environment:
+      - KOSKIDEX_API_KEY=${KOSKIDEX_API_KEY}
 
 volumes:
   koskidex_data:

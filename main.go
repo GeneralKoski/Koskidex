@@ -110,8 +110,10 @@ func main() {
 		Handler:           srv,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		// Adding documents can wait on the embedder for up to 5 minutes
+		// (clientEmbedder in internal/server): the response must outlast it.
+		WriteTimeout: 6 * time.Minute,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	// Graceful shutdown on SIGINT/SIGTERM.

@@ -186,3 +186,32 @@ func TestWALBatchCostsOneSync(t *testing.T) {
 		t.Fatalf("200 operazioni in un blocco devono costare una sincronizzazione, ne sono costate %d", n)
 	}
 }
+
+// Un'operazione scritta nel WAL mentre lo snapshot si costruisce può non
+// esserci dentro: il troncamento la deve lasciare nel WAL.
+func TestFlushTieneLaCodaDelWAL(t *testing.T) {
+	dir := t.TempDir()
+	p := NewPersistence(Options{DataDir: dir})
+
+	_ = p.AppendWAL(WALOperation{Op: "ADD_DOC", Index: "test", DocID: "1", DocData: map[string]interface{}{"title": "Hello"}})
+	p.SaveFunc(func() map[string]IndexData {
+		_ = p.AppendWAL(WALOperation{Op: "ADD_DOC", Index: "test", DocID: "2", DocData: map[string]interface{}{"title": "Later"}})
+		return map[string]IndexData{"test": {Settings: engine.DefaultSettings(), Docs: []DocRecord{{ID: "1", Data: map[string]interface{}{"title": "Hello"}}}}}
+	})
+	time.Sleep(2 * time.Second)
+
+	ops, err := p.ReadWAL()
+	if err != nil {
+		t.Fatalf("ReadWAL failed: %v", err)
+	}
+	if len(ops) != 1 || ops[0].DocID != "2" {
+		t.Fatalf("nel WAL deve restare solo l'operazione arrivata dopo, c'è %+v", ops)
+	}
+
+	// Il WAL riscritto resta in append: la prossima operazione va in coda.
+	_ = p.AppendWAL(WALOperation{Op: "DELETE_DOC", Index: "test", DocID: "1"})
+	p.Wait()
+	if ops, _ = p.ReadWAL(); len(ops) != 2 || ops[1].Op != "DELETE_DOC" {
+		t.Fatalf("dopo un'altra scrittura il WAL deve avere 2 operazioni, ha %+v", ops)
+	}
+}
