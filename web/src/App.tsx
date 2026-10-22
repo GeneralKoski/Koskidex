@@ -215,6 +215,7 @@ function AppContent() {
           <div className="flex flex-col gap-1">
             <span className="text-ink"><Logo /></span>
             <span className="mt-2">{t("footer.license")} {t("footer.made_by")}</span>
+            <span className="max-w-xl text-xs">{t("footer.privacy")}</span>
           </div>
           <div className="flex gap-6">
             <Link to="/docs" className="hover:text-ink transition-colors">{t("nav.features")}</Link>

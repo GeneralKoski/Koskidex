@@ -260,7 +260,8 @@
   },
   "footer": {
     "license": "Open source under the MIT license.",
-    "made_by": "Built by Martin Trajkovski."
+    "made_by": "Built by Martin Trajkovski.",
+    "privacy": "This site uses Hydran, a cookie-free analytics tool, to count visits and errors. It does not store your IP address: it only keeps an anonymous ID in your browser (localStorage)."
   },
   "datasets": {
     "movies": {
