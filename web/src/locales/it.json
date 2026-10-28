@@ -182,6 +182,7 @@
           "searchable_fields": "Campi indicizzati per la ricerca full-text. Vuoto significa tutti i campi.",
           "displayed_fields": "Campi restituiti nei risultati. Vuoto significa il documento intero.",
           "field_weights": "Moltiplicatore del punteggio per campo.",
+          "boosts": "Lista di {\"filter\": \"kind=zone\", \"factor\": 1.5}: moltiplica il punteggio dei documenti che il filtro trova, dopo la rilevanza. Un fattore appena sopra 1 rompe solo i pareggi.",
           "synonyms": "Sinonimi applicati in indicizzazione, in un verso solo: mappa da parola a lista di parole singole. Meglio synonym_groups.",
           "synonym_fields": "Campi in cui valgono i sinonimi, di tutti e due i tipi; le parole come scritte si trovano comunque ovunque. Vuoto significa tutti i campi.",
           "synonym_groups": "Gruppi di termini equivalenti, applicati alla ricerca in tutti i versi, per esempio [[\"bibite\", \"bevande\", \"soft drink\"]]. Un membro può avere più parole; un refuso nella query attiva comunque il gruppo, i sinonimi si cercano come sono scritti. Cambiarlo non reindicizza.",

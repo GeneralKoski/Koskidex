@@ -474,6 +474,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if err := engine.ValidaBoosts(settings.Boosts); err != nil {
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	if err := s.mgr.UpdateSettings(name, settings); err != nil {
 		if err == manager.ErrIndexNotFound {

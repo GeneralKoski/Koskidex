@@ -52,6 +52,7 @@ const SETTINGS_FIELDS = [
   ["searchable_fields", "searchable_fields"],
   ["displayed_fields", "displayed_fields"],
   ["field_weights", "field_weights"],
+  ["boosts", "boosts"],
   ["synonym_groups", "synonym_groups"],
   ["synonyms", "synonyms"],
   ["synonym_fields", "synonym_fields"],

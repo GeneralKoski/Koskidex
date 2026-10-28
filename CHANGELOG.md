@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `boosts` setting: a list of `{"filter": "kind=zone", "factor": 1.5}` that
+  multiplies the score of the documents the filter matches, after relevance
+  and before sorting; the filter has the search `filter` syntax. A factor just
+  above 1 only breaks ties. An empty or unreadable filter, or a factor that is
+  not positive, is refused with `400`. Changing only `boosts` does not
+  reindex. Empty by default.
 - `synonym_fields` setting: restricts both `synonym_groups` and the
   index-time `synonyms` map to a list of fields. A synonym matches only there,
   the words as typed still match everywhere, so a zone name shared by every

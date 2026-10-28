@@ -348,6 +348,18 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 		}
 	}
 
+	for _, b := range settings.Boosts {
+		filtri := ParseFilters(b.Filter)
+		if len(filtri) == 0 {
+			continue
+		}
+		for docID, m := range docMatches {
+			if ApplyFilters(idx.docs[docID], filtri) {
+				m.Score *= b.Factor
+			}
+		}
+	}
+
 	var results []SearchMatch
 	for _, m := range docMatches {
 		results = append(results, *m)

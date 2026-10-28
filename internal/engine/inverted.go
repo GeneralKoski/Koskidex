@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"reflect"
 	"slices"
 	"strconv"
@@ -322,7 +323,10 @@ type Settings struct {
 	// SynonymFields restricts both kinds of synonym to these fields: a
 	// synonym matches only there, the words as typed still match anywhere.
 	// Empty, as up to now, is every field.
-	SynonymFields []string           `json:"synonym_fields"`
+	SynonymFields []string `json:"synonym_fields"`
+	// Boosts multiply the score of the documents their filter matches, after
+	// relevance and before the results are sorted. Empty, as up to now.
+	Boosts        []Boost            `json:"boosts"`
 	TypoTolerance TypoSettings       `json:"typo_tolerance"`
 	FieldWeights  map[string]float64 `json:"field_weights"`
 	Sitemap       SitemapSettings    `json:"sitemap"`
@@ -502,6 +506,28 @@ const (
 	RetrievalAny = "any"
 )
 
+// Boost multiplies by Factor the score of the documents Filter matches.
+// Filter has the syntax of the search filter, e.g. "kind=zone"; a factor a
+// little above 1 only breaks ties.
+type Boost struct {
+	Filter string  `json:"filter"`
+	Factor float64 `json:"factor"`
+}
+
+// ValidaBoosts refuses a boost whose filter is empty or unreadable, which
+// would match every document, or whose factor is not positive.
+func ValidaBoosts(boosts []Boost) error {
+	for _, b := range boosts {
+		if len(ParseFilters(b.Filter)) == 0 {
+			return fmt.Errorf("boost filter %q is not a filter", b.Filter)
+		}
+		if !(b.Factor > 0) {
+			return fmt.Errorf("boost factor for %q must be positive", b.Filter)
+		}
+	}
+	return nil
+}
+
 type SitemapSettings struct {
 	BaseUrl    string `json:"base_url"`
 	UrlField   string `json:"url_field"`
@@ -556,6 +582,7 @@ func (s Settings) campoSinonimi(field string) bool {
 // any other difference, even an empty map against a nil one, says no.
 func (s Settings) StessoIndice(o Settings) bool {
 	s.SynonymGroups, o.SynonymGroups = nil, nil
+	s.Boosts, o.Boosts = nil, nil
 	return reflect.DeepEqual(s, o)
 }
 

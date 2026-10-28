@@ -46,3 +46,22 @@ func TestSynonymFieldsAreASettingOverHTTP(t *testing.T) {
 		t.Fatalf("\"bibite\" deve trovare solo la Coca-Cola, non il Lambrusco: %v", hits)
 	}
 }
+
+func TestBoostsAreASettingOverHTTP(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	richiesta(t, srv, "POST", "/indexes", `{"name":"korsia"}`)
+	richiesta(t, srv, "POST", "/indexes/korsia/documents", `[
+		{"id": "1", "kind": "product", "name": "Pepe nero"},
+		{"id": "2", "kind": "zone", "name": "Pepe"}]`)
+	if w := richiesta(t, srv, "PUT", "/indexes/korsia/settings", `{"boosts": [{"filter": "kind=zone"}]}`); w.Code != http.StatusBadRequest {
+		t.Fatalf("un boost senza fattore va rifiutato: %d", w.Code)
+	}
+	if w := richiesta(t, srv, "PUT", "/indexes/korsia/settings", `{"searchable_fields": ["name"], "boosts": [{"filter": "kind=product", "factor": 2}]}`); w.Code != http.StatusOK {
+		t.Fatalf("aggiornamento impostazioni fallito: %d %s", w.Code, w.Body.String())
+	}
+	hits := searchV2(t, srv, "/indexes/korsia/search?q=pepe")["hits"].([]interface{})
+	if hits[0].(map[string]interface{})["id"] != "1" {
+		t.Fatalf("il prodotto, raddoppiato, deve venire prima: %v", hits)
+	}
+}

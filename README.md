@@ -64,6 +64,7 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 | **Typo tolerance**   | Damerau-Levenshtein fuzzy matching with dynamic fuzziness (`0`, `1`, `2`, `AUTO`)   |         |
 | **Smart ranking**    | Multi-factor pipeline: exactness, typo count, field weight, term frequency                  |         |
 | **Field weighting**  | Boost specific fields via `field_weights` settings (e.g. `name: 5`, `description: 1`) |         |
+| **Value boosts**     | Multiply the score of documents matching a filter via `boosts` (e.g. `kind=zone`)        |         |
 | **Explicit sorting** | Sort results by any field:`sort=price:asc,rating:desc`                                    |         |
 | **Faceted search**   | Aggregate counts per field:`facets=genre,category`                                        |         |
 | **Geospatial**       | Haversine distance filtering:`filter=distance(_geo,45.46,9.19)<50000`                     |         |
@@ -216,6 +217,20 @@ Two forms, which can be used together:
 words as typed still match in every field. Empty means every field. With a
 `zone_names` field holding "Bevande e vini" for every drink, a group
 `["bibite", "bevande"]` without it makes "bibite" find the Lambrusco too.
+
+#### Boosts
+
+`boosts` multiplies the score of the documents a filter matches, after
+relevance and before sorting. The filter has the syntax of the search `filter`
+parameter; the factor must be positive.
+
+```json
+"boosts": [{"filter": "kind=zone", "factor": 1.5}]
+```
+
+Several boosts multiply together. A factor just above 1 (e.g. `1.001`) only
+breaks ties between documents with the same relevance; a larger one can lift a
+document over others. Changing only `boosts` does not reindex.
 
 ### Authentication
 
