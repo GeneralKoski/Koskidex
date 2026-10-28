@@ -1,8 +1,15 @@
 package tests
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"sync"
 	"testing"
+
+	"github.com/GeneralKoski/Koskidex/internal/engine"
+	"github.com/GeneralKoski/Koskidex/internal/manager"
+	"github.com/GeneralKoski/Koskidex/internal/storage"
 )
 
 // L'indice dei prodotti e delle zone di Korsia, configurato via HTTP come lo
@@ -54,8 +61,10 @@ func TestBoostsAreASettingOverHTTP(t *testing.T) {
 	richiesta(t, srv, "POST", "/indexes/korsia/documents", `[
 		{"id": "1", "kind": "product", "name": "Pepe nero"},
 		{"id": "2", "kind": "zone", "name": "Pepe"}]`)
-	if w := richiesta(t, srv, "PUT", "/indexes/korsia/settings", `{"boosts": [{"filter": "kind=zone"}]}`); w.Code != http.StatusBadRequest {
-		t.Fatalf("un boost senza fattore va rifiutato: %d", w.Code)
+	for _, b := range []string{`{"filter": "kind=zone"}`, `{"filter": "kind=zone", "factor": 1e308}`, `{"filter": "garbage, kind=zone", "factor": 2}`} {
+		if w := richiesta(t, srv, "PUT", "/indexes/korsia/settings", `{"boosts": [`+b+`]}`); w.Code != http.StatusBadRequest {
+			t.Fatalf("il boost %s va rifiutato: %d", b, w.Code)
+		}
 	}
 	if w := richiesta(t, srv, "PUT", "/indexes/korsia/settings", `{"searchable_fields": ["name"], "boosts": [{"filter": "kind=product", "factor": 2}]}`); w.Code != http.StatusOK {
 		t.Fatalf("aggiornamento impostazioni fallito: %d %s", w.Code, w.Body.String())
@@ -64,4 +73,98 @@ func TestBoostsAreASettingOverHTTP(t *testing.T) {
 	if hits[0].(map[string]interface{})["id"] != "1" {
 		t.Fatalf("il prodotto, raddoppiato, deve venire prima: %v", hits)
 	}
+}
+
+func TestSynonymLimitsAreCheckedOverHTTP(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	richiesta(t, srv, "POST", "/indexes", `{"name":"korsia"}`)
+	if w := richiesta(t, srv, "PUT", "/indexes/korsia/settings", `{"searchable_fields": ["name"], "synonym_fields": ["nmae"]}`); w.Code != http.StatusBadRequest {
+		t.Fatalf("un campo dei sinonimi che non si cerca va rifiutato: %d", w.Code)
+	}
+}
+
+// Una PUT che cambia solo gruppi e boost non reindicizza e arriva in pochi
+// millisecondi, mentre le ricerche girano: ognuna deve leggere impostazioni
+// intere (go test -race) e nessun risultato vecchio deve restare in cache.
+func TestSettingsChangeWhileSearching(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	richiesta(t, srv, "POST", "/indexes", `{"name":"korsia"}`)
+	richiesta(t, srv, "POST", "/indexes/korsia/documents", `[
+		{"id": "1", "kind": "product", "name": "Bibite gassate"},
+		{"id": "2", "kind": "zone", "name": "Bevande"}]`)
+
+	var wg sync.WaitGroup
+	for g := 0; g < 4; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 50; i++ {
+				richiesta(t, srv, "GET", "/indexes/korsia/search?q=bibite", "")
+			}
+		}()
+	}
+	for i := 0; i < 50; i++ {
+		corpo := fmt.Sprintf(`{"searchable_fields": ["name"], "synonym_groups": [["bibite", "bevande"]], "boosts": [{"filter": "kind=zone", "factor": %d}]}`, 1+i%3)
+		if i%2 == 1 {
+			corpo = `{"searchable_fields": ["name"]}`
+		}
+		richiesta(t, srv, "PUT", "/indexes/korsia/settings", corpo)
+	}
+	wg.Wait()
+
+	// The last PUT has no groups: "bibite" finds only the product.
+	if n := len(searchV2(t, srv, "/indexes/korsia/search?q=bibite")["hits"].([]interface{})); n != 1 {
+		t.Fatalf("dopo l'ultima PUT \"bibite\" trova %d documenti, ne serve 1", n)
+	}
+}
+
+func TestEverySettingsUpdateIsANewGeneration(t *testing.T) {
+	mgr, err := manager.NewManager(storage.Options{DataDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mgr.Close()
+	_ = mgr.CreateIndex("k")
+	_, prima, _ := mgr.Impostazioni("k")
+	s := engine.DefaultSettings()
+	s.SynonymGroups = [][]string{{"bibite", "bevande"}}
+	_ = mgr.UpdateSettings("k", s)
+	if _, dopo, _ := mgr.Impostazioni("k"); dopo == prima {
+		t.Fatalf("la generazione non cambia: %d", dopo)
+	}
+}
+
+// Settings replayed from the WAL apply to the documents of the snapshot too.
+func TestReplayedSettingsReindexTheSnapshot(t *testing.T) {
+	dir := t.TempDir()
+	opts := storage.Options{DataDir: dir}
+	mgr, err := manager.NewManager(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = mgr.CreateIndex("k")
+	_, _, _ = mgr.AddDocuments("k", []map[string]interface{}{{"id": "1", "name": "Matrix", "code": "xr7"}})
+	mgr.Close()
+
+	s := engine.DefaultSettings()
+	s.SearchableFields = []string{"name"}
+	p := storage.NewPersistence(opts)
+	if err := p.AppendWAL(storage.WALOperation{Op: "UPDATE_SETTINGS", Index: "k", Settings: &s}); err != nil {
+		t.Fatal(err)
+	}
+	p.Wait()
+
+	mgr, err = manager.NewManager(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mgr.Close()
+	idx, _ := mgr.GetIndex("k")
+	impostazioni, _, _ := mgr.Impostazioni("k")
+	if ids, _ := idx.Engine.Search("xr7", impostazioni, "0", nil); len(ids) != 0 {
+		t.Fatalf("code non si cerca più, ma \"xr7\" trova %v", ids)
+	}
+	_ = os.RemoveAll(dir)
 }

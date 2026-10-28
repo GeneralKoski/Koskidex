@@ -9,14 +9,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `boosts` setting: a list of `{"filter": "kind=zone", "factor": 1.5}` that
   multiplies the score of the documents the filter matches, after relevance
   and before sorting; the filter has the search `filter` syntax. A factor just
-  above 1 only breaks ties. An empty or unreadable filter, or a factor that is
-  not positive, is refused with `400`. Changing only `boosts` does not
-  reindex. Empty by default.
+  above 1 only breaks ties, and a negative score is divided by it instead.
+  A filter with an unreadable clause, a factor outside 0.01-100 and more than
+  32 boosts are refused with `400`; the filters are parsed once, when the
+  settings are stored. Changing only `boosts` does not reindex. Empty by
+  default.
 - `synonym_fields` setting: restricts both `synonym_groups` and the
   index-time `synonyms` map to a list of fields. A synonym matches only there,
   the words as typed still match everywhere, so a zone name shared by every
   product of a zone no longer spreads a synonym to all of them. Empty, every
-  field, by default.
+  field, by default. A name missing from an explicit `searchable_fields` is
+  refused with `400`.
 - `synonym_groups` setting: groups of equivalent terms, applied at query time
   and in every direction, e.g. `[["bibite", "bevande", "soft drink"]]`. A
   query word, or run of words, that matches a member exactly or within the
@@ -24,8 +27,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   longest member wins, a multi-word member requires all its words, and
   synonyms are matched as written, with no typo and no prefix. The index-time
   `synonyms` map, one way and single-word, keeps working beside it. A settings
-  update that changes only query-time settings no longer reindexes. Empty by
-  default.
+  update that changes only query-time settings no longer reindexes. The
+  groups are tokenized once, when the settings are stored, and looked up by
+  the first word of their members; at most 500 groups and 2,000 members,
+  refused with `400` past that. Searches read the settings and their
+  generation under the manager's lock, and the generation is part of the
+  cache key, so a search still running across a settings update can neither
+  see torn settings nor leave a stale result in the cache. Empty by default.
 - `typo_tolerance.disable_on_amounts`: denies typos to a query term made of
   digits and at least one dot or comma, with a digit at both ends (1.234,56,
   5056,03, 14.01.2026). With the standard tokenizer such a term stays whole,
@@ -139,6 +147,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optimized social share image (`og-image`) from ~5 MB to ~107 KB.
 
 ### Fixed
+- Settings replayed from the WAL at startup now reindex the documents loaded
+  from the snapshot, which had stayed indexed with the old settings until the
+  next settings update.
 - Indexing slowed down with every new distinct term: each one's bigrams were
   checked against the whole list of terms sharing them, so documents with
   unique values in a searchable field (string ids, codes, protocol numbers)

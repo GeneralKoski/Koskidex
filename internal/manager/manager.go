@@ -23,6 +23,8 @@ type Index struct {
 	Name     string
 	Engine   *engine.InvertedIndex
 	Settings engine.Settings
+	// generazione counts the settings updates, for Impostazioni.
+	generazione uint64
 }
 
 type CacheInvalidator interface {
@@ -61,6 +63,7 @@ func NewManager(opts storage.Options) (*Manager, error) {
 	// For simplicity in Phase 1, we just return a new empty manager
 	// Later persistence layer can load from disk here
 	err := p.LoadIndexes(func(name string, d []storage.DocRecord, settings engine.Settings) {
+		settings.Prepara()
 		idx := &Index{
 			Name:     name,
 			Engine:   engine.NewInvertedIndex(),
@@ -77,6 +80,9 @@ func NewManager(opts storage.Options) (*Manager, error) {
 	}
 
 	walOps, _ := p.ReadWAL()
+	// Indexes whose settings the WAL changed: their snapshot documents were
+	// indexed with the old ones.
+	riindicizza := make(map[string]bool)
 	for i := 0; i < len(walOps); i++ {
 		op := walOps[i]
 		switch op.Op {
@@ -93,6 +99,8 @@ func NewManager(opts storage.Options) (*Manager, error) {
 		case "UPDATE_SETTINGS":
 			if idx, ok := mgr.indexes[op.Index]; ok && op.Settings != nil {
 				idx.Settings = *op.Settings
+				idx.Settings.Prepara()
+				riindicizza[op.Index] = true
 			}
 		case "ADD_DOC":
 			// The ADD_DOCs of one request follow each other: replayed as one
@@ -118,6 +126,12 @@ func NewManager(opts storage.Options) (*Manager, error) {
 			if idx, ok := mgr.indexes[op.Index]; ok {
 				idx.Engine.DeleteDocuments(op.DocIDs)
 			}
+		}
+	}
+
+	for name := range riindicizza {
+		if idx, ok := mgr.indexes[name]; ok {
+			idx.Engine.Reindex(idx.Settings)
 		}
 	}
 
@@ -157,6 +171,20 @@ func (m *Manager) GetIndex(name string) (*Index, error) {
 	}
 
 	return idx, nil
+}
+
+// Impostazioni returns a copy of an index's settings, read under the lock
+// UpdateSettings writes them under, and their generation: it changes with
+// every update, so a result computed with the old settings can be told apart.
+func (m *Manager) Impostazioni(name string) (engine.Settings, uint64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	idx, exists := m.indexes[name]
+	if !exists {
+		return engine.Settings{}, 0, ErrIndexNotFound
+	}
+	return idx.Settings, idx.generazione, nil
 }
 
 // ListIndexes returns a list of all index names
@@ -349,7 +377,9 @@ func (m *Manager) UpdateSettings(indexName string, settings engine.Settings) err
 	}
 
 	reindex := !idx.Settings.StessoIndice(settings)
+	settings.Prepara()
 	idx.Settings = settings
+	idx.generazione++
 
 	if err := m.persistence.AppendWAL(storage.WALOperation{Op: "UPDATE_SETTINGS", Index: indexName, Settings: &settings}); err != nil {
 		return fmt.Errorf("WAL write failed: %w", err)

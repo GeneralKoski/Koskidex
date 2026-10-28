@@ -214,7 +214,11 @@ Two forms, which can be used together:
   a member (exactly or within the typo tolerance) also finds the documents that
   hold any other member of the group. A member can be several words: all of
   them are required, in any position. Synonyms are matched as written, with no
-  typo and no prefix. Changing only `synonym_groups` does not reindex.
+  typo and no prefix; a typo in the query fires a group only where the index
+  would accept it (`prefix_length` included). Changing only `synonym_groups`
+  does not reindex. At most 500 groups and 2,000 members in all: every query
+  word is looked up among the members, and with typos allowed its cost grows
+  with the members of similar length.
 - `synonyms`: the original map of term to list of terms, applied at index time
   and one way only (`{"bibite": ["bevande"]}` makes a document holding
   "bibite" also found by "bevande", not the other way round). Each value must be
@@ -222,7 +226,8 @@ Two forms, which can be used together:
 
 `synonym_fields` restricts both forms to a list of fields, e.g.
 `["name", "category_label"]`: a synonym then matches only there, while the
-words as typed still match in every field. Empty means every field. With a
+words as typed still match in every field. Empty means every field; with an
+explicit `searchable_fields`, a name that is not in it is refused. With a
 `zone_names` field holding "Bevande e vini" for every drink, a group
 `["bibite", "bevande"]` without it makes "bibite" find the Lambrusco too.
 
@@ -230,7 +235,8 @@ words as typed still match in every field. Empty means every field. With a
 
 `boosts` multiplies the score of the documents a filter matches, after
 relevance and before sorting. The filter has the syntax of the search `filter`
-parameter; the factor must be positive.
+parameter, and every clause must be readable; the factor goes from 0.01 to
+100, and there can be at most 32 boosts. Anything else is refused with `400`.
 
 ```json
 "boosts": [{"filter": "kind=zone", "factor": 1.5}]
@@ -238,7 +244,9 @@ parameter; the factor must be positive.
 
 Several boosts multiply together. A factor just above 1 (e.g. `1.001`) only
 breaks ties between documents with the same relevance; a larger one can lift a
-document over others. Changing only `boosts` does not reindex.
+document over others. A negative score (from a vector) is divided by the
+factor instead, so a boost always moves a document up. Changing only `boosts`
+does not reindex.
 
 ### Authentication
 

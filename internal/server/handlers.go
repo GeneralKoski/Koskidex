@@ -95,20 +95,21 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Index not found", http.StatusNotFound)
 		return
 	}
+	settings, _, _ := s.mgr.Impostazioni(name)
 
-	baseUrl := idx.Settings.Sitemap.BaseUrl
+	baseUrl := settings.Sitemap.BaseUrl
 	if baseUrl == "" {
 		http.Error(w, "Sitemap base_url not configured for this index in settings", http.StatusBadRequest)
 		return
 	}
 	baseUrl = strings.TrimRight(baseUrl, "/")
 
-	urlField := idx.Settings.Sitemap.UrlField
+	urlField := settings.Sitemap.UrlField
 	if urlField == "" {
 		urlField = "url"
 	}
 
-	freq := idx.Settings.Sitemap.ChangeFreq
+	freq := settings.Sitemap.ChangeFreq
 	if freq == "" {
 		freq = "weekly"
 	}
@@ -292,17 +293,17 @@ func (s *Server) handleAddDocuments(w http.ResponseWriter, r *http.Request) {
 // aggiungiVettori gives a _vector to the documents that lack one, when the
 // index has an embedder. A document with no text gets none.
 func (s *Server) aggiungiVettori(ctx context.Context, name string, docs []map[string]interface{}) error {
-	idx, err := s.mgr.GetIndex(name)
-	if err != nil || idx.Settings.Embedder.Source == "" {
+	settings, _, err := s.mgr.Impostazioni(name)
+	if err != nil || settings.Embedder.Source == "" {
 		return nil
 	}
-	e, err := embedder.New(idx.Settings.Embedder, s.clientEmbedder)
+	e, err := embedder.New(settings.Embedder, s.clientEmbedder)
 	if err != nil {
 		return err
 	}
-	campi := idx.Settings.Embedder.Fields
+	campi := settings.Embedder.Fields
 	if len(campi) == 0 {
-		campi = idx.Settings.SearchableFields
+		campi = settings.SearchableFields
 	}
 	var testi []string
 	var dove []int
@@ -442,7 +443,7 @@ func (s *Server) handleDeleteDocuments(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	idx, err := s.mgr.GetIndex(name)
+	settings, _, err := s.mgr.Impostazioni(name)
 	if err != nil {
 		if err == manager.ErrIndexNotFound {
 			sendError(w, http.StatusNotFound, "Index not found")
@@ -452,7 +453,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendJSON(w, http.StatusOK, idx.Settings)
+	sendJSON(w, http.StatusOK, settings)
 }
 
 func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
@@ -475,6 +476,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := engine.ValidaBoosts(settings.Boosts); err != nil {
+		sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := engine.ValidaSinonimi(settings); err != nil {
 		sendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -577,13 +582,20 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusNotFound, "Index not found")
 		return
 	}
+	// One copy of the settings for the whole search: a PUT can replace them
+	// meanwhile, and its generation keeps this result out of later lookups.
+	settings, generazione, err := s.mgr.Impostazioni(name)
+	if err != nil {
+		sendError(w, http.StatusNotFound, "Index not found")
+		return
+	}
 
 	if hybrid && len(vector) == 0 && query != "" {
-		if idx.Settings.Embedder.Source == "" {
+		if settings.Embedder.Source == "" {
 			sendError(w, http.StatusBadRequest, "hybrid search needs an embedder in the index settings")
 			return
 		}
-		e, err := embedder.New(idx.Settings.Embedder, s.clientEmbedder)
+		e, err := embedder.New(settings.Embedder, s.clientEmbedder)
 		if err == nil {
 			var vettori [][]float64
 			vettori, err = s.vettori.Embed(r.Context(), e, []string{query})
@@ -615,7 +627,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if len(vector) > 0 {
 		vecKey = fmt.Sprintf("%v", vector)
 	}
-	cacheKey := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%s|%t", name, query, filterRaw, fuzziness, sortParam, facetsParam, limit, offset, vecKey, idsOnly)
+	cacheKey := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%s|%t|%d", name, query, filterRaw, fuzziness, sortParam, facetsParam, limit, offset, vecKey, idsOnly, generazione)
 	if cached, ok := s.cache.Get(cacheKey); ok {
 		if resp, ok := cached.(map[string]interface{}); ok {
 			// The LRU returns the stored map by reference. Copy it before
@@ -632,7 +644,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	matches, highlights := idx.Engine.SearchScored(query, idx.Settings, fuzziness, vector)
+	matches, highlights := idx.Engine.SearchScored(query, settings, fuzziness, vector)
 	docIDs := make([]string, len(matches))
 	scores := make(map[string]float64, len(matches))
 	for i, m := range matches {
@@ -752,8 +764,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 		if doc, ok := idx.Engine.GetDocument(id); ok {
 			displayDoc := make(map[string]interface{})
-			if len(idx.Settings.DisplayedFields) > 0 {
-				for _, f := range idx.Settings.DisplayedFields {
+			if len(settings.DisplayedFields) > 0 {
+				for _, f := range settings.DisplayedFields {
 					if val, ok := doc[f]; ok {
 						displayDoc[f] = val
 					}
