@@ -196,6 +196,14 @@ curl -X PUT http://localhost:7700/indexes/movies/settings \
 }'
 ```
 
+#### Searchable fields and weights
+
+`searchable_fields` decides which fields are indexed, not how they rank: their
+order has no effect on scores. To make a field count more, give it a weight in
+`field_weights` (default 1); a term found in several fields takes the highest
+weight among them. When `searchable_fields` is empty every string or list field
+of the document is indexed, ids and type fields included, so set it explicitly.
+
 #### Synonyms
 
 Two forms, which can be used together:

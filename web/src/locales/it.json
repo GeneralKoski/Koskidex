@@ -179,7 +179,7 @@
         "example": "Esempio",
         "fields_title": "Campi principali",
         "fields": {
-          "searchable_fields": "Campi indicizzati per la ricerca full-text. Vuoto significa tutti i campi.",
+          "searchable_fields": "Campi indicizzati per la ricerca full-text. Vuoto significa tutti i campi. Il loro ordine non conta nel ranking: per quello c'è field_weights.",
           "displayed_fields": "Campi restituiti nei risultati. Vuoto significa il documento intero.",
           "field_weights": "Moltiplicatore del punteggio per campo.",
           "boosts": "Lista di {\"filter\": \"kind=zone\", \"factor\": 1.5}: moltiplica il punteggio dei documenti che il filtro trova, dopo la rilevanza. Un fattore appena sopra 1 rompe solo i pareggi.",

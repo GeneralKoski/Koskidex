@@ -109,6 +109,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Elasticsearch's `_source: false`.
 
 ### Changed
+- Docs: the order of `searchable_fields` has no effect on ranking, and now
+  says so; `field_weights` is the setting that makes a field count more.
 - Accent folding no longer builds a new NFD, strip marks, NFC chain (two 4 KB
   buffers) for every text it tokenizes: ASCII text, which the chain returns
   unchanged, skips it, and other text takes a chain from a pool. Same

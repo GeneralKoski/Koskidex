@@ -179,7 +179,7 @@
         "example": "Example",
         "fields_title": "Main fields",
         "fields": {
-          "searchable_fields": "Fields indexed for full-text search. Empty means every field.",
+          "searchable_fields": "Fields indexed for full-text search. Empty means every field. Their order does not affect ranking: use field_weights.",
           "displayed_fields": "Fields returned in hits. Empty means the whole document.",
           "field_weights": "Score multiplier per field.",
           "boosts": "List of {\"filter\": \"kind=zone\", \"factor\": 1.5}: multiplies the score of the documents the filter matches, after relevance. A factor just above 1 only breaks ties.",
