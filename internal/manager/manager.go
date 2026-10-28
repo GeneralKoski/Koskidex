@@ -348,6 +348,7 @@ func (m *Manager) UpdateSettings(indexName string, settings engine.Settings) err
 		return ErrIndexNotFound
 	}
 
+	reindex := !idx.Settings.StessoIndice(settings)
 	idx.Settings = settings
 
 	if err := m.persistence.AppendWAL(storage.WALOperation{Op: "UPDATE_SETTINGS", Index: indexName, Settings: &settings}); err != nil {
@@ -356,7 +357,10 @@ func (m *Manager) UpdateSettings(indexName string, settings engine.Settings) err
 
 	// Re-index all docs in place with the new settings (synonyms, searchable
 	// fields, etc.). Reindex holds the engine lock for the whole rebuild.
-	idx.Engine.Reindex(settings)
+	// Settings read only at query time, such as synonym_groups, need none.
+	if reindex {
+		idx.Engine.Reindex(settings)
+	}
 
 	m.invalidateCache(indexName)
 	return m.triggerSaveLocked()

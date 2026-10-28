@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"reflect"
 	"strconv"
 	"sync"
 )
@@ -307,15 +308,23 @@ type Settings struct {
 	// "dell'illuminazione" is indexed as "illuminazione". Empty, as up to now,
 	// strips nothing. It only matters with TokenizerStandard, the one that
 	// keeps an apostrophe inside a term.
-	ElisionArticles []string            `json:"elision_articles"`
-	Synonyms        map[string][]string `json:"synonyms"`
-	TypoTolerance   TypoSettings        `json:"typo_tolerance"`
-	FieldWeights    map[string]float64  `json:"field_weights"`
-	Sitemap         SitemapSettings     `json:"sitemap"`
-	RetrievalMode   string              `json:"retrieval_mode"`
-	ScoringMode     string              `json:"scoring_mode"`
-	BM25K1          float64             `json:"bm25_k1"`
-	BM25B           float64             `json:"bm25_b"`
+	ElisionArticles []string `json:"elision_articles"`
+	// Synonyms is applied at index time, one way: a document holding a key
+	// is also indexed under the key's values, each value one term.
+	Synonyms map[string][]string `json:"synonyms"`
+	// SynonymGroups are sets of equivalent terms, applied at query time in
+	// every direction: a query word, or run of words, that matches a member
+	// exactly or within the typo tolerance also finds the documents holding
+	// any other member of its groups, matched as written. A member can be
+	// several words. Empty, as up to now; Synonyms keeps working beside it.
+	SynonymGroups [][]string         `json:"synonym_groups"`
+	TypoTolerance TypoSettings       `json:"typo_tolerance"`
+	FieldWeights  map[string]float64 `json:"field_weights"`
+	Sitemap       SitemapSettings    `json:"sitemap"`
+	RetrievalMode string             `json:"retrieval_mode"`
+	ScoringMode   string             `json:"scoring_mode"`
+	BM25K1        float64            `json:"bm25_k1"`
+	BM25B         float64            `json:"bm25_b"`
 	// BM25Expansion is the document frequency a prefix or typo expansion is
 	// weighted with. Empty is the term found, as up to now; BM25ExpansionBlended
 	// is the highest among the terms the query term matched;
@@ -530,6 +539,14 @@ func DefaultSettings() Settings {
 			ChangeFreq: "weekly",
 		},
 	}
+}
+
+// StessoIndice says whether indexing with o builds the same index as with s:
+// they differ at most in the settings read only at query time. Conservative,
+// any other difference, even an empty map against a nil one, says no.
+func (s Settings) StessoIndice(o Settings) bool {
+	s.SynonymGroups, o.SynonymGroups = nil, nil
+	return reflect.DeepEqual(s, o)
 }
 
 // DeleteDocument removes a document from the index

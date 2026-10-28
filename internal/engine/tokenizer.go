@@ -19,6 +19,9 @@ type Token struct {
 	Term     string
 	Position int
 	Field    string
+	// Sinonimo marks a query term that comes from Settings.SynonymGroups: it
+	// matches only itself, with no typo and no prefix.
+	Sinonimo bool
 }
 
 // removeAccents strips diacritical marks from letters (e.g., è -> e).

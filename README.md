@@ -76,7 +76,7 @@ curl "http://localhost:7700/indexes/movies/search?q=matrx"
 | **Substring match**  | `substring_match` setting: also finds documents with a term containing the whole query, as a `*query*` wildcard |         |
 | **Multi-index**      | Create and manage independent indexes with their own settings                               |         |
 | **Schemaless**       | Index any JSON object, only a unique `id` field is required                                |         |
-| **Synonyms**         | Configure per-index synonym mappings                                                        |         |
+| **Synonyms**         | Query-time synonym groups (bidirectional, multi-word) and the index-time `synonyms` map    |         |
 | **Auth**             | Optional API key via `--api-key` flag, Bearer token auth                                  |         |
 | **Rate limiting**    | Per-IP token bucket via `--rate-limit` flag                                               |         |
 | **TLS**              | Native HTTPS via `--tls-cert` and `--tls-key` flags                                     |         |
@@ -182,7 +182,7 @@ curl -X POST http://localhost:7700/indexes/movies/documents \
 curl -X PUT http://localhost:7700/indexes/movies/settings \
   -H 'Content-Type: application/json' \
   -d '{
-  "synonyms": {"iphone": ["apple phone", "smartphone"]},
+  "synonym_groups": [["iphone", "apple phone", "smartphone"]],
   "searchable_fields": ["title", "description"],
   "displayed_fields": ["title", "price"],
   "stop_words": ["the", "a", "is"],
@@ -194,6 +194,22 @@ curl -X PUT http://localhost:7700/indexes/movies/settings \
   }
 }'
 ```
+
+#### Synonyms
+
+Two forms, which can be used together:
+
+- `synonym_groups` (recommended): a list of groups of equivalent terms, e.g.
+  `[["bibite", "bevande", "soft drink"], ["pesce", "pescheria"]]`. Applied at
+  query time and in every direction: a query word, or run of words, that matches
+  a member (exactly or within the typo tolerance) also finds the documents that
+  hold any other member of the group. A member can be several words: all of
+  them are required, in any position. Synonyms are matched as written, with no
+  typo and no prefix. Changing only `synonym_groups` does not reindex.
+- `synonyms`: the original map of term to list of terms, applied at index time
+  and one way only (`{"bibite": ["bevande"]}` makes a document holding
+  "bibite" also found by "bevande", not the other way round). Each value must be
+  a single word. Kept for existing indexes; changing it reindexes.
 
 ### Authentication
 

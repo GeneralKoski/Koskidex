@@ -89,6 +89,12 @@ func (idx *InvertedIndex) findDocsForToken(token Token, settings Settings, highl
 // matchedTermsLocked is the index terms a query token matches, exactly,
 // by prefix or with typos.
 func (idx *InvertedIndex) matchedTermsLocked(token Token, settings Settings, fuzziness string) []string {
+	if token.Sinonimo {
+		if _, ok := idx.index[token.Term]; ok {
+			return []string{token.Term}
+		}
+		return nil
+	}
 	maxTypos := MaxTypos(token.Term, settings.TypoTolerance, fuzziness)
 	// Search already holds idx.mu (read); use the lock-free variant to avoid
 	// recursive read-locking, which can deadlock against a concurrent writer.
@@ -253,81 +259,15 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 		return nil, nil
 	}
 
-	docMatches := make(map[string]*SearchMatch)
 	highlights := make(map[string][]string)
-
-	// With AllTermsInOneField, the fields that hold every must term seen so
-	// far, per document: best_fields with operator and.
-	unCampo := settings.AllTermsInOneField && settings.RetrievalMode != RetrievalAny
-	campiComuni := make(map[string]map[string]bool)
-
-	// When every must term is required and no later step can bring a
-	// document back, only the documents that hold them all need scoring;
-	// the rest would be dropped by the filter below. They are found first,
-	// from the rarest term, and each token is then scored as before, in the
-	// query's order, so every score is the same sum in the same order.
-	var termini [][]string
-	var candidati map[string]int
-	if !senzaCandidati && settings.RetrievalMode != RetrievalAny && len(allTokens) > 1 && !hasOR && !settings.SubstringMatch && len(queryVector) == 0 {
-		termini, candidati = idx.candidatiCongiuntiviLocked(allTokens, settings, fuzziness)
-	}
-
-	// Process must (AND) terms
-	for n, token := range allTokens {
-		var tokenDocBest map[string]*TokenDocMatch
-		if candidati != nil {
-			tokenDocBest = idx.docsForTermsLocked(token, termini[n], settings, highlights, candidati, len(allTokens))
-		} else {
-			tokenDocBest = idx.findDocsForToken(token, settings, highlights, fuzziness)
-		}
-
-		for docID, match := range tokenDocBest {
-			if _, ok := docMatches[docID]; !ok {
-				docMatches[docID] = &SearchMatch{DocID: docID}
+	veloce := !hasOR && !settings.SubstringMatch && len(queryVector) == 0
+	docMatches := idx.mustLocked(allTokens, settings, fuzziness, highlights, veloce)
+	// A document found by several rewrites of the query keeps its best one.
+	for _, v := range settings.variantiSinonimi(allTokens, fuzziness) {
+		for docID, m := range idx.mustLocked(v, settings, fuzziness, highlights, veloce) {
+			if prima, ok := docMatches[docID]; !ok || m.Score > prima.Score {
+				docMatches[docID] = m
 			}
-			if unCampo {
-				if n == 0 {
-					campiComuni[docID] = match.Fields
-				} else {
-					for f := range campiComuni[docID] {
-						if !match.Fields[f] {
-							delete(campiComuni[docID], f)
-						}
-					}
-				}
-			}
-			docMatches[docID].WordsMatched++
-			docMatches[docID].Typos += match.Typos
-			docMatches[docID].ExactMatches += match.ExactMatches
-
-			docMatches[docID].Score += idx.tokenScoreLocked(match, settings)
-		}
-	}
-
-	// Filter: how many of the must terms a document has to carry.
-	// In RetrievalAny one is enough, so the filter below lets everything
-	// through: a document is already in docMatches only if it matched at
-	// least one term.
-	requiredMatches := len(allTokens)
-	if settings.RetrievalMode == RetrievalAny {
-		requiredMatches = 1
-		// The settings API refuses a malformed spec, so an error here cannot
-		// come from a request.
-		if n, err := RequiredTerms(settings.MinimumShouldMatch, len(allTokens)); err == nil {
-			requiredMatches = n
-		}
-	}
-	if requiredMatches > 0 {
-		for docID, m := range docMatches {
-			if m.WordsMatched < requiredMatches || (unCampo && len(campiComuni[docID]) == 0) {
-				delete(docMatches, docID)
-			}
-		}
-	}
-
-	if settings.Coordination && len(allTokens) > 0 {
-		for _, m := range docMatches {
-			m.Score *= float64(m.WordsMatched) / float64(len(allTokens))
 		}
 	}
 
@@ -436,6 +376,90 @@ func (idx *InvertedIndex) SearchScored(query string, settings Settings, fuzzines
 	}
 
 	return results, highlights
+}
+
+// mustLocked scores the documents that hold the must terms, as many of them as
+// the retrieval mode requires. veloce allows the candidate step, which only
+// holds when no later step can bring a document back.
+func (idx *InvertedIndex) mustLocked(allTokens []Token, settings Settings, fuzziness string, highlights map[string][]string, veloce bool) map[string]*SearchMatch {
+	docMatches := make(map[string]*SearchMatch)
+
+	// With AllTermsInOneField, the fields that hold every must term seen so
+	// far, per document: best_fields with operator and.
+	unCampo := settings.AllTermsInOneField && settings.RetrievalMode != RetrievalAny
+	campiComuni := make(map[string]map[string]bool)
+
+	// When every must term is required and no later step can bring a
+	// document back, only the documents that hold them all need scoring;
+	// the rest would be dropped by the filter below. They are found first,
+	// from the rarest term, and each token is then scored as before, in the
+	// query's order, so every score is the same sum in the same order.
+	var termini [][]string
+	var candidati map[string]int
+	if veloce && !senzaCandidati && settings.RetrievalMode != RetrievalAny && len(allTokens) > 1 {
+		termini, candidati = idx.candidatiCongiuntiviLocked(allTokens, settings, fuzziness)
+	}
+
+	// Process must (AND) terms
+	for n, token := range allTokens {
+		var tokenDocBest map[string]*TokenDocMatch
+		if candidati != nil {
+			tokenDocBest = idx.docsForTermsLocked(token, termini[n], settings, highlights, candidati, len(allTokens))
+		} else {
+			tokenDocBest = idx.findDocsForToken(token, settings, highlights, fuzziness)
+		}
+
+		for docID, match := range tokenDocBest {
+			if _, ok := docMatches[docID]; !ok {
+				docMatches[docID] = &SearchMatch{DocID: docID}
+			}
+			if unCampo {
+				if n == 0 {
+					campiComuni[docID] = match.Fields
+				} else {
+					for f := range campiComuni[docID] {
+						if !match.Fields[f] {
+							delete(campiComuni[docID], f)
+						}
+					}
+				}
+			}
+			docMatches[docID].WordsMatched++
+			docMatches[docID].Typos += match.Typos
+			docMatches[docID].ExactMatches += match.ExactMatches
+
+			docMatches[docID].Score += idx.tokenScoreLocked(match, settings)
+		}
+	}
+
+	// Filter: how many of the must terms a document has to carry.
+	// In RetrievalAny one is enough, so the filter below lets everything
+	// through: a document is already in docMatches only if it matched at
+	// least one term.
+	requiredMatches := len(allTokens)
+	if settings.RetrievalMode == RetrievalAny {
+		requiredMatches = 1
+		// The settings API refuses a malformed spec, so an error here cannot
+		// come from a request.
+		if n, err := RequiredTerms(settings.MinimumShouldMatch, len(allTokens)); err == nil {
+			requiredMatches = n
+		}
+	}
+	if requiredMatches > 0 {
+		for docID, m := range docMatches {
+			if m.WordsMatched < requiredMatches || (unCampo && len(campiComuni[docID]) == 0) {
+				delete(docMatches, docID)
+			}
+		}
+	}
+
+	if settings.Coordination && len(allTokens) > 0 {
+		for _, m := range docMatches {
+			m.Score *= float64(m.WordsMatched) / float64(len(allTokens))
+		}
+	}
+
+	return docMatches
 }
 
 // addSubstringMatchesLocked adds the documents with an indexed term that

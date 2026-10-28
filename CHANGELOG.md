@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `synonym_groups` setting: groups of equivalent terms, applied at query time
+  and in every direction, e.g. `[["bibite", "bevande", "soft drink"]]`. A
+  query word, or run of words, that matches a member exactly or within the
+  typo tolerance also finds the documents holding any other member; the
+  longest member wins, a multi-word member requires all its words, and
+  synonyms are matched as written, with no typo and no prefix. The index-time
+  `synonyms` map, one way and single-word, keeps working beside it. A settings
+  update that changes only query-time settings no longer reindexes. Empty by
+  default.
 - `typo_tolerance.disable_on_amounts`: denies typos to a query term made of
   digits and at least one dot or comma, with a digit at both ends (1.234,56,
   5056,03, 14.01.2026). With the standard tokenizer such a term stays whole,

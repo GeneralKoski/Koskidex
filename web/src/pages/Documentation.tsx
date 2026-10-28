@@ -52,6 +52,7 @@ const SETTINGS_FIELDS = [
   ["searchable_fields", "searchable_fields"],
   ["displayed_fields", "displayed_fields"],
   ["field_weights", "field_weights"],
+  ["synonym_groups", "synonym_groups"],
   ["synonyms", "synonyms"],
   ["stop_words", "stop_words"],
   ["typo_tolerance", "typo_tolerance"],
@@ -549,7 +550,7 @@ curl -X POST http://localhost:7700/indexes/movies/search \\
   -d '{
   "searchable_fields": ["title", "director", "genre"],
   "field_weights": {"title": 3, "director": 1.5},
-  "synonyms": {"film": ["movie"], "movie": ["film"]},
+  "synonym_groups": [["film", "movie"]],
   "stop_words": {"the": true, "a": true},
   "typo_tolerance": {
     "enabled": true,
