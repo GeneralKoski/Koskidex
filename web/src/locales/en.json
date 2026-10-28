@@ -183,6 +183,7 @@
           "displayed_fields": "Fields returned in hits. Empty means the whole document.",
           "field_weights": "Score multiplier per field.",
           "synonyms": "Index-time synonyms, one way: a map of word to single-word list. Prefer synonym_groups.",
+          "synonym_fields": "Fields where synonyms apply, both kinds; the words as typed still match everywhere. Empty means every field.",
           "synonym_groups": "Groups of equivalent terms, applied at query time in every direction, e.g. [[\"bibite\", \"bevande\", \"soft drink\"]]. Members can be several words; a typo in the query still fires the group, synonyms are matched as written. Changing it does not reindex.",
           "stop_words": "Words ignored by the index, as a map of word to true.",
           "typo_tolerance": "enabled, min_word_length_one_typo (4), min_word_length_two_typos (8), disable_on_numbers, disable_on_amounts.",

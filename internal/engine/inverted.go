@@ -2,6 +2,7 @@ package engine
 
 import (
 	"reflect"
+	"slices"
 	"strconv"
 	"sync"
 )
@@ -179,7 +180,7 @@ func (idx *InvertedIndex) addDocumentLocked(docID string, doc map[string]interfa
 				expandedTokens := make([]Token, 0, len(tokens))
 				for _, t := range tokens {
 					expandedTokens = append(expandedTokens, t)
-					if syns, ok := settings.Synonyms[t.Term]; ok {
+					if syns, ok := settings.Synonyms[t.Term]; ok && settings.campoSinonimi(field) {
 						for _, syn := range syns {
 							expandedTokens = append(expandedTokens, Token{
 								Term:     syn,
@@ -317,7 +318,11 @@ type Settings struct {
 	// exactly or within the typo tolerance also finds the documents holding
 	// any other member of its groups, matched as written. A member can be
 	// several words. Empty, as up to now; Synonyms keeps working beside it.
-	SynonymGroups [][]string         `json:"synonym_groups"`
+	SynonymGroups [][]string `json:"synonym_groups"`
+	// SynonymFields restricts both kinds of synonym to these fields: a
+	// synonym matches only there, the words as typed still match anywhere.
+	// Empty, as up to now, is every field.
+	SynonymFields []string           `json:"synonym_fields"`
 	TypoTolerance TypoSettings       `json:"typo_tolerance"`
 	FieldWeights  map[string]float64 `json:"field_weights"`
 	Sitemap       SitemapSettings    `json:"sitemap"`
@@ -539,6 +544,11 @@ func DefaultSettings() Settings {
 			ChangeFreq: "weekly",
 		},
 	}
+}
+
+// campoSinonimi says whether synonyms apply in field.
+func (s Settings) campoSinonimi(field string) bool {
+	return len(s.SynonymFields) == 0 || slices.Contains(s.SynonymFields, field)
 }
 
 // StessoIndice says whether indexing with o builds the same index as with s:

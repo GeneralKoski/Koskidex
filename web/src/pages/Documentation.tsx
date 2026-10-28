@@ -54,6 +54,7 @@ const SETTINGS_FIELDS = [
   ["field_weights", "field_weights"],
   ["synonym_groups", "synonym_groups"],
   ["synonyms", "synonyms"],
+  ["synonym_fields", "synonym_fields"],
   ["stop_words", "stop_words"],
   ["typo_tolerance", "typo_tolerance"],
   ["scoring_mode", "scoring_mode"],

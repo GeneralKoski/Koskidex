@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `synonym_fields` setting: restricts both `synonym_groups` and the
+  index-time `synonyms` map to a list of fields. A synonym matches only there,
+  the words as typed still match everywhere, so a zone name shared by every
+  product of a zone no longer spreads a synonym to all of them. Empty, every
+  field, by default.
 - `synonym_groups` setting: groups of equivalent terms, applied at query time
   and in every direction, e.g. `[["bibite", "bevande", "soft drink"]]`. A
   query word, or run of words, that matches a member exactly or within the

@@ -211,6 +211,12 @@ Two forms, which can be used together:
   "bibite" also found by "bevande", not the other way round). Each value must be
   a single word. Kept for existing indexes; changing it reindexes.
 
+`synonym_fields` restricts both forms to a list of fields, e.g.
+`["name", "category_label"]`: a synonym then matches only there, while the
+words as typed still match in every field. Empty means every field. With a
+`zone_names` field holding "Bevande e vini" for every drink, a group
+`["bibite", "bevande"]` without it makes "bibite" find the Lambrusco too.
+
 ### Authentication
 
 ```bash

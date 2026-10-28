@@ -135,6 +135,9 @@ func (idx *InvertedIndex) docsForTermsLocked(token Token, matchedTerms []string,
 			if candidati != nil && candidati[p.DocID] != servono {
 				continue
 			}
+			if token.Sinonimo && !settings.campoSinonimi(p.Field) {
+				continue
+			}
 			matchDist := dist
 			if isPrefix && dist > 0 {
 				_ = matchDist // prefix match tracking

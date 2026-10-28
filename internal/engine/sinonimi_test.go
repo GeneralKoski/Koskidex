@@ -106,3 +106,40 @@ func TestOnlyQueryTimeSettingsKeepTheSameIndex(t *testing.T) {
 		t.Error("the index-time synonyms map needs a reindex")
 	}
 }
+
+// Korsia: "Bevande e vini" is the zone of every drink, Lambrusco included.
+func TestSynonymFieldsKeepSynonymsOutOfTheOtherFields(t *testing.T) {
+	docs := []map[string]interface{}{
+		{"id": "1", "name": "Lambrusco", "category_label": "Vini", "zone_names": "Bevande e vini"},
+		{"id": "2", "name": "Coca-Cola", "category_label": "Bevande", "zone_names": "Bevande e vini"},
+	}
+	for _, forma := range []string{"synonym_groups", "synonyms"} {
+		s := DefaultSettings()
+		s.SearchableFields = []string{"name", "category_label", "zone_names"}
+		if forma == "synonyms" {
+			s.Synonyms = map[string][]string{"bevande": {"bibite"}}
+		} else {
+			s.SynonymGroups = [][]string{{"bibite", "bevande"}}
+		}
+		indicizza := func(s Settings) *InvertedIndex {
+			idx := NewInvertedIndex()
+			for _, d := range docs {
+				idx.AddDocument(d["id"].(string), d, s)
+			}
+			return idx
+		}
+
+		if got := conSinonimi(indicizza(s), "bibite", s); !slices.Equal(got, []string{"1", "2"}) {
+			t.Errorf("%s, every field: got %v, want [1 2]", forma, got)
+		}
+		s.SynonymFields = []string{"name", "category_label"}
+		idx := indicizza(s)
+		if got := conSinonimi(idx, "bibite", s); !slices.Equal(got, []string{"2"}) {
+			t.Errorf("%s, name and category_label: got %v, want [2]", forma, got)
+		}
+		// The word as typed still matches in every field.
+		if got := conSinonimi(idx, "bevande", s); !slices.Equal(got, []string{"1", "2"}) {
+			t.Errorf("%s, bevande: got %v, want [1 2]", forma, got)
+		}
+	}
+}
