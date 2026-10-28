@@ -55,6 +55,36 @@ func ParseFilters(raw string) []Filter {
 	return filters
 }
 
+// filtroCompleto says whether every comma-separated clause of raw is a
+// filter ParseFilters keeps and ApplyFilters applies: a clause it drops, or a
+// distance() without its three arguments, which it skips, would match more
+// documents than written.
+func filtroCompleto(raw string) bool {
+	filtri := ParseFilters(raw)
+	clausole, aperte := 1, 0
+	for _, ch := range raw {
+		switch ch {
+		case '(':
+			aperte++
+		case ')':
+			aperte--
+		case ',':
+			if aperte == 0 {
+				clausole++
+			}
+		}
+	}
+	if len(filtri) == 0 || len(filtri) != clausole {
+		return false
+	}
+	for _, f := range filtri {
+		if strings.HasPrefix(f.Field, "distance(") && (!strings.HasSuffix(f.Field, ")") || len(strings.Split(f.Field[9:len(f.Field)-1], ",")) != 3) {
+			return false
+		}
+	}
+	return true
+}
+
 func parseFilter(s string) Filter {
 	for _, op := range []string{">=", "<=", "!=", ">", "<", "=", ":"} {
 		idx := strings.Index(s, op)

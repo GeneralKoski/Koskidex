@@ -143,3 +143,54 @@ func TestSynonymFieldsKeepSynonymsOutOfTheOtherFields(t *testing.T) {
 		}
 	}
 }
+
+// Every member reaches every other, also when one is the start of another.
+func TestEveryMemberOfAGroupReachesEveryOther(t *testing.T) {
+	idx := indiceSinonimi(t, map[string]string{"1": "Gas", "2": "Gas naturale", "3": "Metano"})
+	s := conGruppi([]string{"gas naturale", "gas", "metano"})
+	for _, q := range []string{"gas naturale", "gas", "metano"} {
+		if got := conSinonimi(idx, q, s); !slices.Equal(got, []string{"1", "2", "3"}) {
+			t.Errorf("%q: got %v, want [1 2 3]", q, got)
+		}
+	}
+	// The same once the groups are compiled, as the manager stores them.
+	s.Prepara()
+	if got := conSinonimi(idx, "gas naturale", s); !slices.Equal(got, []string{"1", "2", "3"}) {
+		t.Errorf("prepared, gas naturale: got %v, want [1 2 3]", got)
+	}
+}
+
+// A group fires only on a typo the index would accept.
+func TestSynonymGroupsKeepThePrefixLength(t *testing.T) {
+	idx := indiceSinonimi(t, map[string]string{"1": "Pescheria", "2": "Pesce spada"})
+	s := conGruppi([]string{"pesce", "pescheria"})
+	s.PrefixLength = 1
+	if got := conSinonimi(idx, "lesce", s); len(got) != 0 {
+		t.Errorf("lesce with prefix_length 1: got %v, want nothing", got)
+	}
+	if got := conSinonimi(idx, "pesse", s); !slices.Equal(got, []string{"1", "2"}) {
+		t.Errorf("pesse with prefix_length 1: got %v, want [1 2]", got)
+	}
+}
+
+func TestSynonymSettingsPastTheLimitsAreRefused(t *testing.T) {
+	s := DefaultSettings()
+	s.SynonymGroups = make([][]string, MaxSynonymGroups+1)
+	if ValidaSinonimi(s) == nil {
+		t.Error("too many groups must be refused")
+	}
+	s.SynonymGroups = [][]string{make([]string, MaxSynonymMembers+1)}
+	if ValidaSinonimi(s) == nil {
+		t.Error("too many members must be refused")
+	}
+	s.SynonymGroups = [][]string{{"bibite", "bevande"}}
+	s.SearchableFields = []string{"name"}
+	s.SynonymFields = []string{"nmae"}
+	if ValidaSinonimi(s) == nil {
+		t.Error("a synonym field that is not searchable must be refused")
+	}
+	s.SynonymFields = []string{"name"}
+	if err := ValidaSinonimi(s); err != nil {
+		t.Error(err)
+	}
+}

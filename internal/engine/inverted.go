@@ -415,6 +415,10 @@ type Settings struct {
 	// FusionAlpha is the lexical weight of FusionConvex, the vector's being
 	// 1 - FusionAlpha; nil is 0.5.
 	FusionAlpha *float64 `json:"fusion_alpha,omitempty"`
+
+	// compilate is what Prepara derives from the settings once, so that every
+	// search does not redo it. Nil is fine: a search then derives it itself.
+	compilate *compilate
 }
 
 const (
@@ -514,15 +518,26 @@ type Boost struct {
 	Factor float64 `json:"factor"`
 }
 
-// ValidaBoosts refuses a boost whose filter is empty or unreadable, which
-// would match every document, or whose factor is not positive.
+// Limits of Settings.Boosts: every boost is checked against every candidate
+// of every search, and factors past these bounds can overflow the score.
+const (
+	MaxBoosts      = 32
+	MaxBoostFactor = 100.0
+)
+
+// ValidaBoosts refuses a boost whose filter is empty, unreadable or partly
+// unreadable, which would match more documents than it says, or whose factor
+// is not between 1/MaxBoostFactor and MaxBoostFactor; and more than MaxBoosts.
 func ValidaBoosts(boosts []Boost) error {
+	if len(boosts) > MaxBoosts {
+		return fmt.Errorf("boosts: at most %d", MaxBoosts)
+	}
 	for _, b := range boosts {
-		if len(ParseFilters(b.Filter)) == 0 {
+		if !filtroCompleto(b.Filter) {
 			return fmt.Errorf("boost filter %q is not a filter", b.Filter)
 		}
-		if !(b.Factor > 0) {
-			return fmt.Errorf("boost factor for %q must be positive", b.Filter)
+		if !(b.Factor >= 1/MaxBoostFactor && b.Factor <= MaxBoostFactor) {
+			return fmt.Errorf("boost factor for %q must be between %g and %g", b.Filter, 1/MaxBoostFactor, MaxBoostFactor)
 		}
 	}
 	return nil
@@ -577,12 +592,47 @@ func (s Settings) campoSinonimi(field string) bool {
 	return len(s.SynonymFields) == 0 || slices.Contains(s.SynonymFields, field)
 }
 
+type compilate struct {
+	sinonimi *gruppiCompilati
+	boosts   [][]Filter
+}
+
+// Prepara derives once what a search would otherwise derive every time from
+// the synonym groups and the boosts. Call it on settings that will not change
+// any more, as the manager does when it stores them.
+func (s *Settings) Prepara() {
+	s.compilate = &compilate{sinonimi: compilaGruppi(*s), boosts: compilaBoosts(s.Boosts)}
+}
+
+func (s Settings) gruppiSinonimi() *gruppiCompilati {
+	if s.compilate != nil {
+		return s.compilate.sinonimi
+	}
+	return compilaGruppi(s)
+}
+
+func (s Settings) filtriBoosts() [][]Filter {
+	if s.compilate != nil {
+		return s.compilate.boosts
+	}
+	return compilaBoosts(s.Boosts)
+}
+
+func compilaBoosts(boosts []Boost) [][]Filter {
+	filtri := make([][]Filter, len(boosts))
+	for i, b := range boosts {
+		filtri[i] = ParseFilters(b.Filter)
+	}
+	return filtri
+}
+
 // StessoIndice says whether indexing with o builds the same index as with s:
 // they differ at most in the settings read only at query time. Conservative,
 // any other difference, even an empty map against a nil one, says no.
 func (s Settings) StessoIndice(o Settings) bool {
 	s.SynonymGroups, o.SynonymGroups = nil, nil
 	s.Boosts, o.Boosts = nil, nil
+	s.compilate, o.compilate = nil, nil
 	return reflect.DeepEqual(s, o)
 }
 
