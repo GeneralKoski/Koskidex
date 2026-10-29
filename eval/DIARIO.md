@@ -1508,3 +1508,7 @@ per i numeri, non per le parole.
 La lezione, un'altra volta: le ipotesi scritte senza verificarle erano
 plausibili e sbagliate. Quella che ha risolto è venuta dal chiedere a
 Elasticsearch perché non trovava un documento preciso.
+
+## 28/10/2026 - Sinonimi a gruppi, sinonimi per campo e boost (per Korsia)
+
+Tre impostazioni nuove, tutte facoltative e spente di default: `synonym_groups` (sinonimi applicati alla query), `synonym_fields` (i sinonimi valgono solo sui campi elencati) e `boosts` (spinta ai documenti il cui campo corrisponde a un filtro). Con le impostazioni predefinite il ranking non cambia e i numeri della baseline restano identici, quindi niente misura nuova.
