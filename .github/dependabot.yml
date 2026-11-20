@@ -1,0 +1,35 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+
+  # Base images of the engine (/) and of the web playground (/web).
+  - package-ecosystem: docker
+    directories:
+      - /
+      - /web
+    schedule:
+      interval: weekly
+      day: monday
+
+  # The playground is not part of the engine image: minor and patch updates
+  # go in one pull request to keep the noise down.
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      web-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

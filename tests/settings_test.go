@@ -3,6 +3,7 @@ package tests
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -80,5 +81,25 @@ func TestStopWordsAsMapAreAccepted(t *testing.T) {
 	richiesta(t, srv, "POST", "/indexes", `{"name": "s"}`)
 	if w := richiesta(t, srv, "PUT", "/indexes/s/settings", `{"stop_words": {"the": true, "a": true, "is": true}}`); w.Code != http.StatusOK {
 		t.Fatalf("stop_words come nel README: %d %s", w.Code, w.Body.String())
+	}
+}
+
+func TestSettingsErrorNamesTheField(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	richiesta(t, srv, "POST", "/indexes", `{"name": "e"}`)
+
+	for _, metodo := range []string{"PUT", "PATCH"} {
+		w := richiesta(t, srv, metodo, "/indexes/e/settings", `{"stop_words": ["the"]}`)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("%s: atteso 400, ottenuto %d", metodo, w.Code)
+		}
+		var corpo map[string]string
+		if err := json.Unmarshal(w.Body.Bytes(), &corpo); err != nil {
+			t.Fatalf("%s: risposta illeggibile: %s", metodo, w.Body.String())
+		}
+		if !strings.Contains(corpo["error"], "stop_words") || !strings.Contains(corpo["error"], "object") {
+			t.Fatalf("%s: l'errore deve dire quale campo e cosa si aspetta: %q", metodo, corpo["error"])
+		}
 	}
 }

@@ -1,0 +1,131 @@
+name: Dependency check
+
+# Weekly: known vulnerabilities in the Go code (govulncheck), in the engine
+# image (trivy: Alpine packages and the Go binary), in the web playground
+# (npm audit), and end of life of Go, Alpine and Node. On the schedule the
+# findings go to one open issue, refreshed each week and closed when clean;
+# on a pull request that touches dependencies the check just fails.
+
+on:
+  schedule:
+    - cron: "0 5 * * 1" # Monday 05:00 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - go.mod
+      - go.sum
+      - Dockerfile
+      - web/Dockerfile
+      - web/package.json
+      - web/package-lock.json
+      - .github/workflows/weekly-security.yml
+      - .github/scripts/**
+
+permissions:
+  contents: read
+  issues: write
+
+defaults:
+  run:
+    # pipefail: a failing scanner must fail its step even when piped to tee.
+    shell: bash
+
+env:
+  ISSUE_LABEL: dependency-check
+  TRIVY_IMAGE: aquasec/trivy:0.67.2@sha256:e2b22eac59c02003d8749f5b8d9bd073b62e30fefaef5b7c8371204e0a4b0c08
+  GOVULNCHECK: golang.org/x/vuln/cmd/govulncheck@v1.9.0
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: govulncheck
+        id: govulncheck
+        continue-on-error: true
+        run: go run "$GOVULNCHECK" $(go list ./... | grep -v /node_modules/) | tee govulncheck.txt
+
+      - name: Engine image (trivy)
+        id: trivy
+        continue-on-error: true
+        run: |
+          docker build --pull -t koskidex:check .
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE" \
+            image --quiet --scanners vuln --exit-code 1 koskidex:check | tee trivy.txt
+
+      - name: Web playground (npm audit)
+        id: npm
+        continue-on-error: true
+        working-directory: web
+        run: npm audit | tee ../npm-audit.txt
+
+      - name: End of life
+        id: eol
+        continue-on-error: true
+        run: python3 .github/scripts/eol_check.py go.mod Dockerfile web/Dockerfile | tee eol.txt
+
+      - name: Report
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          OUTCOMES: >-
+            govulncheck=${{ steps.govulncheck.outcome }}
+            trivy=${{ steps.trivy.outcome }}
+            npm=${{ steps.npm.outcome }}
+            eol=${{ steps.eol.outcome }}
+        run: |
+          failed=""
+          for pair in $OUTCOMES; do
+            [ "${pair#*=}" = success ] || failed="$failed ${pair%%=*}"
+          done
+
+          {
+            echo "Weekly dependency check: $RUN_URL"
+            echo
+            for name in $failed; do
+              case $name in
+                govulncheck) file=govulncheck.txt; title="Go code (govulncheck)";;
+                trivy) file=trivy.txt; title="Engine image (trivy)";;
+                npm) file=npm-audit.txt; title="Web playground (npm audit)";;
+                eol) file=eol.txt; title="End of life";;
+              esac
+              echo "## $title"
+              echo
+              echo '```'
+              tail -c 20000 "$file" 2>/dev/null || echo "(no output, see the run)"
+              echo '```'
+              echo
+            done
+            # Upstream maintainer, so the findings reach both repositories.
+            echo "cc @GeneralKoski"
+          } > report.md
+
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            [ -z "$failed" ] && exit 0
+            cat report.md
+            exit 1
+          fi
+
+          gh label create "$ISSUE_LABEL" --color B60205 --description "Weekly dependency check" --force
+          issue=$(gh issue list --label "$ISSUE_LABEL" --state open --json number --jq '.[0].number')
+
+          if [ -z "$failed" ]; then
+            if [ -n "$issue" ]; then
+              gh issue close "$issue" --comment "Clean on $(date -u +%F): $RUN_URL"
+            fi
+            exit 0
+          fi
+
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body-file report.md
+          else
+            gh issue create --title "Dependency check: findings to fix" --label "$ISSUE_LABEL" --body-file report.md
+          fi
+          exit 1

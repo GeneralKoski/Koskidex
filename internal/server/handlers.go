@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -464,7 +465,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	var settings engine.Settings
 	if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
-		sendError(w, http.StatusBadRequest, "Invalid JSON settings")
+		sendError(w, http.StatusBadRequest, settingsDecodeError(err))
 		return
 	}
 	if err := validaSettings(settings); err != nil {
@@ -506,7 +507,7 @@ func (s *Server) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		var nuove engine.Settings
 		if err := json.Unmarshal(corpo, &nuove); err != nil {
-			return engine.Settings{}, richiestaNonValida{errors.New("Invalid JSON settings")}
+			return engine.Settings{}, richiestaNonValida{errors.New(settingsDecodeError(err))}
 		}
 		if err := validaSettings(nuove); err != nil {
 			return engine.Settings{}, richiestaNonValida{err}
@@ -517,6 +518,31 @@ func (s *Server) handlePatchSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 type richiestaNonValida struct{ error }
+
+// settingsDecodeError names the setting with the wrong shape and the shape it
+// needs: "Invalid JSON settings" alone left callers guessing which key failed.
+func settingsDecodeError(err error) string {
+	var typeErr *json.UnmarshalTypeError
+	if !errors.As(err, &typeErr) || typeErr.Field == "" {
+		return "Invalid JSON settings"
+	}
+	expected := "a " + typeErr.Type.Kind().String()
+	switch typeErr.Type.Kind() {
+	case reflect.Map, reflect.Struct:
+		expected = "an object"
+	case reflect.Slice, reflect.Array:
+		expected = "an array"
+	case reflect.Bool:
+		expected = "true or false"
+	case reflect.Int, reflect.Int64, reflect.Float64:
+		expected = "a number"
+	}
+	message := fmt.Sprintf("Invalid JSON settings: %s must be %s, not %s", typeErr.Field, expected, typeErr.Value)
+	if typeErr.Field == "stop_words" {
+		message += ` (e.g. {"the": true, "a": true})`
+	}
+	return message
+}
 
 func validaSettings(settings engine.Settings) error {
 	if _, err := engine.RequiredTerms(settings.MinimumShouldMatch, 1); err != nil {

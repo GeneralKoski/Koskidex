@@ -1,0 +1,111 @@
+name: Upstream sync
+
+# Keeps this fork and GeneralKoski/Koskidex aligned in both directions:
+#   1. upstream main is merged into our main (fast-forward when possible);
+#   2. whatever our main has that upstream lacks is offered upstream in one
+#      pull request from Dieffetech:main, which follows main as it moves.
+# A merge conflict opens an issue here instead. See CLAUDE.md.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 5 * * 1" # Monday 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: upstream-sync
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  UPSTREAM: GeneralKoski/Koskidex
+  ISSUE_LABEL: upstream-sync
+
+jobs:
+  sync:
+    # Only in the fork: upstream has nothing to sync with.
+    if: github.repository == 'Dieffetech/koskidex'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Merge upstream into main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/$UPSTREAM.git"
+          git fetch upstream main
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "main already contains upstream/main"
+            exit 0
+          fi
+
+          if git merge --no-edit upstream/main; then
+            # A push made with GITHUB_TOKEN starts no other workflow, so CI on
+            # the merged main runs from the next push or pull request.
+            git push origin HEAD:main
+            exit 0
+          fi
+
+          git merge --abort
+          gh label create "$ISSUE_LABEL" --color FBCA04 --description "Fork and upstream diverged" --force
+          if [ -z "$(gh issue list --label "$ISSUE_LABEL" --state open --json number --jq '.[0].number')" ]; then
+            gh issue create --label "$ISSUE_LABEL" \
+              --title "upstream/main does not merge cleanly into main" \
+              --body "Merge it by hand: \`git fetch upstream && git merge upstream/main\`, resolve, push. See CLAUDE.md."
+          fi
+          exit 1
+
+      - name: Open or refresh the pull request upstream
+        env:
+          # Classic token with public_repo of the account that signs the pull
+          # request: GITHUB_TOKEN cannot open pull requests in another repository.
+          GH_TOKEN: ${{ secrets.UPSTREAM_PR_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::UPSTREAM_PR_TOKEN is not set: no pull request opened upstream"
+            exit 0
+          fi
+          git fetch upstream main
+
+          # Content, not history: after a squash merge upstream the commits
+          # differ but the files are the same, and there is nothing to offer.
+          if git diff --quiet upstream/main HEAD; then
+            echo "Fork and upstream have the same content"
+            exit 0
+          fi
+
+          {
+            echo "Changes from the Dieffetech fork, used in production by Welintouch."
+            echo "This pull request follows the fork's \`main\`: new commits there show up here."
+            echo "Merge with **Create a merge commit** if you can, so both histories stay the same; otherwise any merge works."
+            echo
+            echo "Commits not in upstream:"
+            echo
+            git log --reverse --format='- %h %s' upstream/main..HEAD
+          } > body.md
+
+          # REST, not gh pr list/edit/create: their GraphQL queries also ask
+          # for read:org, and the token only has public_repo.
+          number=$(gh api "repos/$UPSTREAM/pulls?state=open&head=Dieffetech:main" --jq '.[0].number // empty')
+
+          if [ -n "$number" ]; then
+            gh api -X PATCH "repos/$UPSTREAM/pulls/$number" -F body=@body.md --jq .html_url
+            echo "Pull request #$number refreshed"
+          else
+            gh api "repos/$UPSTREAM/pulls" -f base=main -f head=Dieffetech:main \
+              -f title="Changes from the Dieffetech fork" -F body=@body.md --jq .html_url
+          fi

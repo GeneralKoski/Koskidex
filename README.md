@@ -406,7 +406,7 @@ results = client.search('movies', 'matrx')
 
 | Layer              | Technology                                                            |
 | ------------------ | --------------------------------------------------------------------- |
-| **Engine**   | Go 1.23, zero external dependencies                                   |
+| **Engine**   | Go 1.26+, one dependency (golang.org/x/text)                          |
 | **Search**   | Inverted index, Damerau-Levenshtein, bigram prefix, cosine similarity |
 | **Ranking**  | Field weighting, dynamic fuzziness, hybrid text+vector scoring        |
 | **Storage**  | GOB snapshots + Write-Ahead Log (WAL), debounced persistence          |

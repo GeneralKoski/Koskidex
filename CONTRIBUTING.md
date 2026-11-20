@@ -7,7 +7,7 @@ your environment and submit changes.
 
 ### Backend (Go)
 
-Requires Go 1.23+.
+Requires Go 1.26+.
 
 ```bash
 make build      # build the binary
@@ -18,7 +18,7 @@ make bench      # run benchmarks
 
 ### Frontend (React + Vite)
 
-Requires Node.js 20+.
+Requires Node.js 24+.
 
 ```bash
 cd web

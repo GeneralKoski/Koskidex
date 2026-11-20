@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 WORKDIR /app
 
@@ -14,10 +14,11 @@ ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -ldflags="-w -s -X main.version=${VERSION}" -o koskidex main.go
 
 # Final slim image
-FROM alpine:3.19
+FROM alpine:3.24
 
 # Run as a non-root user for security.
-RUN addgroup -S koskidex && adduser -S koskidex -G koskidex \
+RUN apk upgrade --no-cache \
+    && addgroup -S koskidex && adduser -S koskidex -G koskidex \
     && mkdir -p /data && chown -R koskidex:koskidex /data
 
 # Copy binary from builder
