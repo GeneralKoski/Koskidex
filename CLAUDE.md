@@ -1,12 +1,18 @@
 # CLAUDE.md
 
-Fork Dieffetech di [GeneralKoski/Koskidex](https://github.com/GeneralKoski/Koskidex), il motore di ricerca di un
-collega. Lo usa in produzione Welintouch (ricerca pacchetti per significato). Il fork esiste per non dipendere dai
-tempi del repo originale: correzioni e aggiornamenti li rilasciamo da qui, e li proponiamo sempre anche a lui.
+Questo file è identico in due repository tenuti allineati. `git remote -v` dice in quale ci si trova:
 
-## Il doppio lavoro: fork e originale allineati
+- **L'originale**, [GeneralKoski/Koskidex](https://github.com/GeneralKoski/Koskidex): qui il motore viene sviluppato
+  dal suo autore. `origin` è il repo stesso, si lavora su `main` e non c'è nessun `upstream`. Le sezioni
+  "Il doppio lavoro" e "Rilascio su Welintouch" descrivono cosa fa il fork e da dove arriva la PR `Dieffetech:main`:
+  qui non sono passi da eseguire, e `upstream-sync.yml` non parte. Il resto del file vale così com'è.
+- **Il fork**, `Dieffetech/koskidex`: lo usa in produzione Welintouch (ricerca pacchetti per significato) ed esiste
+  per non dipendere dai tempi del repo originale. Correzioni e aggiornamenti si rilasciano dal fork e si propongono
+  sempre anche all'originale. Qui vale tutto il file.
 
-Remote: `origin` = `Dieffetech/koskidex`, `upstream` = `GeneralKoski/Koskidex`.
+## Il doppio lavoro: fork e originale allineati (nel fork)
+
+Remote del fork: `origin` = `Dieffetech/koskidex`, `upstream` = `GeneralKoski/Koskidex`.
 
 ```bash
 git remote add upstream https://github.com/GeneralKoski/Koskidex.git   # una volta
@@ -51,7 +57,7 @@ Il fallimento del workflow manda una mail a chi ha toccato per ultimo il `cron`.
 Flusso di una correzione: si accetta la PR di Dependabot (o si corregge a mano) su `main`, la CI è verde, la PR
 all'originale si aggiorna da sola, poi si rilascia su Welintouch (sotto).
 
-## Rilascio su Welintouch
+## Rilascio su Welintouch (dal fork)
 
 L'immagine non si pubblica da qui. Dal repo `welintouch_amedea`:
 
