@@ -27,6 +27,11 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # typescript-eslint 8 accepts typescript < 6.1 and eslint crashes on
+      # TypeScript 7. Remove when typescript-eslint supports it.
+      - dependency-name: typescript
+        versions: [">=7"]
 
   - package-ecosystem: github-actions
     directory: /
